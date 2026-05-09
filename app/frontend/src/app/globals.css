@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 24% 8%;
+  --foreground: 210 18% 96%;
+  --card: 214 22% 12%;
+  --card-foreground: 210 18% 96%;
+  --muted: 214 18% 17%;
+  --muted-foreground: 215 14% 68%;
+  --primary: 169 72% 42%;
+  --primary-foreground: 180 30% 8%;
+  --secondary: 215 18% 18%;
+  --secondary-foreground: 210 18% 96%;
+  --accent: 32 90% 56%;
+  --accent-foreground: 28 26% 8%;
+  --destructive: 0 78% 58%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 16% 24%;
+  --input: 214 16% 24%;
+  --ring: 169 72% 42%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.maplibregl-ctrl-bottom-left,
+.maplibregl-ctrl-bottom-right {
+  display: none;
+}

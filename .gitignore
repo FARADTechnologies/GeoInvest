@@ -1,0 +1,48 @@
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Data files (large / generated) ───────────────────────────────────────────
+data/raw_data_template.csv
+
+# ── Local tools (pgAdmin binary etc.) ────────────────────────────────────────
+app/.tools/
+
+# ── Docker volumes & runtime DB data ─────────────────────────────────────────
+nextgen_h3_analytics/postgres-data/
+nextgen_h3_analytics/redis-data/
+app/.runtime/
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+.gstack/
+nextgen_h3_analytics/.gstack/
+screenshots/
