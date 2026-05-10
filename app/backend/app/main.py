@@ -6,12 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.router import api_router
 from app.core.config import settings
 from app.db.session import dispose_engine
+from app.scheduler import start_scheduler, stop_scheduler
 from app.services.cache import close_cache
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    start_scheduler()
     yield
+    stop_scheduler()
     await close_cache()
     await dispose_engine()
 

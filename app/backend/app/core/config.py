@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     )
     cache_ttl_seconds: int = 120
 
+    # Source (Ana) DB — standard libpq URL, e.g. postgresql://user:pass@host:5432/dbname
+    # Leave empty to disable the nightly job.
+    source_database_url: str = ""
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

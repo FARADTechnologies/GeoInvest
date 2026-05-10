@@ -46,6 +46,9 @@ services:
       RAW_DATA_CSV_PATH: /data/h3_analysis.csv
       BOUNDARIES_JSON_PATH: /data/baku_districts.json
       CACHE_TTL_SECONDS: 120
+      # Ana (source) DB connection — set this to enable the nightly job.
+      # Format: postgresql://user:password@host:port/dbname
+      SOURCE_DATABASE_URL: ""
     ports:
       - "8000:8000"
     volumes:

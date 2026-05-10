@@ -1,0 +1,48 @@
+{
+  "header": {
+    "title": "Analitika",
+    "subtitle": "H3 heksaqonal daşınmaz əmlak analitikası · Bakı",
+    "refresh": "Yeniləmək"
+  },
+  "metrics": {
+    "totalAds": "Cəmi Elanlar",
+    "medianPrice": "Median Qiymət",
+    "medianPriceSuffix": "AZN/m²",
+    "trend": "Trend",
+    "trendSuffix": "%",
+    "activeH3Cells": "Aktiv H3 Xanalar"
+  },
+  "sidebar": {
+    "label": "Analitika",
+    "title": "H3 İdarəetmə",
+    "analysisType": "Analiz Növü",
+    "period": "Dövr",
+    "periodPlaceholder": "Dövr seçin",
+    "categories": "Kateqoriyalar",
+    "selectAll": "Hamısı",
+    "resolution": "Həll",
+    "outlierFilter": "Kənar Filtr",
+    "outlierOff": "Söndürülüb",
+    "outlierMaxLabel": "10 elan",
+    "outlierDescription": "≤ {{count}} elanlı xanalar xəritədən və analizdən gizlədilir.",
+    "outlierDescriptionPlural": "≤ {{count}} elanlı xanalar xəritədən və analizdən gizlədilir."
+  },
+  "errors": {
+    "filtersLoad": "API-dən filtr kataloqu yüklənə bilmədi.",
+    "metricsLoad": "Seçilmiş filtrlər üçün ölçülər yüklənə bilmədi.",
+    "mapLoad": "Xəritə məlumatları yüklənə bilmədi."
+  },
+  "map": {
+    "loading": "Yüklənir...",
+    "noData": "Seçilmiş filtrlər üçün məlumat yoxdur."
+  },
+  "chart": {
+    "title": "Qiymət Paylanması",
+    "xAxis": "Median Qiymət (AZN/m²)",
+    "yAxis": "Elan Sayı"
+  },
+  "analysisTypes": {
+    "geom": "Rayon əsaslı",
+    "pure_h3": "Grid əsaslı"
+  }
+}
