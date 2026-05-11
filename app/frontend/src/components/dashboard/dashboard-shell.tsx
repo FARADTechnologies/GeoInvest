@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FiltersSidebar } from "@/components/dashboard/filters-sidebar";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { PriceDistributionChart } from "@/components/dashboard/price-distribution-chart";
+import { PricePercentileChart } from "@/components/dashboard/price-percentile-chart";
 import { MapPanel } from "@/components/map/map-panel";
 
 function createDefaultFilters(catalog: FiltersResponse): DashboardFilters | null {
@@ -172,7 +173,10 @@ export function DashboardShell() {
                 loading={mapQuery.isFetching}
                 error={Boolean(mapQuery.error)}
               />
-              <PriceDistributionChart data={mapData} loading={mapQuery.isFetching} />
+              <div className="flex flex-col gap-4 overflow-y-auto">
+                <PriceDistributionChart data={mapData} loading={mapQuery.isFetching} />
+                <PricePercentileChart data={mapData} loading={mapQuery.isFetching} />
+              </div>
             </div>
           </div>
         </section>
