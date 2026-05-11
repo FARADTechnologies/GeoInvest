@@ -113,13 +113,21 @@ async def rebuild_precomputed() -> None:
     async with async_session_factory() as session:
         async with session.begin():
             await session.execute(text("TRUNCATE h3_map_precomputed;"))
+            # Aggregate by h3_index — a single hex can span multiple rayons,
+            # so h3_analytics_records may have >1 row per hex.
             await session.execute(text("""\
                 INSERT INTO h3_map_precomputed
                     (h3_index, resolution, period, category, analysis_type,
                      ad_count, avg_price_kvm, median_price_kvm, rayon_name, computed_at)
-                SELECT h3_index, resolution, period, category, analysis_type,
-                       ad_count, avg_price_kvm, median_price_kvm, rayon_name, NOW()
-                FROM h3_analytics_records;
+                SELECT
+                    h3_index, resolution, period, category, analysis_type,
+                    SUM(ad_count),
+                    AVG(avg_price_kvm),
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY median_price_kvm),
+                    STRING_AGG(DISTINCT rayon_name, ', '),
+                    NOW()
+                FROM h3_analytics_records
+                GROUP BY h3_index, resolution, period, category, analysis_type;
             """))
 
         async with session.begin():

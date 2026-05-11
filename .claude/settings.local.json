@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'fix: revert analytics.py to main — only additive changes remain *)",
+      "Bash(git push *)"
+    ]
+  }
+}
