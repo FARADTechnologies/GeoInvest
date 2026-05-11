@@ -47,3 +47,5 @@ Thumbs.db
 nextgen_h3_analytics/.gstack/
 screenshots/
 .claude/
+app/backend/.env
+app/frontend/.env.local
