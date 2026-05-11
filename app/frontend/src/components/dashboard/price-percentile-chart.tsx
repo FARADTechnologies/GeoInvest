@@ -1,17 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import type { MapDataPoint } from "@/types/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Slider } from "@/components/ui/slider";
 
 type Props = {
   data: MapDataPoint[];
   loading?: boolean;
 };
+
+const P_LOW = 1;   // statik alt percentile
+const P_HIGH = 99; // statik üst percentile
 
 function computePercentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
@@ -31,9 +33,7 @@ function buildBuckets(prices: number[], min: number, max: number) {
     const low = min + i * width;
     const high = i === bucketCount - 1 ? max : low + width;
     const count = prices.filter((p) =>
-      i === bucketCount - 1
-        ? p >= low && p <= high
-        : p >= low && p < high
+      i === bucketCount - 1 ? p >= low && p <= high : p >= low && p < high
     ).length;
     return {
       range: `${Math.round(low)}-${Math.round(high)}`,
@@ -43,49 +43,34 @@ function buildBuckets(prices: number[], min: number, max: number) {
 }
 
 export function PricePercentileChart({ data, loading }: Props) {
-  const [range, setRange] = useState([1, 99]);
-
-  const { pMin, pMax, buckets, included } = useMemo(() => {
-    if (data.length === 0) return { pMin: 0, pMax: 0, buckets: [], included: 0 };
+  const { buckets, pMin, pMax, included } = useMemo(() => {
+    if (data.length === 0) return { buckets: [], pMin: 0, pMax: 0, included: 0 };
 
     const sorted = data.map((d) => d.median_price_kvm).sort((a, b) => a - b);
-    const pMin = computePercentile(sorted, range[0]);
-    const pMax = computePercentile(sorted, range[1]);
+    const pMin = computePercentile(sorted, P_LOW);
+    const pMax = computePercentile(sorted, P_HIGH);
     const filtered = sorted.filter((p) => p >= pMin && p <= pMax);
 
     return {
+      buckets: buildBuckets(filtered, pMin, pMax),
       pMin,
       pMax,
-      buckets: buildBuckets(filtered, pMin, pMax),
       included: filtered.length
     };
-  }, [data, range]);
+  }, [data]);
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">Price Analysis</CardTitle>
-
-        <div className="mt-2 space-y-3">
-          <Slider
-            value={range}
-            min={0}
-            max={100}
-            step={1}
-            onValueChange={(val) => {
-              if (val[0] < val[1]) setRange(val);
-            }}
-          />
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="rounded bg-secondary px-1.5 py-0.5 font-mono">
-              P{range[0]} · {Math.round(pMin).toLocaleString()} AZN/m²
-            </span>
-            <span className="text-[10px]">{included} hex</span>
-            <span className="rounded bg-secondary px-1.5 py-0.5 font-mono">
-              P{range[1]} · {Math.round(pMax).toLocaleString()} AZN/m²
-            </span>
-          </div>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm font-semibold">Price Analysis</CardTitle>
+          <span className="text-xs text-muted-foreground">
+            P{P_LOW}–P{P_HIGH} · {included} hex
+          </span>
         </div>
+        <p className="text-xs text-muted-foreground">
+          {Math.round(pMin).toLocaleString()} – {Math.round(pMax).toLocaleString()} AZN/m²
+        </p>
       </CardHeader>
 
       <CardContent className="h-[200px] pt-0">
