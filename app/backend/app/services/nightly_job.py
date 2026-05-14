@@ -37,14 +37,14 @@ SELECT
     )                                                                    AS median_price_kvm,
     {res}                                                                AS resolution,
     TO_CHAR(i.created_date, 'YYYY-MM')                                  AS period
-FROM item_app_items i
+FROM item_app_items_excel i
 LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
 JOIN index_app_object o
     ON ST_Contains(o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326))
 WHERE i.latitude IS NOT NULL
   AND i.longitude IS NOT NULL
   AND i.owner_price IS NOT NULL
-  AND o.type_id = 23
+  AND o.type_id = 22
   AND i.category_id IN ({cats})
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, rayon_name;
@@ -63,7 +63,7 @@ SELECT
     )                                                                    AS median_price_kvm,
     {res}                                                                AS resolution,
     TO_CHAR(i.created_date, 'YYYY-MM')                                  AS period
-FROM item_app_items i
+FROM item_app_items_excel i
 LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
 WHERE i.latitude IS NOT NULL
   AND i.longitude IS NOT NULL
@@ -78,11 +78,21 @@ def _fetch_from_source_db(conn_str: str) -> list[tuple]:
     """Runs synchronously in a thread — must not use asyncio."""
     cats = ", ".join(str(c) for c in _TARGET_CATEGORIES)
     rows: list[tuple] = []
-    with psycopg.connect(conn_str) as conn:
+    # Keep-alive params prevent server-side SSL close on long-running queries.
+    with psycopg.connect(
+        conn_str,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+        options="-c statement_timeout=300000",  # 5 min per statement
+    ) as conn:
         with conn.cursor() as cur:
             for res in _RESOLUTIONS:
+                logger.info("Fetching geom path (res=%d)…", res)
                 cur.execute(_GEOM_SQL.format(res=res, cats=cats))
                 rows.extend(cur.fetchall())
+                logger.info("Fetching pure_h3 path (res=%d)…", res)
                 cur.execute(_PURE_H3_SQL.format(res=res, cats=cats))
                 rows.extend(cur.fetchall())
     return rows
