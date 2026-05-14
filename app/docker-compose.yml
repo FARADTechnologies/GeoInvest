@@ -1,22 +1,4 @@
 services:
-  db:
-    image: postgis/postgis:16-3.4
-    container_name: geoinvest_db
-    environment:
-      POSTGRES_DB: h3_analytics
-      POSTGRES_USER: h3
-      POSTGRES_PASSWORD: h3
-    ports:
-      - "5433:5432"
-    volumes:
-      - geoinvest_pg_data:/var/lib/postgresql/data
-      - ./docker/postgres:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U h3 -d h3_analytics"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
   redis:
     image: redis:7-alpine
     container_name: geoinvest_redis
@@ -38,21 +20,20 @@ services:
     environment:
       PYTHONPATH: /app
       APP_NAME: GeoInvest Analytics API
-      ENVIRONMENT: development
+      ENVIRONMENT: production
       API_PREFIX: /api/v1
-      DATABASE_URL: postgresql+asyncpg://h3:h3@db:5432/h3_analytics
+      DATABASE_URL: postgresql+asyncpg://analitics:Sv4lSA5SeCwDv5p@62.171.172.225:5432/homora_dev_db
       REDIS_URL: redis://redis:6379/0
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       RAW_DATA_CSV_PATH: /data/h3_analysis.csv
       BOUNDARIES_JSON_PATH: /data/baku_districts.json
       CACHE_TTL_SECONDS: 120
+      SOURCE_DATABASE_URL: postgresql://analitics:Sv4lSA5SeCwDv5p@62.171.172.225:5432/homora_dev_db
     ports:
       - "8000:8000"
     volumes:
       - ../data:/data:ro
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -69,5 +50,4 @@ services:
       - backend
 
 volumes:
-  geoinvest_pg_data:
   geoinvest_redis_data:

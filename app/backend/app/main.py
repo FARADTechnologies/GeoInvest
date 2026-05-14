@@ -5,13 +5,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
-from app.db.session import dispose_engine
+from app.db.base import Base
+from app.db.session import dispose_engine, engine
+from app.models import H3AnalyticsRecord, MarketStats  # noqa: F401 — ensure models are registered
+from app.models.precomputed import H3MapPrecomputed, H3MetricsPrecomputed  # noqa: F401
+from app.scheduler import start_scheduler, stop_scheduler
 from app.services.cache import close_cache
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    start_scheduler()
     yield
+    stop_scheduler()
     await close_cache()
     await dispose_engine()
 

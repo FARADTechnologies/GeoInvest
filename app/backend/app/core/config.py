@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         default=PROJECT_ROOT / "data" / "baku_districts.json"
     )
     cache_ttl_seconds: int = 120
+    source_database_url: str = ""  # Ana DB — postgresql://user:pass@host:port/dbname
 
     @property
     def allowed_origins_list(self) -> list[str]:
