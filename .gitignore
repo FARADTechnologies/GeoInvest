@@ -36,6 +36,10 @@ nextgen_h3_analytics/postgres-data/
 nextgen_h3_analytics/redis-data/
 app/.runtime/
 
+# ── Agent / tooling artifacts (do not commit) ────────────────────────────────
+.claude/
+CLAUDE.md
+
 # ── OS / editor ───────────────────────────────────────────────────────────────
 .DS_Store
 Thumbs.db

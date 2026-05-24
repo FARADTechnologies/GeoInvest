@@ -16,6 +16,11 @@ class MetricsResponse(BaseModel):
     trend_percentage: float
     active_h3_cells: int
     previous_period: str | None = None
+    # Previous-period absolute values so the UI can compute its own deltas
+    # (used by KPI cards to show real % change instead of mock numbers).
+    previous_total_ads: int | None = None
+    previous_avg_median_price: float | None = None
+    previous_active_h3_cells: int | None = None
 
 
 class MapDataPoint(BaseModel):

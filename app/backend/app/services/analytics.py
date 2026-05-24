@@ -99,6 +99,9 @@ class AnalyticsService:
             trend_percentage=round(trend, 2),
             active_h3_cells=int(current["active_h3_cells"] or 0),
             previous_period=format_period(previous_period),
+            previous_total_ads=int(previous["total_ads"] or 0) if previous else None,
+            previous_avg_median_price=previous_price if previous else None,
+            previous_active_h3_cells=int(previous["active_h3_cells"] or 0) if previous else None,
         )
 
     async def get_map_data(
