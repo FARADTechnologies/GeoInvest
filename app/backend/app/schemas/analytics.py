@@ -23,6 +23,18 @@ class MetricsResponse(BaseModel):
     previous_active_h3_cells: int | None = None
 
 
+class SparklinesResponse(BaseModel):
+    total_ads: list[int]
+    avg_median_price: list[float]
+    trend_percentage: list[float]
+    active_h3_cells: list[int]
+
+
+class TrendSeriesItem(BaseModel):
+    label: str
+    data: list[float]
+
+
 class MapDataPoint(BaseModel):
     h3_index: str
     ad_count: int

@@ -33,11 +33,9 @@ import type { DashboardFilters, FiltersResponse } from "@/types/api";
 // ──────────────────────────────────────────────────────────────────────
 // DashboardShell
 // Layout: [nav | filters] | [topbar / KPI / map+rayons / charts / activity]
-// All data is wired through TanStack Query. The 4 backend-served queries
-// (filters / metrics / map-data) drive the core dashboard. The 5
-// dashboard-only queries (rayons, sparklines, histogram, trend, activity)
-// hit lib/dashboard-api.ts which is currently mock-backed — they switch
-// to live fetches as the backend grows endpoints.
+// All data is wired through TanStack Query. Backend-served queries drive
+// filters, metrics, map data, sparklines, and trend series; remaining
+// dashboard-only panels fall back to mock data until dedicated endpoints exist.
 // ──────────────────────────────────────────────────────────────────────
 
 function createDefaultFilters(catalog: FiltersResponse): DashboardFilters | null {
@@ -93,12 +91,22 @@ export function DashboardShell() {
     placeholderData: keepPreviousData
   });
 
-  // ── Dashboard-only queries (mock-backed) ──────────────────────────
-  const rayonsQuery      = useQuery({ queryKey: queryKeys.rayons,      queryFn: fetchRayons });
-  const sparklinesQuery  = useQuery({ queryKey: queryKeys.sparklines,  queryFn: fetchSparklines });
-  const histogramQuery   = useQuery({ queryKey: queryKeys.histogram,   queryFn: fetchHistogram });
-  const trendSeriesQuery = useQuery({ queryKey: queryKeys.trendSeries, queryFn: fetchTrendSeries });
-  const activityQuery    = useQuery({
+  // ── Dashboard extension queries ──────────────────────────────────
+  const rayonsQuery = useQuery({ queryKey: queryKeys.rayons, queryFn: fetchRayons });
+  const sparklinesQuery = useQuery({
+    queryKey: queryKeys.sparklines(filters, minAdsThreshold),
+    queryFn: () => fetchSparklines(filters ?? undefined, minAdsThreshold),
+    enabled: filters !== null,
+    placeholderData: keepPreviousData
+  });
+  const histogramQuery = useQuery({ queryKey: queryKeys.histogram, queryFn: fetchHistogram });
+  const trendSeriesQuery = useQuery({
+    queryKey: queryKeys.trendSeries(filters),
+    queryFn: () => fetchTrendSeries(filters ?? undefined),
+    enabled: filters !== null,
+    placeholderData: keepPreviousData
+  });
+  const activityQuery = useQuery({
     queryKey: queryKeys.activity(lang),
     queryFn: () => fetchActivity(lang)
   });

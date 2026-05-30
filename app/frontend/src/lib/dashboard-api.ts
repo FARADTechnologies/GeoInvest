@@ -8,11 +8,13 @@
 
 import type {
   ActivityItem,
+  DashboardFilters,
   HistogramBucket,
   Rayon,
   Sparklines,
   TrendSeries
 } from "@/types/api";
+import { apiGet } from "@/lib/api";
 import {
   fetchActivity as mockActivity,
   fetchHistogram as mockHistogram,
@@ -25,16 +27,35 @@ export function fetchRayons(): Promise<Rayon[]> {
   return mockRayons();
 }
 
-export function fetchSparklines(): Promise<Sparklines> {
-  return mockSparklines();
+export async function fetchSparklines(
+  filters?: DashboardFilters,
+  minAdsPerCell = 0
+): Promise<Sparklines> {
+  if (!filters) return mockSparklines();
+
+  try {
+    return await apiGet<Sparklines>("/sparklines", filters, {
+      min_ads_per_cell: String(minAdsPerCell)
+    });
+  } catch {
+    return mockSparklines();
+  }
 }
 
 export function fetchHistogram(): Promise<HistogramBucket[]> {
   return mockHistogram();
 }
 
-export function fetchTrendSeries(): Promise<TrendSeries[]> {
-  return mockTrendSeries();
+export async function fetchTrendSeries(
+  filters?: DashboardFilters
+): Promise<TrendSeries[]> {
+  if (!filters) return mockTrendSeries();
+
+  try {
+    return await apiGet<TrendSeries[]>("/trend-series", filters);
+  } catch {
+    return mockTrendSeries();
+  }
 }
 
 export function fetchActivity(lang: "tr" | "en" = "tr"): Promise<ActivityItem[]> {

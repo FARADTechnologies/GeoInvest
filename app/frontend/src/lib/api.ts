@@ -8,7 +8,7 @@ import type {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
-async function apiGet<T>(
+export async function apiGet<T>(
   path: string,
   filters?: DashboardFilters,
   extra?: Record<string, string>

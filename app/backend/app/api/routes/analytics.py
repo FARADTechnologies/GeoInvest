@@ -9,6 +9,8 @@ from app.schemas.analytics import (
     FiltersResponse,
     MapDataPoint,
     MetricsResponse,
+    SparklinesResponse,
+    TrendSeriesItem,
 )
 from app.services.analytics import AnalyticsService
 from app.services.boundaries import BoundaryService
@@ -86,6 +88,57 @@ async def get_map_data(
         )
 
     return await cached_json(cache_key, MapDataPoint, loader, many=True)
+
+
+@router.get("/sparklines", response_model=SparklinesResponse)
+async def get_sparklines(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    period: Annotated[str, Query(description="Period in YYYY-MM format")],
+    resolution: Annotated[int, Query(ge=0, le=15)],
+    analysis_type: Annotated[str, Query(min_length=1)],
+    min_ads_per_cell: Annotated[int, Query(ge=0)] = 0,
+) -> SparklinesResponse:
+    categories = parse_categories(request)
+    if not categories:
+        raise HTTPException(status_code=422, detail="At least one category is required.")
+
+    cache_key = (
+        "sparklines:v1:"
+        f"{analysis_type}:{period}:{resolution}:{min_ads_per_cell}:{','.join(sorted(categories))}"
+    )
+
+    async def loader() -> SparklinesResponse:
+        return await AnalyticsService(session).get_sparklines(
+            period=period,
+            categories=categories,
+            resolution=resolution,
+            analysis_type=analysis_type,
+            min_ads_per_cell=min_ads_per_cell,
+        )
+
+    return await cached_json(cache_key, SparklinesResponse, loader)
+
+
+@router.get("/trend-series", response_model=list[TrendSeriesItem])
+async def get_trend_series(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    period: Annotated[str, Query(description="Period in YYYY-MM format")],
+) -> list[TrendSeriesItem]:
+    categories = parse_categories(request)
+    if not categories:
+        raise HTTPException(status_code=422, detail="At least one category is required.")
+
+    cache_key = f"trend-series:v1:{period}:{','.join(sorted(categories))}"
+
+    async def loader() -> list[TrendSeriesItem]:
+        return await AnalyticsService(session).get_trend_series(
+            period=period,
+            categories=categories,
+        )
+
+    return await cached_json(cache_key, TrendSeriesItem, loader, many=True)
 
 
 @router.get("/boundaries", response_model=BoundaryFeatureCollection)

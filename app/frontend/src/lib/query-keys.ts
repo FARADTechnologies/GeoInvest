@@ -11,10 +11,11 @@ export const queryKeys = {
   mapData: (filters: DashboardFilters, minAdsPerCell: number) =>
     ["map-data", filters, minAdsPerCell] as const,
 
-  // Dashboard extensions (served from mock-data for now)
-  rayons:        ["rayons"] as const,
-  sparklines:    ["sparklines"] as const,
+  // Dashboard extensions (fallback to mock-data when live endpoints are absent)
+  rayons: ["rayons"] as const,
+  sparklines: (filters: DashboardFilters | null, minAdsPerCell: number) =>
+    ["sparklines", filters, minAdsPerCell] as const,
   histogram:     ["histogram"] as const,
-  trendSeries:   ["trend-series"] as const,
+  trendSeries: (filters: DashboardFilters | null) => ["trend-series", filters] as const,
   activity:      (lang: "tr" | "en") => ["activity", lang] as const
 };
