@@ -10,6 +10,9 @@ export type AuthUser = {
   email: string;
   name: string;
   initials: string;
+  role: "super_admin" | "company_admin" | "employee";
+  companyId: string;
+  permissions: string[];
 };
 
 export function getToken(): string | null {
@@ -69,7 +72,10 @@ export async function signIn(
   const user: AuthUser = {
     email: email.trim(),
     name: opts.name?.trim() || email.split("@")[0],
-    initials: deriveInitials(email, opts.name)
+    initials: deriveInitials(email, opts.name),
+    role: email.trim().toLowerCase().includes("admin") ? "super_admin" : "company_admin",
+    companyId: "company-caspian",
+    permissions: ["dashboard:read", "reports:export", "users:manage", "companies:manage"]
   };
   const fakeToken = "demo." + btoa(`${email}:${Date.now()}`);
 

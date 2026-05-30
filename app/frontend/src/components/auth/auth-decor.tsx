@@ -4,6 +4,7 @@
 import type { CSSProperties, ReactElement } from "react";
 
 import { HMIcon } from "@/components/auth/auth-icons";
+import type { Lang } from "@/lib/i18n";
 
 // ──────────────────────────────────────────────────────────────────────
 // Hex-grid backdrop (mesh + honeycomb overlay).
@@ -353,8 +354,8 @@ export function HMBrandHeader({
   color = "#fff"
 }: {
   t: Record<string, string>;
-  lang: "tr" | "en";
-  onLang: (l: "tr" | "en") => void;
+  lang: Lang;
+  onLang: (l: Lang) => void;
   theme: "light" | "dark";
   onTheme: () => void;
   color?: string;
@@ -384,7 +385,7 @@ export function HMBrandHeader({
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
           type="button"
-          onClick={() => onLang(lang === "tr" ? "en" : "tr")}
+          onClick={() => onLang(lang === "tr" ? "en" : lang === "en" ? "az" : "tr")}
           style={{
             appearance: "none",
             border: `1px solid ${border}`,

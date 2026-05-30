@@ -2,14 +2,14 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
 import { FiltersPanel } from "@/components/dashboard/filters-panel";
 import { HistogramChart } from "@/components/dashboard/histogram-chart";
 import { KpiGrid } from "@/components/dashboard/kpi-grid";
-import { NavSidebar } from "@/components/dashboard/nav-sidebar";
+import { NavSidebar, type DashboardView } from "@/components/dashboard/nav-sidebar";
 import { RayonList } from "@/components/dashboard/rayon-list";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { TrendChart } from "@/components/dashboard/trend-chart";
@@ -18,6 +18,7 @@ import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
+import { COMPANIES, getAccountRequests } from "@/lib/admin-data";
 import {
   fetchActivity,
   fetchHistogram,
@@ -28,7 +29,18 @@ import {
 import { MONTH_LABELS_EN, MONTH_LABELS_TR } from "@/lib/mock-data";
 import { useStrings, type Lang } from "@/lib/i18n";
 import { queryKeys } from "@/lib/query-keys";
-import type { DashboardFilters, FiltersResponse } from "@/types/api";
+import type {
+  ActivityItem,
+  DashboardFilters,
+  FiltersResponse,
+  HistogramBucket,
+  MapDataPoint,
+  MetricsResponse,
+  Rayon,
+  Sparklines,
+  TrendSeries
+} from "@/types/api";
+import type { AccountRequest } from "@/types/admin";
 
 // ──────────────────────────────────────────────────────────────────────
 // DashboardShell
@@ -64,6 +76,8 @@ export function DashboardShell() {
   const [filters, setFilters] = useState<DashboardFilters | null>(null);
   const [minAdsThreshold, setMinAdsThreshold] = useState(2);
   const [colorBy, setColorBy] = useState<"price" | "listings">("price");
+  const [activeView, setActiveView] = useState<DashboardView>("overview");
+  const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);
 
   // ── Backend-served queries ────────────────────────────────────────
   const filtersQuery = useQuery({
@@ -76,6 +90,10 @@ export function DashboardShell() {
       setFilters(createDefaultFilters(filtersQuery.data));
     }
   }, [filters, filtersQuery.data]);
+
+  useEffect(() => {
+    setAccountRequests(getAccountRequests());
+  }, [activeView]);
 
   const metricsQuery = useQuery({
     queryKey: filters ? queryKeys.metrics(filters, minAdsThreshold) : ["metrics", "empty"],
@@ -126,14 +144,14 @@ export function DashboardShell() {
 
   const mapData = useMemo(() => mapQuery.data ?? [], [mapQuery.data]);
 
-  const monthLabels = lang === "tr" ? MONTH_LABELS_TR : MONTH_LABELS_EN;
+  const monthLabels = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_TR;
 
   return (
     <main className="min-h-screen bg-background">
       <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[260px_1fr]">
         {/* Left rail: nav + filters */}
         <aside className="border-b bg-card/40 lg:border-b-0 lg:border-r">
-          <NavSidebar t={t} />
+          <NavSidebar t={t} activeView={activeView} onViewChange={setActiveView} />
           {filtersQuery.data && filters ? (
             <FiltersPanel
               catalog={filtersQuery.data}
@@ -178,87 +196,307 @@ export function DashboardShell() {
               <Alert>Unable to load metrics for the selected filters.</Alert>
             ) : null}
 
-            {/* KPI strip */}
-            <KpiGrid
-              t={t}
-              metrics={metricsQuery.data}
-              sparklines={sparklinesQuery.data}
-              loading={isLoading || metricsQuery.isLoading}
-            />
+            {activeView === "overview" ? (
+              <OverviewView
+                t={t}
+                metrics={metricsQuery.data}
+                sparklines={sparklinesQuery.data}
+                metricsLoading={isLoading || metricsQuery.isLoading}
+                mapData={mapData}
+                mapLoading={mapQuery.isFetching}
+                mapError={Boolean(mapQuery.error)}
+                rayons={rayonsQuery.data}
+                trendSeries={trendSeriesQuery.data}
+                histogram={histogramQuery.data}
+                activity={activityQuery.data}
+                monthLabels={monthLabels}
+              />
+            ) : null}
 
-            {/* Map + Rayon ranking */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
-              <DashboardCard
-                title={t.secMap}
-                subtitle={t.secMapSub}
-                bodyClassName="p-0"
-                className="min-h-[520px]"
-              >
-                <MapPanel
-                  data={mapData}
-                  loading={mapQuery.isFetching}
-                  error={Boolean(mapQuery.error)}
-                  t={t}
-                />
-              </DashboardCard>
+            {activeView === "map" ? (
+              <MapView
+                t={t}
+                metrics={metricsQuery.data}
+                sparklines={sparklinesQuery.data}
+                metricsLoading={isLoading || metricsQuery.isLoading}
+                mapData={mapData}
+                mapLoading={mapQuery.isFetching}
+                mapError={Boolean(mapQuery.error)}
+                rayons={rayonsQuery.data}
+                histogram={histogramQuery.data}
+              />
+            ) : null}
 
-              <DashboardCard
-                title={t.secRayons}
-                subtitle={t.secRayonsSub}
-                action={
-                  <button className="flex items-center gap-1 text-[11.5px] font-medium text-[var(--brand-600)] transition-colors hover:text-[var(--brand-700)]">
-                    {t.viewAll}
-                    <ArrowRight className="h-3 w-3" />
-                  </button>
-                }
-              >
-                {rayonsQuery.data ? (
-                  <RayonList t={t} rayons={rayonsQuery.data} />
-                ) : (
-                  <Skeleton className="h-64 w-full" />
-                )}
-              </DashboardCard>
-            </div>
-
-            {/* Trend + Histogram */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <DashboardCard title={t.secTrend} subtitle={t.secTrendSub}>
-                {trendSeriesQuery.data ? (
-                  <TrendChart series={trendSeriesQuery.data} labels={monthLabels} />
-                ) : (
-                  <Skeleton className="h-[260px] w-full" />
-                )}
-              </DashboardCard>
-
-              <DashboardCard title={t.secHisto} subtitle={t.secHistoSub}>
-                {histogramQuery.data ? (
-                  <HistogramChart data={histogramQuery.data} />
-                ) : (
-                  <Skeleton className="h-[260px] w-full" />
-                )}
-              </DashboardCard>
-            </div>
-
-            {/* Activity */}
-            <DashboardCard
-              title={t.secActivity}
-              subtitle={t.secActivitySub}
-              action={
-                <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-                  Live
-                </span>
-              }
-            >
-              {activityQuery.data ? (
-                <ActivityFeed activity={activityQuery.data} />
-              ) : (
-                <Skeleton className="h-48 w-full" />
-              )}
-            </DashboardCard>
+            {activeView === "rayons" ? <RayonsView t={t} rayons={rayonsQuery.data ?? []} /> : null}
+            {activeView === "trends" ? (
+              <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
+            ) : null}
+            {activeView === "listings" ? <ListingsView t={t} /> : null}
+            {activeView === "reports" ? <ReportsView t={t} /> : null}
+            {activeView === "alerts" ? <AlertsView t={t} /> : null}
+            {activeView === "admin" ? (
+              <AdminView t={t} requests={accountRequests} onRequestsChange={setAccountRequests} />
+            ) : null}
+            {activeView === "settings" || activeView === "account" ? (
+              <PlaceholderView
+                title={activeView === "settings" ? t.navSettings : t.navAccount}
+                subtitle="Profile, permissions, billing, and workspace controls."
+              />
+            ) : null}
           </div>
         </section>
       </div>
     </main>
+  );
+}
+
+function OverviewView({
+  t,
+  metrics,
+  sparklines,
+  metricsLoading,
+  mapData,
+  mapLoading,
+  mapError,
+  rayons,
+  trendSeries,
+  histogram,
+  activity,
+  monthLabels
+}: {
+  t: Record<string, string>;
+  metrics?: MetricsResponse;
+  sparklines?: Sparklines;
+  metricsLoading: boolean;
+  mapData: MapDataPoint[];
+  mapLoading: boolean;
+  mapError: boolean;
+  rayons?: Rayon[];
+  trendSeries?: TrendSeries[];
+  histogram?: HistogramBucket[];
+  activity?: ActivityItem[];
+  monthLabels: string[];
+}) {
+  return (
+    <>
+      <KpiGrid t={t} metrics={metrics} sparklines={sparklines} loading={metricsLoading} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+        <DashboardCard title={t.secMap} subtitle={t.secMapSub} bodyClassName="p-0" className="min-h-[520px]">
+          <MapPanel data={mapData} loading={mapLoading} error={mapError} t={t} />
+        </DashboardCard>
+        <DashboardCard
+          title={t.secRayons}
+          subtitle={t.secRayonsSub}
+          action={<button className="flex items-center gap-1 text-[11.5px] font-medium text-[var(--brand-600)]">{t.viewAll}<ArrowRight className="h-3 w-3" /></button>}
+        >
+          {rayons ? <RayonList t={t} rayons={rayons} /> : <Skeleton className="h-64 w-full" />}
+        </DashboardCard>
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <DashboardCard title={t.secTrend} subtitle={t.secTrendSub}>
+          {trendSeries ? <TrendChart series={trendSeries} labels={monthLabels} /> : <Skeleton className="h-[260px] w-full" />}
+        </DashboardCard>
+        <DashboardCard title={t.secHisto} subtitle={t.secHistoSub}>
+          {histogram ? <HistogramChart data={histogram} /> : <Skeleton className="h-[260px] w-full" />}
+        </DashboardCard>
+      </div>
+      <DashboardCard title={t.secActivity} subtitle={t.secActivitySub}>
+        {activity ? <ActivityFeed activity={activity} /> : <Skeleton className="h-48 w-full" />}
+      </DashboardCard>
+    </>
+  );
+}
+
+function MapView(props: {
+  t: Record<string, string>;
+  metrics?: MetricsResponse;
+  sparklines?: Sparklines;
+  metricsLoading: boolean;
+  mapData: MapDataPoint[];
+  mapLoading: boolean;
+  mapError: boolean;
+  rayons?: Rayon[];
+  histogram?: HistogramBucket[];
+}) {
+  return (
+    <>
+      <KpiGrid t={props.t} metrics={props.metrics} sparklines={props.sparklines} loading={props.metricsLoading} />
+      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-[minmax(0,2fr)_420px]">
+        <DashboardCard title={props.t.secMap} subtitle={props.t.secMapSub} bodyClassName="p-0" className="min-h-[680px]">
+          <MapPanel data={props.mapData} loading={props.mapLoading} error={props.mapError} t={props.t} />
+        </DashboardCard>
+        <div className="grid gap-4">
+          <DashboardCard title={props.t.secRayons} subtitle={props.t.secRayonsSub}>
+            {props.rayons ? <RayonList t={props.t} rayons={props.rayons.slice(0, 6)} /> : <Skeleton className="h-64 w-full" />}
+          </DashboardCard>
+          <DashboardCard title={props.t.secHisto} subtitle={props.t.secHistoSub}>
+            {props.histogram ? <HistogramChart data={props.histogram} /> : <Skeleton className="h-[220px] w-full" />}
+          </DashboardCard>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function RayonsView({ t, rayons }: { t: Record<string, string>; rayons: Rayon[] }) {
+  const [q, setQ] = useState("");
+  const rows = rayons
+    .filter((r) => `${r.name} ${r.short}`.toLowerCase().includes(q.toLowerCase()))
+    .sort((a, b) => b.median - a.median);
+  return (
+    <DashboardCard title={t.navRayons} subtitle={t.secRayonsSub}>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchPh} className="mb-4 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none" />
+      <DataTable
+        headers={["Rayon", t.listings, t.kpiMedian, t.kpiTrend, "Status"]}
+        rows={rows.map((r) => [r.name, r.listings.toLocaleString(), `${r.median.toLocaleString()} ${t.perM2}`, `${r.trend}%`, r.hot ? t.hot : t.low])}
+      />
+    </DashboardCard>
+  );
+}
+
+function TrendsView({ t, trendSeries, labels }: { t: Record<string, string>; trendSeries: TrendSeries[]; labels: string[] }) {
+  return (
+    <DashboardCard title={t.secTrend} subtitle={t.secTrendSub}>
+      <TrendChart series={trendSeries} labels={labels} />
+    </DashboardCard>
+  );
+}
+
+const LISTINGS = [
+  ["Sea View Residence", "Sebail", "425,000 AZN", "112", "3", "3,794", "2026-05-29", "Active"],
+  ["Narimanov Premium", "Nerimanov", "318,000 AZN", "96", "3", "3,312", "2026-05-28", "Active"],
+  ["Yasamal Family Flat", "Yasamal", "214,000 AZN", "84", "2", "2,548", "2026-05-27", "Watch"]
+];
+
+function ListingsView({ t }: { t: Record<string, string> }) {
+  return (
+    <DashboardCard title={t.navListings} subtitle="Mock listing workspace until listing endpoints are added.">
+      <DataTable headers={["Title", "Rayon", "Price", "m2", "Rooms", "AZN/m2", "Date", "Status"]} rows={LISTINGS} actionLabel={t.details ?? "Details"} />
+    </DashboardCard>
+  );
+}
+
+function ReportsView({ t }: { t: Record<string, string> }) {
+  return <ActionCards title={t.navReports} items={["Market pulse export", "Scheduled board report", "PDF investor pack"]} />;
+}
+
+function AlertsView({ t }: { t: Record<string, string> }) {
+  return <ActionCards title={t.navAlerts} items={["Sabail median +5%", "Low inventory in Xetai", "New hot H3 cells"]} />;
+}
+
+function AdminView({
+  t,
+  requests,
+  onRequestsChange
+}: {
+  t: Record<string, string>;
+  requests: AccountRequest[];
+  onRequestsChange: (requests: AccountRequest[]) => void;
+}) {
+  const setStatus = (id: string, status: AccountRequest["status"]) =>
+    onRequestsChange(requests.map((r) => (r.id === id ? { ...r, status } : r)));
+  const activeCompanies = COMPANIES.filter((c) => c.status === "active").length;
+  const blockedUsers = COMPANIES.flatMap((c) => c.users).filter((u) => u.status === "blocked").length;
+  return (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+        {[
+          ["Total companies", COMPANIES.length],
+          ["Active companies", activeCompanies],
+          ["Pending requests", requests.filter((r) => r.status === "pending").length],
+          ["Blocked users", blockedUsers],
+          ["MAU", 70]
+        ].map(([label, value]) => (
+          <div key={label} className="rounded-xl border bg-card p-4">
+            <div className="text-[11px] text-muted-foreground">{label}</div>
+            <div className="mt-1 text-2xl font-semibold">{value}</div>
+          </div>
+        ))}
+      </div>
+      <DashboardCard title={t.pendingRequests ?? "Pending requests"} subtitle="localStorage/mock queue">
+        <DataTable
+          headers={["Company", "Name", "Email", "Phone", "VOEN", "Title", "Employees", "Status"]}
+          rows={requests.map((r) => [r.companyName, `${r.firstName} ${r.lastName}`, r.email, r.phone, r.taxId, r.title, r.employeeCount ?? "-", r.status])}
+          renderActions={(index) => {
+            const r = requests[index];
+            return (
+              <div className="flex gap-2">
+                <button className="rounded-md border px-2 py-1 text-xs" onClick={() => setStatus(r.id, "approved")}>{t.approve ?? "Approve"}</button>
+                <button className="rounded-md border px-2 py-1 text-xs text-red-500" onClick={() => setStatus(r.id, "rejected")}>{t.reject ?? "Reject"}</button>
+              </div>
+            );
+          }}
+        />
+      </DashboardCard>
+      <DashboardCard title={t.companies ?? "Companies"} subtitle="B2B company administration mock">
+        <DataTable
+          headers={["Company", "VOEN", "Admin", "Email", "Employees", "Active", "Plan/status", "Last login", "Actions"]}
+          rows={COMPANIES.map((c) => [c.name, c.taxId, c.adminName, c.adminEmail, c.employeeCount, c.activeUsers, `${c.plan} / ${c.status}`, c.lastLogin, `${t.details ?? "Details"} | ${t.block ?? "Block"} | ${t.activate ?? "Activate"}`])}
+        />
+      </DashboardCard>
+      <DashboardCard title="Company detail" subtitle={t.employees ?? "Employees"}>
+        <DataTable
+          headers={["Name", "Email", "Role", "Status", "Last login"]}
+          rows={COMPANIES[0].users.map((u) => [u.name, u.email, u.role, u.status, u.lastLogin])}
+        />
+        <div className="mt-4 text-xs text-muted-foreground">{t.auditLog ?? "Audit log"}: {COMPANIES[0].auditLog.join(" / ")}</div>
+      </DashboardCard>
+    </div>
+  );
+}
+
+function ActionCards({ title, items }: { title: string; items: string[] }) {
+  return (
+    <DashboardCard title={title} subtitle="Operational controls are ready for backend wiring.">
+      <div className="grid gap-3 md:grid-cols-3">
+        {items.map((item) => (
+          <div key={item} className="rounded-lg border bg-background p-4">
+            <div className="text-sm font-semibold">{item}</div>
+            <div className="mt-2 text-xs text-muted-foreground">Configured as a functional placeholder.</div>
+          </div>
+        ))}
+      </div>
+    </DashboardCard>
+  );
+}
+
+function PlaceholderView({ title, subtitle }: { title: string; subtitle: string }) {
+  return <DashboardCard title={title} subtitle={subtitle}><div className="text-sm text-muted-foreground">Workspace controls are grouped here for the next backend pass.</div></DashboardCard>;
+}
+
+function DataTable({
+  headers,
+  rows,
+  actionLabel,
+  renderActions
+}: {
+  headers: string[];
+  rows: Array<Array<string | number>>;
+  actionLabel?: string;
+  renderActions?: (index: number) => ReactNode;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">
+        <thead>
+          <tr>
+            {headers.map((h) => <th key={h} className="border-b px-3 py-2 text-xs font-semibold text-muted-foreground">{h}</th>)}
+            {renderActions || actionLabel ? <th className="border-b px-3 py-2 text-xs font-semibold text-muted-foreground">Action</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="hover:bg-muted/30">
+              {row.map((cell, j) => <td key={`${i}-${j}`} className="border-b px-3 py-2">{cell}</td>)}
+              {renderActions || actionLabel ? (
+                <td className="border-b px-3 py-2">
+                  {renderActions ? renderActions(i) : <button className="rounded-md border px-2 py-1 text-xs">{actionLabel}</button>}
+                </td>
+              ) : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

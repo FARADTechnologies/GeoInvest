@@ -17,5 +17,5 @@ export const queryKeys = {
     ["sparklines", filters, minAdsPerCell] as const,
   histogram:     ["histogram"] as const,
   trendSeries: (filters: DashboardFilters | null) => ["trend-series", filters] as const,
-  activity:      (lang: "tr" | "en") => ["activity", lang] as const
+  activity:      (lang: "tr" | "en" | "az") => ["activity", lang] as const
 };

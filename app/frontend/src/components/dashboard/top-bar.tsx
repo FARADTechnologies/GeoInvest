@@ -78,6 +78,7 @@ export function TopBar({
 
   const initials = user?.initials ?? "AD";
   const displayName = user?.name ?? "admin";
+  const nextLang: Record<Lang, Lang> = { tr: "en", en: "az", az: "tr" };
 
   return (
     <header className="flex items-center gap-3 border-b bg-card px-5 py-3">
@@ -93,12 +94,12 @@ export function TopBar({
       {/* Search — not yet wired to backend */}
       <div
         className="hidden h-9 items-center gap-2 rounded-lg border bg-muted/30 px-3 md:flex md:w-[280px]"
-        title="Arama özelliği yakında"
+        title={t.searchSoon ?? "Search coming soon"}
       >
         <Search className="h-3.5 w-3.5 text-muted-foreground" />
         <input
           type="text"
-          placeholder={`${t.searchPh} (yakında)`}
+          placeholder={`${t.searchPh} (${t.searchSoon ?? "soon"})`}
           disabled
           className="flex-1 cursor-not-allowed bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/60"
         />
@@ -149,7 +150,7 @@ export function TopBar({
       </Button>
 
       <button
-        onClick={() => onLangChange(lang === "tr" ? "en" : "tr")}
+        onClick={() => onLangChange(nextLang[lang])}
         className="flex h-9 items-center gap-1.5 rounded-lg border bg-background px-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
         aria-label="Toggle language"
       >

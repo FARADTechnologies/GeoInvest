@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, type CSSProperties } from "react";
 
 import { HMIcon, type IconName } from "@/components/auth/auth-icons";
+import { submitAccountRequest } from "@/lib/admin-data";
 import { signIn } from "@/lib/auth";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -26,7 +27,12 @@ export function HMAuthFlow({ t }: Props) {
   const [email, setEmail] = useState("admin@homora.ai");
   const [password, setPassword] = useState("12345");
   const [name, setName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
+  const [phone, setPhone] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [title, setTitle] = useState("");
+  const [employeeCount, setEmployeeCount] = useState("");
   const [remember, setRemember] = useState(true);
   const [otp, setOtp] = useState("");
   const [otpOrigin, setOtpOrigin] = useState<Mode>("signin");
@@ -61,20 +67,33 @@ export function HMAuthFlow({ t }: Props) {
 
   const handleSignUp = async () => {
     setError("");
-    if (!email.trim() || !password.trim()) {
+    if (
+      !name.trim() ||
+      !lastName.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      !company.trim() ||
+      !taxId.trim() ||
+      !title.trim() ||
+      !password.trim()
+    ) {
       setError(t.errEmpty || "Email ve şifre gerekli.");
       return;
     }
-    // Sign-up in this prototype just verifies and goes to dashboard.
     setSubmitting(true);
-    try {
-      await signIn(email, password, { name });
-      goto("verify");
-      setSubmitting(false);
-    } catch {
-      setError(t.errEmpty || "Kayıt başarısız.");
-      setSubmitting(false);
-    }
+    submitAccountRequest({
+      firstName: name,
+      lastName,
+      email,
+      phone,
+      companyName: company,
+      taxId,
+      title,
+      password,
+      employeeCount: employeeCount || undefined
+    });
+    goto("verify");
+    setSubmitting(false);
   };
 
   const onOtpComplete = async (code: string) => {
@@ -255,17 +274,39 @@ export function HMAuthFlow({ t }: Props) {
             >
               <HMField
                 icon="user"
-                label={t.fullName}
+                label={t.firstName ?? t.fullName}
                 value={name}
                 onChange={setName}
                 placeholder={t.fullNamePlaceholder}
               />
+              <HMField
+                icon="user"
+                label={t.lastName ?? "Soyad"}
+                value={lastName}
+                onChange={setLastName}
+                placeholder="Mammadova"
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12
+              }}
+            >
               <HMField
                 icon="building"
                 label={t.company}
                 value={company}
                 onChange={setCompany}
                 placeholder={t.companyPlaceholder}
+              />
+              <HMField
+                icon="building"
+                label={t.taxId ?? "VOEN"}
+                value={taxId}
+                onChange={setTaxId}
+                placeholder="1702458891"
               />
             </div>
             <HMField
@@ -275,6 +316,35 @@ export function HMAuthFlow({ t }: Props) {
               value={email}
               onChange={setEmail}
               placeholder={t.emailPlaceholder}
+            />
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 12
+              }}
+            >
+              <HMField
+                icon="mail"
+                label={t.phone ?? "Telefon"}
+                value={phone}
+                onChange={setPhone}
+                placeholder="+994 50 000 00 00"
+              />
+              <HMField
+                icon="user"
+                label={t.title ?? "Unvan / pozisyon"}
+                value={title}
+                onChange={setTitle}
+                placeholder="Director"
+              />
+            </div>
+            <HMField
+              icon="building"
+              label={t.employeeCount ?? "Calisan sayisi"}
+              value={employeeCount}
+              onChange={setEmployeeCount}
+              placeholder="Opsiyonel"
             />
             <HMField
               icon="lock"
@@ -293,7 +363,7 @@ export function HMAuthFlow({ t }: Props) {
               style={{ marginTop: 4 }}
               disabled={submitting}
             >
-              {t.createAccount} <HMIcon name="arrow-right" size={16} />
+              {t.submitAccountRequest ?? t.createAccount} <HMIcon name="arrow-right" size={16} />
             </button>
 
             <p style={{ ...hmStyles.fine, marginTop: 4 }}>
@@ -430,11 +500,10 @@ export function HMAuthFlow({ t }: Props) {
           <div style={hmStyles.iconBubble}>
             <HMIcon name="check-circle" size={28} stroke={1.6} />
           </div>
-          <h1 style={hmStyles.h1}>{t.verifyTitle}</h1>
+          <h1 style={hmStyles.h1}>{t.requestReceivedTitle ?? t.verifyTitle}</h1>
           <p style={hmStyles.sub}>
-            {t.verifySub}{" "}
-            <strong style={{ color: "var(--ink-800)" }}>{email}</strong>
-            {t.verifySub2}
+            {t.requestReceivedBody ??
+              "Talebiniz alindi, super admin onayindan sonra erisim acilacak."}
           </p>
           <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
             <button

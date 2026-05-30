@@ -114,6 +114,6 @@ export async function fetchTrendSeries(): Promise<TrendSeries[]> {
   return TREND_SERIES;
 }
 
-export async function fetchActivity(lang: "tr" | "en" = "tr"): Promise<ActivityItem[]> {
+export async function fetchActivity(lang: "tr" | "en" | "az" = "tr"): Promise<ActivityItem[]> {
   return lang === "en" ? ACTIVITY_EN : ACTIVITY_TR;
 }

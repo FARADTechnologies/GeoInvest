@@ -58,6 +58,6 @@ export async function fetchTrendSeries(
   }
 }
 
-export function fetchActivity(lang: "tr" | "en" = "tr"): Promise<ActivityItem[]> {
+export function fetchActivity(lang: "tr" | "en" | "az" = "tr"): Promise<ActivityItem[]> {
   return mockActivity(lang);
 }
