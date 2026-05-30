@@ -74,7 +74,7 @@ export function DashboardShell() {
   const t = useStrings(lang);
 
   const [filters, setFilters] = useState<DashboardFilters | null>(null);
-  const [minAdsThreshold, setMinAdsThreshold] = useState(2);
+  const [minAdsThreshold, setMinAdsThreshold] = useState(0);
   const [colorBy, setColorBy] = useState<"price" | "listings">("price");
   const [activeView, setActiveView] = useState<DashboardView>("overview");
   const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);

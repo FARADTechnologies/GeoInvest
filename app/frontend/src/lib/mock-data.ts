@@ -7,7 +7,10 @@
 
 import type {
   ActivityItem,
+  FiltersResponse,
   HistogramBucket,
+  MapDataPoint,
+  MetricsResponse,
   Rayon,
   Sparklines,
   TrendSeries
@@ -36,6 +39,40 @@ const SPARKLINES: Sparklines = {
   trend_percentage: [ 1.1,  3.2, -0.4,  1.8,  0.7,  -1.4,   2.1,   4.6],
   active_h3_cells:  [ 942,  984, 1021, 1064, 1098,  1142,  1198,  1247]
 };
+
+const FALLBACK_FILTERS: FiltersResponse = {
+  periods: ["2026-05", "2026-04", "2026-03", "2026-02", "2026-01", "2025-12"],
+  categories: ["Köhnə tikili", "Yeni tikili"],
+  resolutions: [6, 7, 8],
+  analysis_types: ["geom", "pure_h3"]
+};
+
+const FALLBACK_METRICS: MetricsResponse = {
+  total_ads: 35,
+  avg_median_price: 2948,
+  trend_percentage: 4.8,
+  active_h3_cells: 13,
+  previous_period: "2026-04",
+  previous_total_ads: 31,
+  previous_avg_median_price: 2812,
+  previous_active_h3_cells: 11
+};
+
+const FALLBACK_MAP_DATA: MapDataPoint[] = [
+  { h3_index: "872ce581cffffff", ad_count: 10, median_price_kvm: 3340, category: "Yeni tikili", rayon_name: "Nəsimi rayonu, Yasamal rayonu" },
+  { h3_index: "872ce5819ffffff", ad_count: 5, median_price_kvm: 4045, category: "Köhnə tikili, Yeni tikili", rayon_name: "Nərimanov rayonu, Xətai rayonu" },
+  { h3_index: "872ce581dffffff", ad_count: 5, median_price_kvm: 3109, category: "Yeni tikili", rayon_name: "Nərimanov rayonu, Nəsimi rayonu" },
+  { h3_index: "872ce5802ffffff", ad_count: 3, median_price_kvm: 2633, category: "Yeni tikili", rayon_name: "Yasamal rayonu" },
+  { h3_index: "872ce580affffff", ad_count: 2, median_price_kvm: 3080, category: "Yeni tikili", rayon_name: "Nərimanov rayonu" },
+  { h3_index: "872ce58e3ffffff", ad_count: 2, median_price_kvm: 2524, category: "Köhnə tikili", rayon_name: "Nizami rayonu, Xətai rayonu" },
+  { h3_index: "872ce58e1ffffff", ad_count: 2, median_price_kvm: 1894, category: "Yeni tikili", rayon_name: "Nizami rayonu, Sabunçu rayonu" },
+  { h3_index: "872ce58c4ffffff", ad_count: 1, median_price_kvm: 2697, category: "Yeni tikili", rayon_name: "Xətai rayonu" },
+  { h3_index: "872ce58e2ffffff", ad_count: 1, median_price_kvm: 2471, category: "Köhnə tikili", rayon_name: "Xətai rayonu" },
+  { h3_index: "872ce580effffff", ad_count: 1, median_price_kvm: 2611, category: "Yeni tikili", rayon_name: "Binəqədi rayonu" },
+  { h3_index: "872ce58e5ffffff", ad_count: 1, median_price_kvm: 2609, category: "Yeni tikili", rayon_name: "Nizami rayonu" },
+  { h3_index: "872ce580cffffff", ad_count: 1, median_price_kvm: 2350, category: "Yeni tikili", rayon_name: "Binəqədi rayonu" },
+  { h3_index: "872ce5803ffffff", ad_count: 1, median_price_kvm: 2950, category: "Yeni tikili", rayon_name: "Nəsimi rayonu" }
+];
 
 // ── Price-distribution histogram (AZN/m², 10 bins) ───────────────────
 const HISTOGRAM: HistogramBucket[] = [
@@ -100,6 +137,18 @@ const ACTIVITY_EN: ActivityItem[] = [
 // ── Async fetchers (mirror api.ts signatures) ────────────────────────
 export async function fetchRayons(): Promise<Rayon[]> {
   return RAYONS;
+}
+
+export async function fetchFallbackFilters(): Promise<FiltersResponse> {
+  return FALLBACK_FILTERS;
+}
+
+export async function fetchFallbackMetrics(): Promise<MetricsResponse> {
+  return FALLBACK_METRICS;
+}
+
+export async function fetchFallbackMapData(): Promise<MapDataPoint[]> {
+  return FALLBACK_MAP_DATA;
 }
 
 export async function fetchSparklines(): Promise<Sparklines> {
