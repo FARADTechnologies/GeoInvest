@@ -1,14 +1,87 @@
-// Minimal i18n for the dashboard. TR is the default for Homora.ai.
+// Combined i18n for the dashboard + auth flow.
+// TR is canonical; EN is mirrored. Both maps share the same keys so the
+// type lookup `t.X` is safe at any callsite regardless of language.
 
 export type Lang = "tr" | "en";
 
 type Strings = Record<string, string>;
 
 const TR: Strings = {
-  // Brand / workspace
+  // ── Brand / shared ───────────────────────────────────────
+  brand: "Homora",
   workspace: "Çalışma Alanı",
 
-  // Top bar
+  // ── Login / auth ─────────────────────────────────────────
+  brandTag: "Bölgesel Emlak Zekâsı",
+  tagline:
+    "Bakü emlak piyasasını H3 hexagon ızgarasında çözümleyin. Fiyat, talep ve eğilimleri tek bir panelde.",
+  testimonial:
+    "Homora yatırım kararlarımızı haftalar yerine dakikalara indirdi. Bakü'de hangi rayonların gerçekten ısındığını ilk biz görüyoruz.",
+  testimonialAuthor: "Maqsud Aydayev",
+  testimonialRole: "Head of Company",
+
+  signIn: "Giriş Yap",
+  signUp: "Hesap Oluştur",
+  backToSignIn: "Girişe dön",
+
+  signInTitle: "Tekrar hoş geldin",
+  signInSub: "Çalışma alanına devam etmek için giriş yap.",
+  email: "İş e-postası",
+  emailPlaceholder: "ad@sirket.com",
+  password: "Şifre",
+  passwordPlaceholder: "En az 8 karakter",
+  rememberMe: "Beni hatırla",
+  forgot: "Şifremi unuttum",
+  continue: "Devam et",
+  signInBtn: "Giriş yap",
+  or: "veya",
+  useOtp: "Şifresiz giriş (OTP)",
+  errEmpty: "Lütfen e-posta ve şifre gir.",
+  loading: "Yükleniyor",
+
+  signUpTitle: "Homora hesabını oluştur",
+  signUpSub: "14 gün ücretsiz deneme. Kredi kartı gerekmez.",
+  fullName: "Ad Soyad",
+  fullNamePlaceholder: "Ayşe Yılmaz",
+  company: "Şirket adı",
+  companyPlaceholder: "Caspian Realty",
+  createAccount: "Hesabı oluştur",
+  agreeStart: "Devam ederek",
+  agreeTerms: "Kullanım Koşulları",
+  agreeAnd: "ve",
+  agreePrivacy: "Gizlilik Politikası",
+  agreeEnd: "kabul etmiş olursun.",
+
+  forgotTitle: "Şifreni mi unuttun?",
+  forgotSub: "E-postanı gir, sana sıfırlama bağlantısı gönderelim.",
+  sendResetLink: "Sıfırlama bağlantısı gönder",
+  rememberItNow: "Hatırladım,",
+
+  otpTitle: "Kodu gir",
+  otpSubA: "6 haneli doğrulama kodunu",
+  otpSubB: "adresine gönderdik.",
+  otpResend: "Kod gelmedi mi?",
+  otpResendBtn: "Tekrar gönder",
+  verifyOtp: "Kodu doğrula",
+
+  verifyTitle: "Hesabın hazır",
+  verifySub: "Hesabını etkinleştirmek için",
+  verifySub2: " adresine bir hoş geldin postası gönderdik.",
+  resendVerify: "Tekrar gönder",
+
+  productHeadline: "Bakü'nün her metrekaresinde fiyat ipucu.",
+  productSub: "H3 hexagon ızgarasında 12.847 ilanı analiz ediyor.",
+  statHexagons: "Aktif hexagon",
+  statListings: "İlan",
+  statRayons: "Rayon",
+  statAccuracy: "Tahmin doğruluğu",
+
+  copyright: "© 2026 Homora.ai · Bakü",
+  help: "Yardım",
+  privacy: "Gizlilik",
+  terms: "Koşullar",
+
+  // ── Top bar / nav (dashboard) ────────────────────────────
   dashTitle: "Analiz Paneli",
   dashSub: "H3 hexagonal emlak istihbaratı · Bakü",
   searchPh: "Bölge, hücre, ilan ara...",
@@ -17,7 +90,6 @@ const TR: Strings = {
   refresh: "Yenile",
   export: "Dışa Aktar",
 
-  // Nav
   navOverview: "Genel Bakış",
   navMap: "Harita",
   navRayons: "Bölgeler",
@@ -27,6 +99,11 @@ const TR: Strings = {
   navAlerts: "Uyarılar",
   navSettings: "Ayarlar",
   navAccount: "Hesap",
+
+  // User menu (dropdown on the user chip)
+  menuAccount: "Hesabım",
+  menuTheme: "Tema",
+  menuSignOut: "Çıkış yap",
 
   // Filters
   analysisType: "Analiz Tipi",
@@ -59,17 +136,14 @@ const TR: Strings = {
   secActivity: "Son Aktivite",
   secActivitySub: "Sistem ve veri olayları",
 
-  // Misc
   low: "Düşük",
   high: "Yüksek",
   hot: "Sıcak",
   viewAll: "Tümünü Gör",
   listings: "İlan",
-  copyright: "© Homora.ai · 2026",
 
-  // Connection
   connectTitle: "DEMO Modu",
-  connectSub: "Canlı veri için backend'i başlatın. Birkaç saniye içinde otomatik bağlanacak.",
+  connectSub: "Canlı veri için backend'i başlatın.",
   connectStep1: "1. Backend'i başlat",
   connectStep2: "2. Bekle, otomatik LIVE olacak",
   connectingLive: "✓ Canlı veri akıyor",
@@ -77,7 +151,77 @@ const TR: Strings = {
 };
 
 const EN: Strings = {
+  brand: "Homora",
   workspace: "Workspace",
+
+  brandTag: "Geospatial Real-Estate Intelligence",
+  tagline:
+    "Decode the Baku real-estate market on the H3 hexagonal grid. Price, demand, and trends in one console.",
+  testimonial:
+    "Homora collapsed our investment cycle from weeks to minutes. We see which rayons are heating up before anyone else does.",
+  testimonialAuthor: "Maqsud Aydayev",
+  testimonialRole: "Head of Company",
+
+  signIn: "Sign in",
+  signUp: "Sign up",
+  backToSignIn: "Back to sign in",
+
+  signInTitle: "Welcome back",
+  signInSub: "Sign in to continue to your workspace.",
+  email: "Work email",
+  emailPlaceholder: "name@company.com",
+  password: "Password",
+  passwordPlaceholder: "At least 8 characters",
+  rememberMe: "Remember me",
+  forgot: "Forgot password",
+  continue: "Continue",
+  signInBtn: "Sign in",
+  or: "or",
+  useOtp: "Passwordless (OTP)",
+  errEmpty: "Please enter email and password.",
+  loading: "Loading",
+
+  signUpTitle: "Create your Homora account",
+  signUpSub: "14-day free trial. No credit card required.",
+  fullName: "Full name",
+  fullNamePlaceholder: "Jane Doe",
+  company: "Company name",
+  companyPlaceholder: "Caspian Realty",
+  createAccount: "Create account",
+  agreeStart: "By continuing, you agree to our",
+  agreeTerms: "Terms",
+  agreeAnd: "and",
+  agreePrivacy: "Privacy Policy",
+  agreeEnd: ".",
+
+  forgotTitle: "Forgot password?",
+  forgotSub: "Enter your email and we'll send you a reset link.",
+  sendResetLink: "Send reset link",
+  rememberItNow: "Got it,",
+
+  otpTitle: "Enter the code",
+  otpSubA: "We sent a 6-digit verification code to",
+  otpSubB: ".",
+  otpResend: "Didn't get it?",
+  otpResendBtn: "Resend",
+  verifyOtp: "Verify code",
+
+  verifyTitle: "You're in",
+  verifySub: "We sent a welcome email to",
+  verifySub2: ".",
+  resendVerify: "Resend",
+
+  productHeadline: "Every square meter of Baku, priced.",
+  productSub: "Analyzing 12,847 listings on the H3 hex grid.",
+  statHexagons: "Active hexagons",
+  statListings: "Listings",
+  statRayons: "Rayons",
+  statAccuracy: "Forecast accuracy",
+
+  copyright: "© 2026 Homora.ai · Baku",
+  help: "Help",
+  privacy: "Privacy",
+  terms: "Terms",
 
   dashTitle: "Analytics",
   dashSub: "H3 hexagonal real estate intelligence · Baku",
@@ -96,6 +240,10 @@ const EN: Strings = {
   navAlerts: "Alerts",
   navSettings: "Settings",
   navAccount: "Account",
+
+  menuAccount: "My account",
+  menuTheme: "Theme",
+  menuSignOut: "Sign out",
 
   analysisType: "Analysis Type",
   period: "Period",
@@ -130,10 +278,9 @@ const EN: Strings = {
   hot: "Hot",
   viewAll: "View all",
   listings: "Listings",
-  copyright: "© Homora.ai · 2026",
 
   connectTitle: "DEMO Mode",
-  connectSub: "Start the backend to see live data. Auto-connects in a few seconds.",
+  connectSub: "Start the backend to see live data.",
   connectStep1: "1. Start the backend",
   connectStep2: "2. Wait — it'll go LIVE automatically",
   connectingLive: "✓ Live data streaming",

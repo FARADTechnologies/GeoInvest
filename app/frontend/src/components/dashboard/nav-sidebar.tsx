@@ -11,6 +11,7 @@ import {
   TrendingUp,
   User
 } from "lucide-react";
+import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
@@ -43,10 +44,13 @@ export function NavSidebar({ t }: Props) {
 
   return (
     <nav className="flex flex-col gap-4 px-3 py-4">
-      {/* Brand */}
-      <div className="flex items-center gap-2 px-2">
+      {/* Brand — clickable, returns to /(dashboard) */}
+      <Link
+        href="/"
+        className="flex items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-muted/40"
+        aria-label="Homora.ai dashboard"
+      >
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-600)] text-white">
-          {/* Inline brand-mark: simple hex */}
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path
               d="M12 2.5 L21 7 V17 L12 21.5 L3 17 V7 Z"
@@ -60,13 +64,14 @@ export function NavSidebar({ t }: Props) {
         </div>
         <div className="flex min-w-0 flex-col">
           <span className="text-[14px] font-bold tracking-tight">
-            Homora<span className="text-muted-foreground font-medium">.ai</span>
+            Homora
+            <span className="font-medium text-muted-foreground">.ai</span>
           </span>
           <span className="truncate text-[10.5px] text-muted-foreground">
             {t.workspace} · Caspian Realty
           </span>
         </div>
-      </div>
+      </Link>
 
       {/* Main nav */}
       <div className="flex flex-col gap-0.5">
@@ -94,6 +99,7 @@ function NavRow({ item }: { item: NavItem }) {
   const Icon = item.icon;
   return (
     <button
+      type="button"
       className={cn(
         "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors",
         item.active
@@ -107,9 +113,7 @@ function NavRow({ item }: { item: NavItem }) {
         <span
           className={cn(
             "rounded-full px-1.5 py-0.5 text-[9.5px] font-bold tracking-wider",
-            item.active
-              ? "bg-white/20 text-white"
-              : "bg-muted text-muted-foreground"
+            item.active ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"
           )}
         >
           {item.pill}
