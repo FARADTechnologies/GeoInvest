@@ -161,7 +161,7 @@ function miniSeries(seed: number, end: number, n = 8) {
 }
 
 // ── Rayon detail (modal body) ───────────────────────────────────────────
-function RayonDetail({ rayon, listings, onClose }: { rayon: RayonStat; listings: Listing[]; onClose: () => void }) {
+function RayonDetail({ t, rayon, listings, onClose }: { t: Record<string, string>; rayon: RayonStat; listings: Listing[]; onClose: () => void }) {
   const rl = listings.filter((l) => l.rayonId === rayon.id);
   const byRooms = [1, 2, 3, 4].map((rooms) => {
     const rows = rl.filter((l) => l.rooms === rooms);
@@ -174,37 +174,37 @@ function RayonDetail({ rayon, listings, onClose }: { rayon: RayonStat; listings:
       <div className="hm-detail-head">
         <div>
           <div className="hm-detail-title">
-            {rayon.name} {rayon.hot && <Badge tone="hot">Sıcak</Badge>}
+            {rayon.name} {rayon.hot && <Badge tone="hot">{t.hot ?? "Sıcak"}</Badge>}
           </div>
-          <div className="hm-detail-sub">{nf(rayon.listings)} aktiv ilan</div>
+          <div className="hm-detail-sub">{nf(rayon.listings)} {t.rdActiveListings ?? "aktiv ilan"}</div>
         </div>
-        <button className="hm-icon-btn" onClick={onClose} aria-label="Kapat">
+        <button className="hm-icon-btn" onClick={onClose} aria-label="Close">
           <X size={15} />
         </button>
       </div>
       <div className="hm-detail-stats">
-        <div><span>Medyan</span><b>{nf(rayon.median)} ₼/m²</b></div>
-        <div><span>Trend</span><b><Trend v={rayon.trend} /></b></div>
-        <div><span>Ort. sahə</span><b>{rayon.avgArea} m²</b></div>
-        <div><span>Yeni tikili</span><b>{rayon.newShare}%</b></div>
+        <div><span>{t.rdMedian ?? "Medyan"}</span><b>{nf(rayon.median)} ₼/m²</b></div>
+        <div><span>{t.kpiTrend ?? "Trend"}</span><b><Trend v={rayon.trend} /></b></div>
+        <div><span>{t.rdAvgAreaLbl ?? "Ort. sahə"}</span><b>{rayon.avgArea} m²</b></div>
+        <div><span>{t.rdNewBuild ?? "Yeni tikili"}</span><b>{rayon.newShare}%</b></div>
       </div>
-      <div className="hm-detail-sec">Oda sayısına göre medyan ₼/m²</div>
+      <div className="hm-detail-sec">{t.rdByRoomMedian ?? "Oda sayısına göre medyan ₼/m²"}</div>
       <div className="hm-roombars">
         {byRooms.map((b) => (
           <div className="hm-roombar" key={b.rooms}>
-            <span className="hm-roombar-k">{b.rooms} otaq</span>
+            <span className="hm-roombar-k">{b.rooms} {t.rdRoom ?? "otaq"}</span>
             <div className="hm-roombar-track"><span style={{ width: `${(b.med / maxRoom) * 100}%` }} /></div>
             <span className="hm-roombar-v">{nf(b.med)}</span>
           </div>
         ))}
       </div>
-      <div className="hm-detail-sec">Son ilanlar</div>
+      <div className="hm-detail-sec">{t.rdRecent ?? "Son ilanlar"}</div>
       <div className="hm-detail-listings">
         {rl.slice(0, 5).map((l) => (
           <div className="hm-mini-listing" key={l.id}>
             <div style={{ minWidth: 0 }}>
               <div className="hm-ml-title">{l.title}</div>
-              <div className="hm-ml-sub">{l.area} m² · {l.rooms} otaq · {l.cat}</div>
+              <div className="hm-ml-sub">{l.area} m² · {l.rooms} {t.rdRoom ?? "otaq"} · {l.cat}</div>
             </div>
             <div className="hm-ml-price">{nf(l.ppm)} ₼/m²</div>
           </div>
@@ -250,7 +250,7 @@ export function RayonsViewV3({
             <div className="hm-rcard-top">
               <span className="hm-rcard-dot" style={{ background: colorFor(heatOf(r)) }} />
               <span className="hm-rcard-name">{r.short}</span>
-              {r.hot && <Badge tone="hot">Sıcak</Badge>}
+              {r.hot && <Badge tone="hot">{t.hot ?? "Sıcak"}</Badge>}
             </div>
             <div className="hm-rcard-val">{nf(r.median)}<small> ₼/m²</small></div>
             <div className="hm-rcard-foot"><Trend v={r.trend} /><span>{nf(r.listings)} ilan</span></div>
@@ -284,12 +284,12 @@ export function RayonsViewV3({
               <tr>
                 <th>#</th>
                 <th>Rayon</th>
-                <th className="num">İlan</th>
-                <th className="num">Medyan ₼/m²</th>
-                <th className="num">Şehir farkı</th>
-                <th className="num">Ort. m²</th>
-                <th className="num">Yeni %</th>
-                <th className="num">Trend</th>
+                <th className="num">{t.listings ?? "İlan"}</th>
+                <th className="num">{t.rvMedianCol ?? "Medyan ₼/m²"}</th>
+                <th className="num">{t.rvCityDiff ?? "Şehir farkı"}</th>
+                <th className="num">{t.rvAvgArea ?? "Ort. m²"}</th>
+                <th className="num">{t.rvNewPct ?? "Yeni %"}</th>
+                <th className="num">{t.kpiTrend ?? "Trend"}</th>
                 <th></th>
               </tr>
             </thead>
@@ -299,7 +299,7 @@ export function RayonsViewV3({
                 return (
                   <tr key={r.id} onClick={() => setSel(r.id)} className={sel === r.id ? "on" : ""}>
                     <td className="muted">{i + 1}</td>
-                    <td><b>{r.short}</b> {r.hot && <Badge tone="hot">Sıcak</Badge>}</td>
+                    <td><b>{r.short}</b> {r.hot && <Badge tone="hot">{t.hot ?? "Sıcak"}</Badge>}</td>
                     <td className="num">{nf(r.listings)}</td>
                     <td className="num"><b>{nf(r.median)}</b></td>
                     <td className="num">
@@ -320,7 +320,7 @@ export function RayonsViewV3({
       {selRayon && (
         <div className="hm-modal" onClick={() => setSel(null)}>
           <div className="hm-modal-card" onClick={(e) => e.stopPropagation()}>
-            <RayonDetail rayon={selRayon} listings={listings} onClose={() => setSel(null)} />
+            <RayonDetail t={t} rayon={selRayon} listings={listings} onClose={() => setSel(null)} />
           </div>
         </div>
       )}
@@ -396,7 +396,7 @@ export function ListingsViewV3({
           <div className="hm-toolbar">
             <div className="hm-search-sm">
               <Search size={14} />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="İlan, başlıq, ID..." />
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.lvSearchPh ?? "İlan, başlıq, ID..."} />
             </div>
             <select value={rayon} onChange={(e) => setRayon(e.target.value)} className="hm-select">
               {rayonOpts.map((o) => (
@@ -421,16 +421,16 @@ export function ListingsViewV3({
           <table className="hm-table">
             <thead>
               <tr>
-                <th onClick={() => sortBy("title")} className="sortable">Başlık{sIcon("title")}</th>
-                <th onClick={() => sortBy("rayon")} className="sortable">Bölge{sIcon("rayon")}</th>
-                <th onClick={() => sortBy("rooms")} className="sortable num">Otaq{sIcon("rooms")}</th>
-                <th onClick={() => sortBy("area")} className="sortable num">m²{sIcon("area")}</th>
-                <th onClick={() => sortBy("price")} className="sortable num">Fiyat{sIcon("price")}</th>
-                <th onClick={() => sortBy("ppm")} className="sortable num">₼/m²{sIcon("ppm")}</th>
-                <th>Kateqoriya</th>
-                <th onClick={() => sortBy("date")} className="sortable num">Tarix{sIcon("date")}</th>
-                <th>Mənbə</th>
-                <th>Status</th>
+                <th onClick={() => sortBy("title")} className="sortable">{t.lvTitle ?? "Başlık"}{sIcon("title")}</th>
+                <th onClick={() => sortBy("rayon")} className="sortable">{t.lvRayon ?? "Bölge"}{sIcon("rayon")}</th>
+                <th onClick={() => sortBy("rooms")} className="sortable num">{t.lvRooms ?? "Otaq"}{sIcon("rooms")}</th>
+                <th onClick={() => sortBy("area")} className="sortable num">{t.lvArea ?? "m²"}{sIcon("area")}</th>
+                <th onClick={() => sortBy("price")} className="sortable num">{t.lvPrice ?? "Fiyat"}{sIcon("price")}</th>
+                <th onClick={() => sortBy("ppm")} className="sortable num">{t.lvPpm ?? "₼/m²"}{sIcon("ppm")}</th>
+                <th>{t.lvCategory ?? "Kateqoriya"}</th>
+                <th onClick={() => sortBy("date")} className="sortable num">{t.lvDate ?? "Tarix"}{sIcon("date")}</th>
+                <th>{t.lvSource ?? "Mənbə"}</th>
+                <th>{t.lvStatus ?? "Status"}</th>
               </tr>
             </thead>
             <tbody>
@@ -438,7 +438,7 @@ export function ListingsViewV3({
                 <tr key={l.id}>
                   <td>
                     <b>{l.title}</b>
-                    <div className="hm-cell-sub">{l.id} · {l.floor}. mərtəbə</div>
+                    <div className="hm-cell-sub">{l.id} · {l.floor}. {t.lvFloor ?? "mərtəbə"}</div>
                   </td>
                   <td>{l.rayon.replace(" rayonu", "")}</td>
                   <td className="num">{l.rooms}</td>
@@ -485,11 +485,12 @@ export function B2CView({
     <div className="hm-v3 hm-b2c">
       <div className="hm-b2c-hero">
         <div className="hm-b2c-hero-txt">
-          <Badge tone="brand">Bakı bazarı · May 2026</Badge>
-          <h2>Bakıda kvadrat metr <b>{nf(b2c.cityMedian)} ₼</b></h2>
+          <Badge tone="brand">{t.b2cHeroBadge ?? "Bakı bazarı · May 2026"}</Badge>
+          <h2>{t.b2cHeroLead ?? "Bakıda kvadrat metr"} <b>{nf(b2c.cityMedian)} ₼</b></h2>
           <p>
-            Şəhər üzrə medyan qiymət son ayda <span className="hm-up">↑ {b2c.cityTrend}%</span> artdı.
-            Aşağıda evinizin dəyərini anlamağa kömək edəcək sadə göstəricilər var.
+            {t.b2cHeroSubA ?? "Şəhər üzrə medyan qiymət son ayda"}{" "}
+            <span className="hm-up">↑ {b2c.cityTrend}%</span>{" "}
+            {t.b2cHeroSubB ?? "artdı. Aşağıda evinizin dəyərini anlamağa kömək edəcək sadə göstəricilər var."}
           </p>
         </div>
         <div className="hm-b2c-hero-card">
@@ -502,14 +503,14 @@ export function B2CView({
             ]}
             center={
               <div>
-                <div style={{ fontSize: 11, color: "var(--ink-500)" }}>Yeni tikili</div>
+                <div style={{ fontSize: 11, color: "var(--ink-500)" }}>{t.b2cNewBuild ?? "Yeni tikili"}</div>
                 <div style={{ fontSize: 22, fontWeight: 700 }}>{newPct}%</div>
               </div>
             }
           />
           <div className="hm-b2c-hero-legend">
-            <span><i style={{ background: "var(--brand-500)" }} />Yeni tikili · {nf(b2c.newVsOld.newMed)} ₼/m²</span>
-            <span><i style={{ background: "var(--ink-300)" }} />Köhnə tikili · {nf(b2c.newVsOld.oldMed)} ₼/m²</span>
+            <span><i style={{ background: "var(--brand-500)" }} />{t.b2cNewBuild ?? "Yeni tikili"} · {nf(b2c.newVsOld.newMed)} ₼/m²</span>
+            <span><i style={{ background: "var(--ink-300)" }} />{t.b2cOldBuild ?? "Köhnə tikili"} · {nf(b2c.newVsOld.oldMed)} ₼/m²</span>
           </div>
         </div>
       </div>
@@ -517,30 +518,30 @@ export function B2CView({
       <div className="hm-b2c-tiles">
         <div className="hm-b2c-tile">
           <span className="hm-b2c-ic ok"><Heart size={16} /></span>
-          <div className="hm-b2c-tk">Ən sərfəli bölgə</div>
+          <div className="hm-b2c-tk">{t.b2cCheapest ?? "Ən sərfəli bölgə"}</div>
           <div className="hm-b2c-tv">{b2c.affordableRayon.short}</div>
           <div className="hm-b2c-ts">{nf(b2c.affordableRayon.median)} ₼/m²</div>
         </div>
         <div className="hm-b2c-tile">
           <span className="hm-b2c-ic warn"><Sparkles size={16} /></span>
-          <div className="hm-b2c-tk">Ən prestijli bölgə</div>
+          <div className="hm-b2c-tk">{t.b2cPremium ?? "Ən prestijli bölgə"}</div>
           <div className="hm-b2c-tv">{b2c.premiumRayon.short}</div>
           <div className="hm-b2c-ts">{nf(b2c.premiumRayon.median)} ₼/m²</div>
         </div>
         <div className="hm-b2c-tile">
           <span className="hm-b2c-ic brand"><TrendingUp size={16} /></span>
-          <div className="hm-b2c-tk">Ən sürətli artan</div>
+          <div className="hm-b2c-tk">{t.b2cFastest ?? "Ən sürətli artan"}</div>
           <div className="hm-b2c-tv">{b2c.fastestRayon.short}</div>
           <div className="hm-b2c-ts"><Trend v={b2c.fastestRayon.trend} /></div>
         </div>
       </div>
 
       <div className="hm-grid-2b">
-        <Card title="Oda sayısına göre qiymət" sub="Şəhər üzrə medyan satış qiyməti">
+        <Card title={t.b2cByRoomTitle ?? "Oda sayısına göre qiymət"} sub={t.b2cByRoomSub ?? "Şəhər üzrə medyan satış qiyməti"}>
           <div className="hm-roombars" style={{ marginTop: 4 }}>
             {b2c.byRooms.map((r) => (
               <div className="hm-roombar" key={r.rooms}>
-                <span className="hm-roombar-k">{r.rooms} otaqlı</span>
+                <span className="hm-roombar-k">{r.rooms} {t.b2cRoomSuffix ?? "otaqlı"}</span>
                 <div className="hm-roombar-track">
                   <span style={{ width: `${(r.medianPrice / maxRoom) * 100}%`, background: "var(--brand-500)" }} />
                 </div>
@@ -548,9 +549,9 @@ export function B2CView({
               </div>
             ))}
           </div>
-          <p className="hm-b2c-note">Qiymətlər {nf(listingsCount)} aktiv elandan hesablanıb.</p>
+          <p className="hm-b2c-note">{t.b2cByRoomNoteA ?? "Qiymətlər"} {nf(listingsCount)} {t.b2cByRoomNoteB ?? "aktiv elandan hesablanıb."}</p>
         </Card>
-        <Card title="Bölgələr üzrə qiymət" sub="Aşağıdan yuxarıya medyan ₼/m²">
+        <Card title={t.b2cRankTitle ?? "Bölgələr üzrə qiymət"} sub={t.b2cRankSub ?? "Aşağıdan yuxarıya medyan ₼/m²"}>
           <div className="hm-b2c-rank">
             {rayons
               .slice()
