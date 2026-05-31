@@ -99,60 +99,76 @@ RAYONS.forEach((r) => {
 });
 LISTINGS.sort((a, b) => (a.date < b.date ? 1 : -1)); // newest first
 
-const RAYON_STATS: RayonStat[] = RAYONS.map((r) => {
-  const rows = LISTINGS.filter((l) => l.rayonId === r.id);
-  const ppms = rows.map((l) => l.ppm).sort((a, b) => a - b);
-  const median = ppms[Math.floor(ppms.length / 2)] || r.base;
-  const avgArea = Math.round(rows.reduce((s, l) => s + l.area, 0) / rows.length);
-  return {
-    id: r.id,
-    name: r.name,
-    short: r.name,
-    listings: rows.length,
-    median,
-    trend: r.trend,
-    hot: r.trend > 3,
-    avgArea,
-    newShare: Math.round((rows.filter((l) => l.cat === "Yeni tikili").length / rows.length) * 100),
-    base: r.base,
-    col: r.col,
-    row: r.row
-  };
-});
-
-const allPpm = LISTINGS.map((l) => l.ppm).sort((a, b) => a - b);
-const cityMedian = allPpm[Math.floor(allPpm.length / 2)];
-
 const median = (arr: number[]) => {
   const s = arr.slice().sort((a, b) => a - b);
-  return s[Math.floor(s.length / 2)] || 0;
+  return s.length ? s[Math.floor(s.length / 2)] : 0;
 };
 
-const B2C_SUMMARY: B2CSummary = {
-  cityMedian,
-  cityTrend: 4.6,
-  affordableRayon: RAYON_STATS.slice().sort((a, b) => a.median - b.median)[0],
-  premiumRayon: RAYON_STATS.slice().sort((a, b) => b.median - a.median)[0],
-  fastestRayon: RAYON_STATS.slice().sort((a, b) => b.trend - a.trend)[0],
-  byRooms: [1, 2, 3, 4].map((rooms) => {
-    const rows = LISTINGS.filter((l) => l.rooms === rooms);
+// Filter listings by period (YYYY-MM) and/or build categories. Empty/omitted
+// filters mean "all". Used to make Rayons / Trends / B2C react to the global
+// Period + Category controls.
+export function filterListings(period?: string, categories?: string[]): Listing[] {
+  const cats = categories && categories.length ? new Set(categories) : null;
+  return LISTINGS.filter(
+    (l) => (!period || l.date.slice(0, 7) === period) && (!cats || cats.has(l.cat))
+  );
+}
+
+export function buildRayonStats(rows: Listing[]): RayonStat[] {
+  return RAYONS.map((r) => {
+    const rrows = rows.filter((l) => l.rayonId === r.id);
     return {
-      rooms,
-      count: rows.length,
-      medianPpm: median(rows.map((l) => l.ppm)),
-      medianPrice: median(rows.map((l) => l.price))
+      id: r.id,
+      name: r.name,
+      short: r.name,
+      listings: rrows.length,
+      median: rrows.length ? median(rrows.map((l) => l.ppm)) : r.base,
+      trend: r.trend,
+      hot: r.trend > 3,
+      avgArea: rrows.length ? Math.round(rrows.reduce((s, l) => s + l.area, 0) / rrows.length) : 0,
+      newShare: rrows.length
+        ? Math.round((rrows.filter((l) => l.cat === "Yeni tikili").length / rrows.length) * 100)
+        : 0,
+      base: r.base,
+      col: r.col,
+      row: r.row
     };
-  }),
-  newVsOld: (() => {
-    const nu = LISTINGS.filter((l) => l.cat === "Yeni tikili");
-    const old = LISTINGS.filter((l) => l.cat === "Köhnə tikili");
-    return {
-      newMed: median(nu.map((l) => l.ppm)),
-      oldMed: median(old.map((l) => l.ppm)),
-      newCount: nu.length,
-      oldCount: old.length
-    };
-  })()
-};
+  });
+}
+
+export function buildB2C(rows: Listing[]): B2CSummary {
+  const stats = buildRayonStats(rows);
+  const withData = stats.filter((s) => s.listings > 0);
+  const pool = withData.length ? withData : stats;
+  return {
+    cityMedian: median(rows.map((l) => l.ppm)),
+    cityTrend: 4.6,
+    affordableRayon: pool.slice().sort((a, b) => a.median - b.median)[0],
+    premiumRayon: pool.slice().sort((a, b) => b.median - a.median)[0],
+    fastestRayon: stats.slice().sort((a, b) => b.trend - a.trend)[0],
+    byRooms: [1, 2, 3, 4].map((rooms) => {
+      const rr = rows.filter((l) => l.rooms === rooms);
+      return {
+        rooms,
+        count: rr.length,
+        medianPpm: median(rr.map((l) => l.ppm)),
+        medianPrice: median(rr.map((l) => l.price))
+      };
+    }),
+    newVsOld: (() => {
+      const nu = rows.filter((l) => l.cat === "Yeni tikili");
+      const old = rows.filter((l) => l.cat === "Köhnə tikili");
+      return {
+        newMed: median(nu.map((l) => l.ppm)),
+        oldMed: median(old.map((l) => l.ppm)),
+        newCount: nu.length,
+        oldCount: old.length
+      };
+    })()
+  };
+}
+
+const RAYON_STATS: RayonStat[] = buildRayonStats(LISTINGS);
+const B2C_SUMMARY: B2CSummary = buildB2C(LISTINGS);
 
 export { LISTINGS, RAYON_STATS, B2C_SUMMARY };

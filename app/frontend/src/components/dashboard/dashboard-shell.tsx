@@ -129,9 +129,31 @@ export function DashboardShell() {
   });
 
   // ── v3 views (Rayons / Listings / B2C) — mock-fed ──────────────────
-  const listingsQuery = useQuery({ queryKey: ["v3", "listings"], queryFn: fetchListings });
-  const rayonStatsQuery = useQuery({ queryKey: ["v3", "rayon-stats"], queryFn: fetchRayonStats });
-  const b2cQuery = useQuery({ queryKey: ["v3", "b2c"], queryFn: fetchB2C });
+  // Rayons / Trends / B2C react to the global Period + Category (not
+  // resolution / outlier). İlanlar keeps the full set (it has its own
+  // toolbar), so listingsQuery stays unfiltered.
+  const periodKey = filters?.period ?? "";
+  const catsKey = filters ? [...filters.categories].sort().join(",") : "";
+
+  const listingsQuery = useQuery({ queryKey: ["v3", "listings"], queryFn: () => fetchListings() });
+  const filteredListingsQuery = useQuery({
+    queryKey: ["v3", "listings", periodKey, catsKey],
+    queryFn: () => fetchListings(filters?.period, filters?.categories),
+    enabled: filters !== null,
+    placeholderData: keepPreviousData
+  });
+  const rayonStatsQuery = useQuery({
+    queryKey: ["v3", "rayon-stats", periodKey, catsKey],
+    queryFn: () => fetchRayonStats(filters?.period, filters?.categories),
+    enabled: filters !== null,
+    placeholderData: keepPreviousData
+  });
+  const b2cQuery = useQuery({
+    queryKey: ["v3", "b2c", periodKey, catsKey],
+    queryFn: () => fetchB2C(filters?.period, filters?.categories),
+    enabled: filters !== null,
+    placeholderData: keepPreviousData
+  });
 
   const hasCatalog = Boolean(filtersQuery.data && filters);
   const isLoading = filtersQuery.isLoading || !hasCatalog;
@@ -235,7 +257,7 @@ export function DashboardShell() {
               <RayonsViewV3
                 t={t}
                 rayons={rayonStatsQuery.data ?? []}
-                listings={listingsQuery.data ?? []}
+                listings={filteredListingsQuery.data ?? []}
               />
             ) : null}
             {activeView === "trends" ? (
@@ -254,7 +276,7 @@ export function DashboardShell() {
                   t={t}
                   b2c={b2cQuery.data}
                   rayons={rayonStatsQuery.data ?? []}
-                  listingsCount={listingsQuery.data?.length ?? 0}
+                  listingsCount={filteredListingsQuery.data?.length ?? 0}
                 />
               ) : (
                 <Skeleton className="h-96 w-full" />

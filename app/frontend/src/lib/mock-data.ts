@@ -16,6 +16,8 @@ import type {
   Sparklines,
   TrendSeries
 } from "@/types/api";
+import { latLngToCell } from "h3-js";
+
 import { LISTINGS } from "@/lib/listings-data";
 
 // ── Rayon roster ─────────────────────────────────────────────────────
@@ -53,10 +55,6 @@ function distinctMonths(): string[] {
   return [...set].sort().reverse(); // newest → oldest
 }
 
-// Finer resolution → more (smaller) cells per rayon, so the outlier slider
-// and resolution both change the picture meaningfully.
-const CELLS_PER_RAYON: Record<number, number> = { 6: 2, 7: 8, 8: 20 };
-
 function hashStr(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
@@ -69,6 +67,34 @@ function med(arr: number[]): number {
   return s[Math.floor(s.length / 2)];
 }
 
+// Approximate Baku rayon centroids (lat, lng) so mock listings get real
+// coordinates → real H3 cells via h3-js. Without valid H3 indices the
+// deck.gl H3HexagonLayer renders nothing.
+const RAYON_CENTROIDS: Record<string, [number, number]> = {
+  bineqedi: [40.455, 49.825],
+  yasamal: [40.395, 49.805],
+  nesimi: [40.405, 49.845],
+  sabuncu: [40.47, 49.945],
+  qaradag: [40.33, 49.66],
+  nerimanov: [40.415, 49.87],
+  sebail: [40.365, 49.835],
+  nizami: [40.41, 49.915],
+  pirallahi: [40.455, 50.115],
+  absheron: [40.51, 49.72],
+  xetai: [40.385, 49.92],
+  suraxani: [40.42, 49.985]
+};
+
+// Deterministic jittered coordinate per listing, clustered around its
+// rayon centroid (~±3 km). Resolution then controls hex size naturally.
+function listingLatLng(rayonId: string, id: string): [number, number] {
+  const [clat, clng] = RAYON_CENTROIDS[rayonId] ?? [40.4, 49.86];
+  const h = hashStr(id);
+  const jLat = ((h % 1000) / 1000 - 0.5) * 0.06;
+  const jLng = (((h >>> 10) % 1000) / 1000 - 0.5) * 0.08;
+  return [clat + jLat, clng + jLng];
+}
+
 function buildCells(
   period: string | undefined,
   categories: string[] | undefined,
@@ -79,22 +105,21 @@ function buildCells(
   const rows = LISTINGS.filter(
     (l) => (!period || l.date.slice(0, 7) === period) && (!cats || cats.has(l.cat))
   );
-  const per = CELLS_PER_RAYON[resolution] ?? 8;
   const buckets = new Map<string, { ppms: number[]; cats: Set<string>; rayons: Set<string> }>();
   for (const l of rows) {
-    const idx = hashStr(l.id) % per;
-    const key = `${l.rayonId}-${resolution}-${idx}`;
-    let c = buckets.get(key);
+    const [lat, lng] = listingLatLng(l.rayonId, l.id);
+    const cell = latLngToCell(lat, lng, resolution); // real, valid H3 index
+    let c = buckets.get(cell);
     if (!c) {
       c = { ppms: [], cats: new Set(), rayons: new Set() };
-      buckets.set(key, c);
+      buckets.set(cell, c);
     }
     c.ppms.push(l.ppm);
     c.cats.add(l.cat);
     c.rayons.add(l.rayon);
   }
-  let cells: MapDataPoint[] = [...buckets.entries()].map(([key, c]) => ({
-    h3_index: "8" + (hashStr(key) % 0xfffffff).toString(16).padStart(7, "0") + "ffff",
+  let cells: MapDataPoint[] = [...buckets.entries()].map(([cell, c]) => ({
+    h3_index: cell,
     ad_count: c.ppms.length,
     median_price_kvm: med(c.ppms),
     category: [...c.cats].join(", "),
