@@ -91,3 +91,46 @@ export type TrendSeries = {
   label: string;       // short rayon name
   data: number[];      // 12 months, oldest → newest
 };
+
+// ── v3 views (Rayons / Listings / B2C) — mock-fed ──────────────────────
+
+export type Listing = {
+  id: string;
+  rayonId: string;
+  rayon: string;
+  title: string;
+  rooms: number;
+  area: number;        // m²
+  ppm: number;         // AZN/m²
+  price: number;       // total AZN
+  cat: "Yeni tikili" | "Köhnə tikili";
+  source: string;
+  status: "active" | "paused" | "sold";
+  date: string;        // YYYY-MM-DD
+  floor: number;
+};
+
+export type RayonStat = {
+  id: string;
+  name: string;
+  short: string;
+  listings: number;
+  median: number;      // AZN/m²
+  trend: number;       // % vs previous period
+  hot: boolean;
+  avgArea: number;     // m²
+  newShare: number;    // % of "Yeni tikili"
+  base: number;
+  col: number;
+  row: number;
+};
+
+export type B2CSummary = {
+  cityMedian: number;
+  cityTrend: number;
+  affordableRayon: RayonStat;
+  premiumRayon: RayonStat;
+  fastestRayon: RayonStat;
+  byRooms: { rooms: number; count: number; medianPpm: number; medianPrice: number }[];
+  newVsOld: { newMed: number; oldMed: number; newCount: number; oldCount: number };
+};

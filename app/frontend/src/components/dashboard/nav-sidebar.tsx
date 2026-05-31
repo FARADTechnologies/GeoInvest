@@ -4,6 +4,7 @@ import {
   Bell,
   Building2,
   Globe,
+  Heart,
   Layers,
   Mail,
   Network,
@@ -28,6 +29,7 @@ export type DashboardView =
   | "rayons"
   | "trends"
   | "listings"
+  | "b2c"
   | "reports"
   | "alerts"
   | "admin"
@@ -48,6 +50,7 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
     { id: "rayons", icon: Building2, label: t.navRayons, pill: "12" },
     { id: "trends", icon: TrendingUp, label: t.navTrends },
     { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
+    { id: "b2c", icon: Heart, label: t.navB2C ?? "B2C Görünüm" },
     { id: "reports", icon: Shield, label: t.navReports },
     { id: "alerts", icon: Bell, label: t.navAlerts, pill: "3" },
     { id: "admin", icon: Network, label: t.navAdmin ?? "Admin / Companies" }

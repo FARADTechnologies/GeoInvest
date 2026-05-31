@@ -17,12 +17,17 @@ import { MapPanel } from "@/components/map/map-panel";
 import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
+import { B2CView, ListingsViewV3, RayonsViewV3 } from "@/components/dashboard/v3-views";
+
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
 import { COMPANIES, getAccountRequests } from "@/lib/admin-data";
 import {
   fetchActivity,
+  fetchB2C,
   fetchHistogram,
+  fetchListings,
   fetchRayons,
+  fetchRayonStats,
   fetchSparklines,
   fetchTrendSeries
 } from "@/lib/dashboard-api";
@@ -129,6 +134,11 @@ export function DashboardShell() {
     queryFn: () => fetchActivity(lang)
   });
 
+  // ── v3 views (Rayons / Listings / B2C) — mock-fed ──────────────────
+  const listingsQuery = useQuery({ queryKey: ["v3", "listings"], queryFn: fetchListings });
+  const rayonStatsQuery = useQuery({ queryKey: ["v3", "rayon-stats"], queryFn: fetchRayonStats });
+  const b2cQuery = useQuery({ queryKey: ["v3", "b2c"], queryFn: fetchB2C });
+
   const hasCatalog = Boolean(filtersQuery.data && filters);
   const isLoading = filtersQuery.isLoading || !hasCatalog;
 
@@ -227,11 +237,35 @@ export function DashboardShell() {
               />
             ) : null}
 
-            {activeView === "rayons" ? <RayonsView t={t} rayons={rayonsQuery.data ?? []} /> : null}
+            {activeView === "rayons" ? (
+              <RayonsViewV3
+                t={t}
+                rayons={rayonStatsQuery.data ?? []}
+                listings={listingsQuery.data ?? []}
+              />
+            ) : null}
             {activeView === "trends" ? (
               <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
             ) : null}
-            {activeView === "listings" ? <ListingsView t={t} /> : null}
+            {activeView === "listings" ? (
+              <ListingsViewV3
+                t={t}
+                listings={listingsQuery.data ?? []}
+                rayons={rayonStatsQuery.data ?? []}
+              />
+            ) : null}
+            {activeView === "b2c" ? (
+              b2cQuery.data ? (
+                <B2CView
+                  t={t}
+                  b2c={b2cQuery.data}
+                  rayons={rayonStatsQuery.data ?? []}
+                  listingsCount={listingsQuery.data?.length ?? 0}
+                />
+              ) : (
+                <Skeleton className="h-96 w-full" />
+              )
+            ) : null}
             {activeView === "reports" ? <ReportsView t={t} /> : null}
             {activeView === "alerts" ? <AlertsView t={t} /> : null}
             {activeView === "admin" ? (
@@ -338,40 +372,10 @@ function MapView(props: {
   );
 }
 
-function RayonsView({ t, rayons }: { t: Record<string, string>; rayons: Rayon[] }) {
-  const [q, setQ] = useState("");
-  const rows = rayons
-    .filter((r) => `${r.name} ${r.short}`.toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) => b.median - a.median);
-  return (
-    <DashboardCard title={t.navRayons} subtitle={t.secRayonsSub}>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchPh} className="mb-4 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none" />
-      <DataTable
-        headers={["Rayon", t.listings, t.kpiMedian, t.kpiTrend, "Status"]}
-        rows={rows.map((r) => [r.name, r.listings.toLocaleString(), `${r.median.toLocaleString()} ${t.perM2}`, `${r.trend}%`, r.hot ? t.hot : t.low])}
-      />
-    </DashboardCard>
-  );
-}
-
 function TrendsView({ t, trendSeries, labels }: { t: Record<string, string>; trendSeries: TrendSeries[]; labels: string[] }) {
   return (
     <DashboardCard title={t.secTrend} subtitle={t.secTrendSub}>
       <TrendChart series={trendSeries} labels={labels} />
-    </DashboardCard>
-  );
-}
-
-const LISTINGS = [
-  ["Sea View Residence", "Sebail", "425,000 AZN", "112", "3", "3,794", "2026-05-29", "Active"],
-  ["Narimanov Premium", "Nerimanov", "318,000 AZN", "96", "3", "3,312", "2026-05-28", "Active"],
-  ["Yasamal Family Flat", "Yasamal", "214,000 AZN", "84", "2", "2,548", "2026-05-27", "Watch"]
-];
-
-function ListingsView({ t }: { t: Record<string, string> }) {
-  return (
-    <DashboardCard title={t.navListings} subtitle="Mock listing workspace until listing endpoints are added.">
-      <DataTable headers={["Title", "Rayon", "Price", "m2", "Rooms", "AZN/m2", "Date", "Status"]} rows={LISTINGS} actionLabel={t.details ?? "Details"} />
     </DashboardCard>
   );
 }
