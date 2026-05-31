@@ -7,6 +7,7 @@
 
 import type {
   ActivityItem,
+  DashboardFilters,
   FiltersResponse,
   HistogramBucket,
   MapDataPoint,
@@ -15,6 +16,7 @@ import type {
   Sparklines,
   TrendSeries
 } from "@/types/api";
+import { LISTINGS } from "@/lib/listings-data";
 
 // ── Rayon roster ─────────────────────────────────────────────────────
 const RAYONS: Rayon[] = [
@@ -40,39 +42,82 @@ const SPARKLINES: Sparklines = {
   active_h3_cells:  [ 942,  984, 1021, 1064, 1098,  1142,  1198,  1247]
 };
 
-const FALLBACK_FILTERS: FiltersResponse = {
-  periods: ["2026-05", "2026-04", "2026-03", "2026-02", "2026-01", "2025-12"],
-  categories: ["Köhnə tikili", "Yeni tikili"],
-  resolutions: [6, 7, 8],
-  analysis_types: ["geom", "pure_h3"]
-};
+// ── Filter-aware mock derived from the listings generator ────────────
+// The fallback used to return a single static payload, so resolution /
+// period / category / outlier changes did nothing when the backend was
+// down. We now derive cells from LISTINGS so every filter visibly affects
+// the result — exactly like the real backend.
 
-const FALLBACK_METRICS: MetricsResponse = {
-  total_ads: 35,
-  avg_median_price: 2948,
-  trend_percentage: 4.8,
-  active_h3_cells: 13,
-  previous_period: "2026-04",
-  previous_total_ads: 31,
-  previous_avg_median_price: 2812,
-  previous_active_h3_cells: 11
-};
+function distinctMonths(): string[] {
+  const set = new Set(LISTINGS.map((l) => l.date.slice(0, 7)));
+  return [...set].sort().reverse(); // newest → oldest
+}
 
-const FALLBACK_MAP_DATA: MapDataPoint[] = [
-  { h3_index: "872ce581cffffff", ad_count: 10, median_price_kvm: 3340, category: "Yeni tikili", rayon_name: "Nəsimi rayonu, Yasamal rayonu" },
-  { h3_index: "872ce5819ffffff", ad_count: 5, median_price_kvm: 4045, category: "Köhnə tikili, Yeni tikili", rayon_name: "Nərimanov rayonu, Xətai rayonu" },
-  { h3_index: "872ce581dffffff", ad_count: 5, median_price_kvm: 3109, category: "Yeni tikili", rayon_name: "Nərimanov rayonu, Nəsimi rayonu" },
-  { h3_index: "872ce5802ffffff", ad_count: 3, median_price_kvm: 2633, category: "Yeni tikili", rayon_name: "Yasamal rayonu" },
-  { h3_index: "872ce580affffff", ad_count: 2, median_price_kvm: 3080, category: "Yeni tikili", rayon_name: "Nərimanov rayonu" },
-  { h3_index: "872ce58e3ffffff", ad_count: 2, median_price_kvm: 2524, category: "Köhnə tikili", rayon_name: "Nizami rayonu, Xətai rayonu" },
-  { h3_index: "872ce58e1ffffff", ad_count: 2, median_price_kvm: 1894, category: "Yeni tikili", rayon_name: "Nizami rayonu, Sabunçu rayonu" },
-  { h3_index: "872ce58c4ffffff", ad_count: 1, median_price_kvm: 2697, category: "Yeni tikili", rayon_name: "Xətai rayonu" },
-  { h3_index: "872ce58e2ffffff", ad_count: 1, median_price_kvm: 2471, category: "Köhnə tikili", rayon_name: "Xətai rayonu" },
-  { h3_index: "872ce580effffff", ad_count: 1, median_price_kvm: 2611, category: "Yeni tikili", rayon_name: "Binəqədi rayonu" },
-  { h3_index: "872ce58e5ffffff", ad_count: 1, median_price_kvm: 2609, category: "Yeni tikili", rayon_name: "Nizami rayonu" },
-  { h3_index: "872ce580cffffff", ad_count: 1, median_price_kvm: 2350, category: "Yeni tikili", rayon_name: "Binəqədi rayonu" },
-  { h3_index: "872ce5803ffffff", ad_count: 1, median_price_kvm: 2950, category: "Yeni tikili", rayon_name: "Nəsimi rayonu" }
-];
+// Finer resolution → more (smaller) cells per rayon, so the outlier slider
+// and resolution both change the picture meaningfully.
+const CELLS_PER_RAYON: Record<number, number> = { 6: 2, 7: 8, 8: 20 };
+
+function hashStr(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function med(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  const s = [...arr].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+}
+
+function buildCells(
+  period: string | undefined,
+  categories: string[] | undefined,
+  resolution: number,
+  minAds: number
+): MapDataPoint[] {
+  const cats = categories && categories.length ? new Set(categories) : null;
+  const rows = LISTINGS.filter(
+    (l) => (!period || l.date.slice(0, 7) === period) && (!cats || cats.has(l.cat))
+  );
+  const per = CELLS_PER_RAYON[resolution] ?? 8;
+  const buckets = new Map<string, { ppms: number[]; cats: Set<string>; rayons: Set<string> }>();
+  for (const l of rows) {
+    const idx = hashStr(l.id) % per;
+    const key = `${l.rayonId}-${resolution}-${idx}`;
+    let c = buckets.get(key);
+    if (!c) {
+      c = { ppms: [], cats: new Set(), rayons: new Set() };
+      buckets.set(key, c);
+    }
+    c.ppms.push(l.ppm);
+    c.cats.add(l.cat);
+    c.rayons.add(l.rayon);
+  }
+  let cells: MapDataPoint[] = [...buckets.entries()].map(([key, c]) => ({
+    h3_index: "8" + (hashStr(key) % 0xfffffff).toString(16).padStart(7, "0") + "ffff",
+    ad_count: c.ppms.length,
+    median_price_kvm: med(c.ppms),
+    category: [...c.cats].join(", "),
+    rayon_name: [...c.rayons].join(", ")
+  }));
+  if (minAds > 0) cells = cells.filter((c) => c.ad_count > minAds);
+  cells.sort((a, b) => b.ad_count - a.ad_count);
+  return cells;
+}
+
+function metricsFor(
+  period: string | undefined,
+  categories: string[] | undefined,
+  resolution: number,
+  minAds: number
+) {
+  const cells = buildCells(period, categories, resolution, minAds);
+  return {
+    total_ads: cells.reduce((s, c) => s + c.ad_count, 0),
+    avg_median_price: med(cells.map((c) => c.median_price_kvm)),
+    active_h3_cells: cells.length
+  };
+}
 
 // ── Price-distribution histogram (AZN/m², 10 bins) ───────────────────
 const HISTOGRAM: HistogramBucket[] = [
@@ -140,15 +185,48 @@ export async function fetchRayons(): Promise<Rayon[]> {
 }
 
 export async function fetchFallbackFilters(): Promise<FiltersResponse> {
-  return FALLBACK_FILTERS;
+  return {
+    periods: distinctMonths(),
+    categories: ["Köhnə tikili", "Yeni tikili"],
+    resolutions: [6, 7, 8],
+    analysis_types: ["geom", "pure_h3"]
+  };
 }
 
-export async function fetchFallbackMetrics(): Promise<MetricsResponse> {
-  return FALLBACK_METRICS;
+export async function fetchFallbackMetrics(
+  filters?: DashboardFilters,
+  minAds = 0
+): Promise<MetricsResponse> {
+  const resolution = filters?.resolution ?? 7;
+  const period = filters?.period;
+  const cur = metricsFor(period, filters?.categories, resolution, minAds);
+
+  const months = distinctMonths();
+  const idx = period ? months.indexOf(period) : 0;
+  const prevPeriod = idx >= 0 && idx < months.length - 1 ? months[idx + 1] : undefined;
+  const prev = prevPeriod ? metricsFor(prevPeriod, filters?.categories, resolution, minAds) : null;
+  const trend =
+    prev && prev.avg_median_price > 0
+      ? ((cur.avg_median_price - prev.avg_median_price) / prev.avg_median_price) * 100
+      : 0;
+
+  return {
+    total_ads: cur.total_ads,
+    avg_median_price: cur.avg_median_price,
+    trend_percentage: Math.round(trend * 100) / 100,
+    active_h3_cells: cur.active_h3_cells,
+    previous_period: prevPeriod ?? null,
+    previous_total_ads: prev?.total_ads ?? null,
+    previous_avg_median_price: prev?.avg_median_price ?? null,
+    previous_active_h3_cells: prev?.active_h3_cells ?? null
+  };
 }
 
-export async function fetchFallbackMapData(): Promise<MapDataPoint[]> {
-  return FALLBACK_MAP_DATA;
+export async function fetchFallbackMapData(
+  filters?: DashboardFilters,
+  minAds = 0
+): Promise<MapDataPoint[]> {
+  return buildCells(filters?.period, filters?.categories, filters?.resolution ?? 7, minAds);
 }
 
 export async function fetchSparklines(): Promise<Sparklines> {

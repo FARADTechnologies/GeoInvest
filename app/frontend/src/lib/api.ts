@@ -13,13 +13,35 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
+// ── Backend availability short-circuit ────────────────────────────────
+// When the backend is unreachable (DB down, container stopped), every
+// query used to wait for a fetch timeout before falling back to mock —
+// adding a ~1s lag to each filter change. Once a call fails we mark the
+// backend "down" for a cooldown window so subsequent calls skip the
+// network entirely and resolve to mock instantly. After the cooldown we
+// retry, so the app auto-recovers when the backend returns.
+const BACKEND_COOLDOWN_MS = 15_000;
+const FETCH_TIMEOUT_MS = 1_500;
+let backendDownUntil = 0;
+
+function backendIsDown(): boolean {
+  return Date.now() < backendDownUntil;
+}
+function markBackendDown(): void {
+  backendDownUntil = Date.now() + BACKEND_COOLDOWN_MS;
+}
+
 export async function apiGet<T>(
   path: string,
   filters?: DashboardFilters,
   extra?: Record<string, string>
 ): Promise<T> {
-  const url = new URL(`${API_PREFIX}${path}`, API_BASE_URL);
+  // Skip the network during the cooldown — callers fall straight to mock.
+  if (backendIsDown()) {
+    throw new Error("backend-cooldown");
+  }
 
+  const url = new URL(`${API_PREFIX}${path}`, API_BASE_URL);
   if (filters) {
     url.searchParams.set("period", filters.period);
     url.searchParams.set("resolution", String(filters.resolution));
@@ -28,18 +50,31 @@ export async function apiGet<T>(
       url.searchParams.append("categories", category);
     }
   }
-
   if (extra) {
     for (const [key, value] of Object.entries(extra)) {
       url.searchParams.set(key, value);
     }
   }
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json" }
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString(), {
+      headers: { Accept: "application/json" },
+      signal: controller.signal
+    });
+  } catch (error) {
+    // network failure or timeout → backend is unreachable
+    markBackendDown();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
+    if (response.status >= 500) markBackendDown();
     const text = await response.text();
     throw new Error(text || `Request failed with ${response.status}`);
   }
@@ -65,7 +100,7 @@ export async function fetchMetrics(filters: DashboardFilters, minAdsPerCell: num
     }
     return metrics;
   } catch {
-    return fetchFallbackMetrics();
+    return fetchFallbackMetrics(filters, minAdsPerCell);
   }
 }
 
@@ -79,6 +114,6 @@ export async function fetchMapData(filters: DashboardFilters, minAdsPerCell: num
     }
     return rows;
   } catch {
-    return fetchFallbackMapData();
+    return fetchFallbackMapData(filters, minAdsPerCell);
   }
 }
