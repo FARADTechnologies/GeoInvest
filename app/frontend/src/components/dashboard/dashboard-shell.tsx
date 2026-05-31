@@ -18,9 +18,9 @@ import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { B2CView, ListingsViewV3, RayonsViewV3 } from "@/components/dashboard/v3-views";
+import { AdminView } from "@/components/dashboard/admin-view";
 
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
-import { COMPANIES, getAccountRequests } from "@/lib/admin-data";
 import {
   fetchActivity,
   fetchB2C,
@@ -45,7 +45,6 @@ import type {
   Sparklines,
   TrendSeries
 } from "@/types/api";
-import type { AccountRequest } from "@/types/admin";
 
 // ──────────────────────────────────────────────────────────────────────
 // DashboardShell
@@ -82,7 +81,6 @@ export function DashboardShell() {
   const [minAdsThreshold, setMinAdsThreshold] = useState(0);
   const [colorBy, setColorBy] = useState<"price" | "listings">("price");
   const [activeView, setActiveView] = useState<DashboardView>("overview");
-  const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);
 
   // ── Backend-served queries ────────────────────────────────────────
   const filtersQuery = useQuery({
@@ -95,10 +93,6 @@ export function DashboardShell() {
       setFilters(createDefaultFilters(filtersQuery.data));
     }
   }, [filters, filtersQuery.data]);
-
-  useEffect(() => {
-    setAccountRequests(getAccountRequests());
-  }, [activeView]);
 
   const metricsQuery = useQuery({
     queryKey: filters ? queryKeys.metrics(filters, minAdsThreshold) : ["metrics", "empty"],
@@ -268,9 +262,7 @@ export function DashboardShell() {
             ) : null}
             {activeView === "reports" ? <ReportsView t={t} /> : null}
             {activeView === "alerts" ? <AlertsView t={t} /> : null}
-            {activeView === "admin" ? (
-              <AdminView t={t} requests={accountRequests} onRequestsChange={setAccountRequests} />
-            ) : null}
+            {activeView === "admin" ? <AdminView t={t} /> : null}
             {activeView === "settings" || activeView === "account" ? (
               <PlaceholderView
                 title={activeView === "settings" ? t.navSettings : t.navAccount}
@@ -386,67 +378,6 @@ function ReportsView({ t }: { t: Record<string, string> }) {
 
 function AlertsView({ t }: { t: Record<string, string> }) {
   return <ActionCards title={t.navAlerts} items={["Sabail median +5%", "Low inventory in Xetai", "New hot H3 cells"]} />;
-}
-
-function AdminView({
-  t,
-  requests,
-  onRequestsChange
-}: {
-  t: Record<string, string>;
-  requests: AccountRequest[];
-  onRequestsChange: (requests: AccountRequest[]) => void;
-}) {
-  const setStatus = (id: string, status: AccountRequest["status"]) =>
-    onRequestsChange(requests.map((r) => (r.id === id ? { ...r, status } : r)));
-  const activeCompanies = COMPANIES.filter((c) => c.status === "active").length;
-  const blockedUsers = COMPANIES.flatMap((c) => c.users).filter((u) => u.status === "blocked").length;
-  return (
-    <div className="grid gap-4">
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
-        {[
-          ["Total companies", COMPANIES.length],
-          ["Active companies", activeCompanies],
-          ["Pending requests", requests.filter((r) => r.status === "pending").length],
-          ["Blocked users", blockedUsers],
-          ["MAU", 70]
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border bg-card p-4">
-            <div className="text-[11px] text-muted-foreground">{label}</div>
-            <div className="mt-1 text-2xl font-semibold">{value}</div>
-          </div>
-        ))}
-      </div>
-      <DashboardCard title={t.pendingRequests ?? "Pending requests"} subtitle="localStorage/mock queue">
-        <DataTable
-          headers={["Company", "Name", "Email", "Phone", "VOEN", "Title", "Employees", "Status"]}
-          rows={requests.map((r) => [r.companyName, `${r.firstName} ${r.lastName}`, r.email, r.phone, r.taxId, r.title, r.employeeCount ?? "-", r.status])}
-          renderActions={(index) => {
-            const r = requests[index];
-            return (
-              <div className="flex gap-2">
-                <button className="rounded-md border px-2 py-1 text-xs" onClick={() => setStatus(r.id, "approved")}>{t.approve ?? "Approve"}</button>
-                <button className="rounded-md border px-2 py-1 text-xs text-red-500" onClick={() => setStatus(r.id, "rejected")}>{t.reject ?? "Reject"}</button>
-              </div>
-            );
-          }}
-        />
-      </DashboardCard>
-      <DashboardCard title={t.companies ?? "Companies"} subtitle="B2B company administration mock">
-        <DataTable
-          headers={["Company", "VOEN", "Admin", "Email", "Employees", "Active", "Plan/status", "Last login", "Actions"]}
-          rows={COMPANIES.map((c) => [c.name, c.taxId, c.adminName, c.adminEmail, c.employeeCount, c.activeUsers, `${c.plan} / ${c.status}`, c.lastLogin, `${t.details ?? "Details"} | ${t.block ?? "Block"} | ${t.activate ?? "Activate"}`])}
-        />
-      </DashboardCard>
-      <DashboardCard title="Company detail" subtitle={t.employees ?? "Employees"}>
-        <DataTable
-          headers={["Name", "Email", "Role", "Status", "Last login"]}
-          rows={COMPANIES[0].users.map((u) => [u.name, u.email, u.role, u.status, u.lastLogin])}
-        />
-        <div className="mt-4 text-xs text-muted-foreground">{t.auditLog ?? "Audit log"}: {COMPANIES[0].auditLog.join(" / ")}</div>
-      </DashboardCard>
-    </div>
-  );
 }
 
 function ActionCards({ title, items }: { title: string; items: string[] }) {
