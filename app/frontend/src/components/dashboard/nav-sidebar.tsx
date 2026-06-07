@@ -2,7 +2,9 @@
 
 import {
   Bell,
+  Boxes,
   Building2,
+  Calculator,
   Globe,
   Heart,
   Layers,
@@ -28,6 +30,8 @@ export type DashboardView =
   | "map"
   | "rayons"
   | "trends"
+  | "valuation-single"
+  | "valuation-mass"
   | "listings"
   | "b2c"
   | "reports"
@@ -49,6 +53,8 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
     { id: "map", icon: Globe, label: t.navMap },
     { id: "rayons", icon: Building2, label: t.navRayons, pill: "12" },
     { id: "trends", icon: TrendingUp, label: t.navTrends },
+    { id: "valuation-single", icon: Calculator, label: t.navValSingle ?? "Tək qiymətləndirmə" },
+    { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
     { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
     { id: "b2c", icon: Heart, label: t.navB2C ?? "B2C Görünüm" },
     { id: "reports", icon: Shield, label: t.navReports },

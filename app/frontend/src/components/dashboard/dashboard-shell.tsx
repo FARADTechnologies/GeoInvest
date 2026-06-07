@@ -19,6 +19,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { B2CView, ListingsViewV3, RayonsViewV3 } from "@/components/dashboard/v3-views";
 import { AdminView } from "@/components/dashboard/admin-view";
+import { ValuationSingleView } from "@/components/dashboard/valuation/valuation-single";
+import { ValuationMassView } from "@/components/dashboard/valuation/valuation-mass";
 
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
 import {
@@ -263,6 +265,8 @@ export function DashboardShell() {
             {activeView === "trends" ? (
               <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
             ) : null}
+            {activeView === "valuation-single" ? <ValuationSingleView t={t} /> : null}
+            {activeView === "valuation-mass" ? <ValuationMassView t={t} /> : null}
             {activeView === "listings" ? (
               <ListingsViewV3
                 t={t}
