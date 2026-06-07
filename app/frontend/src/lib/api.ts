@@ -92,15 +92,16 @@ export async function fetchFilters() {
 
 export async function fetchMetrics(filters: DashboardFilters, minAdsPerCell: number) {
   try {
-    const metrics = await apiGet<MetricsResponse>("/metrics", filters, {
+    let metrics = await apiGet<MetricsResponse>("/metrics", filters, {
       min_ads_per_cell: String(minAdsPerCell)
     });
     if (minAdsPerCell > 0 && metrics.active_h3_cells === 0 && metrics.total_ads === 0) {
-      return apiGet<MetricsResponse>("/metrics", filters, { min_ads_per_cell: "0" });
+      metrics = await apiGet<MetricsResponse>("/metrics", filters, { min_ads_per_cell: "0" });
     }
-    return metrics;
+    return { ...metrics, _source: "db" as const };
   } catch {
-    return fetchFallbackMetrics(filters, minAdsPerCell);
+    const mock = await fetchFallbackMetrics(filters, minAdsPerCell);
+    return { ...mock, _source: "mock" as const };
   }
 }
 

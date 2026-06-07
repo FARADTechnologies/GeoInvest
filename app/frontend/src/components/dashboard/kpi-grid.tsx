@@ -54,7 +54,7 @@ export function KpiGrid({ t, metrics, sparklines, loading }: Props) {
     {
       label: t.kpiMedian,
       icon: TrendingUp,
-      value: fmt(metrics.avg_median_price),
+      value: fmt(Math.round(metrics.avg_median_price)),
       unit: t.perM2,
       trend: delta(metrics.avg_median_price, metrics.previous_avg_median_price),
       data: sparklines.avg_median_price
@@ -76,9 +76,11 @@ export function KpiGrid({ t, metrics, sparklines, loading }: Props) {
     }
   ];
 
+  const source: "db" | "mock" = metrics._source === "db" ? "db" : "mock";
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {items.map((k) => {
+      {items.map((k, i) => {
         const Icon = k.icon;
         const hasTrend = k.trend !== null;
         const dir = !hasTrend
@@ -104,6 +106,19 @@ export function KpiGrid({ t, metrics, sparklines, loading }: Props) {
             <div className="flex items-center gap-1.5 text-[11.5px] font-medium uppercase tracking-wider text-muted-foreground">
               <Icon className="h-3.5 w-3.5" />
               {k.label}
+              {i === 0 ? (
+                <span
+                  className={cn(
+                    "ml-1 rounded-md border px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wide",
+                    source === "db"
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-600"
+                      : "border-red-500/40 bg-red-500/15 text-red-600"
+                  )}
+                  title={source === "db" ? "Canlı veritabanı" : "Mock (DB bağlı değil)"}
+                >
+                  {source === "db" ? "DB" : "MOCK"}
+                </span>
+              ) : null}
             </div>
             <div className="flex items-baseline justify-between gap-2">
               <div className="flex items-baseline gap-1">

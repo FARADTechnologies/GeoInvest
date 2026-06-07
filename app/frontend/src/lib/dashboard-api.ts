@@ -70,7 +70,11 @@ function seriesFor(base: number, seed: number): number[] {
 export async function fetchTrendSeries(filters?: DashboardFilters): Promise<TrendSeries[]> {
   if (filters) {
     try {
-      return await apiGet<TrendSeries[]>("/trend-series", filters);
+      const res = await apiGet<TrendSeries[]>("/trend-series", filters);
+      // Backend endpoint exists but currently returns [] for real data —
+      // only use it when it actually has series, else fall to mock so the
+      // Trends view never renders empty.
+      if (Array.isArray(res) && res.length > 0) return res;
     } catch {
       /* fall through to mock */
     }

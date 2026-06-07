@@ -35,6 +35,9 @@ export type MetricsResponse = {
   previous_total_ads: number | null;
   previous_avg_median_price: number | null;
   previous_active_h3_cells: number | null;
+  // Set client-side by lib/api.ts: "db" = served by the real backend,
+  // "mock" = fell back to local mock because the backend was unreachable.
+  _source?: "db" | "mock";
 };
 
 export type MapDataPoint = {
