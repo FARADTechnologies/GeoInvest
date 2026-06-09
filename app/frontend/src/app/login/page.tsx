@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 
 import { HMAuthFlow } from "@/components/auth/auth-flow";
 import {
@@ -189,7 +189,9 @@ export default function LoginPage() {
               margin: "0 auto"
             }}
           >
-            <HMAuthFlow t={t} />
+            <Suspense fallback={null}>
+              <HMAuthFlow t={t} />
+            </Suspense>
           </div>
           <HMFooter t={t} />
         </div>
