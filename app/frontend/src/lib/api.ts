@@ -9,6 +9,7 @@ import {
   fetchFallbackMapData,
   fetchFallbackMetrics
 } from "@/lib/mock-data";
+import { dashKey, loadSnapshot } from "@/lib/snapshot";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
@@ -86,6 +87,8 @@ export async function fetchFilters() {
   try {
     return await apiGet<FiltersResponse>("/filters");
   } catch {
+    const snap = await loadSnapshot();
+    if (snap?.filters) return snap.filters;
     return fetchFallbackFilters();
   }
 }
@@ -100,6 +103,9 @@ export async function fetchMetrics(filters: DashboardFilters, minAdsPerCell: num
     }
     return { ...metrics, _source: "db" as const };
   } catch {
+    const snap = await loadSnapshot();
+    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
+    if (hit?.metrics) return { ...hit.metrics, _source: "mock" as const };
     const mock = await fetchFallbackMetrics(filters, minAdsPerCell);
     return { ...mock, _source: "mock" as const };
   }
@@ -115,6 +121,9 @@ export async function fetchMapData(filters: DashboardFilters, minAdsPerCell: num
     }
     return rows;
   } catch {
+    const snap = await loadSnapshot();
+    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
+    if (hit?.mapData) return hit.mapData;
     return fetchFallbackMapData(filters, minAdsPerCell);
   }
 }

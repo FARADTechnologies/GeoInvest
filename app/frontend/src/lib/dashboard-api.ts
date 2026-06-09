@@ -28,6 +28,7 @@ import {
   fetchTrendSeries as mockTrendSeries
 } from "@/lib/mock-data";
 import { buildB2C, buildRayonStats, filterListings } from "@/lib/listings-data";
+import { dashKey, loadSnapshot, trendKey } from "@/lib/snapshot";
 
 export function fetchRayons(): Promise<Rayon[]> {
   return mockRayons();
@@ -44,6 +45,9 @@ export async function fetchSparklines(
       min_ads_per_cell: String(minAdsPerCell)
     });
   } catch {
+    const snap = await loadSnapshot();
+    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
+    if (hit?.sparklines) return hit.sparklines;
     return mockSparklines();
   }
 }
@@ -76,8 +80,11 @@ export async function fetchTrendSeries(filters?: DashboardFilters): Promise<Tren
       // Trends view never renders empty.
       if (Array.isArray(res) && res.length > 0) return res;
     } catch {
-      /* fall through to mock */
+      /* fall through to snapshot / mock */
     }
+    const snap = await loadSnapshot();
+    const hit = snap?.trends[trendKey(filters.period, filters.categories)];
+    if (hit && hit.length > 0) return hit;
   }
   // Mock path — derive from the period/category-filtered rayon stats.
   const stats = buildRayonStats(filterListings(filters?.period, filters?.categories));

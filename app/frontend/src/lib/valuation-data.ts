@@ -11,6 +11,7 @@ import type {
   ValuationResult,
   ValuationSource
 } from "@/types/valuation";
+import { loadSnapshot, type Snapshot } from "@/lib/snapshot";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
@@ -55,7 +56,7 @@ export async function fetchValuationMeta(): Promise<Sourced<ValuationMeta>> {
     const data = await request<ValuationMeta>("/valuation/meta");
     return { data, source: "db" };
   } catch {
-    return { data: mockMeta(), source: "mock" };
+    return { data: mockMeta(await loadSnapshot()), source: "mock" };
   }
 }
 
@@ -67,7 +68,7 @@ export async function valuateSingle(input: ValuationInput): Promise<Sourced<Valu
     });
     return { data, source: "db" };
   } catch {
-    return { data: mockValuate(input), source: "mock" };
+    return { data: mockValuate(input, await loadSnapshot()), source: "mock" };
   }
 }
 
@@ -79,7 +80,8 @@ export async function valuateBatch(inputs: ValuationInput[]): Promise<Sourced<Va
     );
     return { data: data.results, source: "db" };
   } catch {
-    return { data: inputs.map(mockValuate), source: "mock" };
+    const snap = await loadSnapshot();
+    return { data: inputs.map((i) => mockValuate(i, snap)), source: "mock" };
   }
 }
 
@@ -121,7 +123,16 @@ function mockRayonPrice(rayon?: string | null): number {
   return 1800;
 }
 
-export function mockMeta(): ValuationMeta {
+export function mockMeta(snap?: Snapshot | null): ValuationMeta {
+  // Prefer the frozen real-data snapshot when available (demo/public deploy).
+  if (snap?.valuation?.rayons?.length) {
+    return {
+      period: snap.valuation.period,
+      categories: [snap.valuation.newCat, snap.valuation.oldCat],
+      rayons: snap.valuation.rayons.map((r) => ({ rayon: r.rayon, median_price_kvm: r.overall, ad_count: r.ad_count })),
+      market_median_kvm: snap.valuation.cityMedian
+    };
+  }
   const rayons: RayonPrice[] = MOCK_RAYONS.map((r) => ({
     rayon: `${r} rayonu`,
     median_price_kvm: MOCK_RAYON_PRICE[r],
@@ -130,9 +141,27 @@ export function mockMeta(): ValuationMeta {
   return { period: null, categories: ["Yeni tikili", "Köhnə tikili"], rayons, market_median_kvm: 1900 };
 }
 
-export function mockValuate(input: ValuationInput): ValuationResult {
+// Look up a real per-type ₼/m² from the snapshot for a rayon (fuzzy match).
+function snapPrice(snap: Snapshot, rayon: string | null | undefined, isNew: boolean): { price: number; market: number } | null {
+  const v = snap.valuation;
+  if (!v?.rayons?.length) return null;
+  let row = null as Snapshot["valuation"]["rayons"][number] | null;
+  if (rayon) {
+    const a = rayon.toLowerCase();
+    row =
+      v.rayons.find((r) => a.includes(r.rayon.replace(/\s*rayonu$/i, "").toLowerCase())) ||
+      v.rayons.find((r) => r.rayon.toLowerCase().includes(a)) ||
+      null;
+  }
+  const price = row ? (isNew ? row.new : row.old) : isNew ? v.cityNew : v.cityOld;
+  const market = row ? row.overall : v.cityMedian;
+  return { price, market };
+}
+
+export function mockValuate(input: ValuationInput, snap?: Snapshot | null): ValuationResult {
   const isNew = (input.type || "").toLowerCase().includes("yeni");
-  const base = mockRayonPrice(input.rayon) * (isNew ? 1.12 : 0.94);
+  const snapped = snap ? snapPrice(snap, input.rayon, isNew) : null;
+  const base = snapped ? snapped.price : mockRayonPrice(input.rayon) * (isNew ? 1.12 : 0.94);
   let adj = REPAIR_FACTOR[(input.repair || "").trim()] ?? 1.0;
   if (input.floor && input.total_floors) {
     if (input.floor === 1) adj *= 0.97;
@@ -148,7 +177,7 @@ export function mockValuate(input: ValuationInput): ValuationResult {
   const yieldPct = fairValue ? +(((monthlyRent * 12) / fairValue) * 100).toFixed(1) : 0;
   const payback = yieldPct ? +(100 / yieldPct).toFixed(1) : 0;
 
-  const market = mockRayonPrice(input.rayon);
+  const market = snapped ? snapped.market : mockRayonPrice(input.rayon);
   let liquidity = isNew ? 70 : 95;
   liquidity += Math.round(((pricePerM2raw - market) / Math.max(market, 1)) * 60);
   liquidity += Math.round(jitter(seed + "l", 18));
@@ -181,8 +210,8 @@ export function mockValuate(input: ValuationInput): ValuationResult {
     liquidity_days: liquidityDays,
     score,
     risk,
-    period: null,
-    price_basis: "fallback"
+    period: snap?.valuation?.period ?? null,
+    price_basis: snapped ? "rayon" : "fallback"
   };
 }
 
