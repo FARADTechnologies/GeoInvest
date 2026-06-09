@@ -265,8 +265,8 @@ export function DashboardShell() {
             {activeView === "trends" ? (
               <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
             ) : null}
-            {activeView === "valuation-single" ? <ValuationSingleView t={t} /> : null}
-            {activeView === "valuation-mass" ? <ValuationMassView t={t} /> : null}
+            {activeView === "valuation-single" ? <ValuationSingleView onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-mass" ? <ValuationMassView /> : null}
             {activeView === "listings" ? (
               <ListingsViewV3
                 t={t}
