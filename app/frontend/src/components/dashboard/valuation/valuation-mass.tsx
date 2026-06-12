@@ -328,8 +328,10 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
                 <th className="center" style={{ width: 60 }}>Otaq</th>
                 <th className="num" style={{ width: 130 }}>Fair value</th>
                 <th className="num" style={{ width: 110 }}>Qiymət/m²</th>
+                <th className="num" style={{ width: 110 }}>Aylıq kirayə</th>
                 <th className="num" style={{ width: 95 }}>Gəlirlilik</th>
-                <th className="center" style={{ width: 80 }}>Skor</th>
+                <th className="num" style={{ width: 110 }}>Geri ödəmə</th>
+                <th className="num" style={{ width: 110 }}>Likvidlik</th>
                 <th style={{ width: 90, textAlign: "right" }}>Əməliyyat</th>
               </tr>
             </thead>
@@ -348,8 +350,10 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
                     <td className="center">{p.rooms ?? "—"}</td>
                     <td className="num cell-strong">{dr ? <span className="muted">—</span> : fmtMoney(p.fairValue)}</td>
                     <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.pricePerM2, "")}</td>
+                    <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.monthlyRent)}</td>
                     <td className="num">{dr ? <span className="muted">—</span> : <span style={{ color: stats && p.yield >= stats.avgYield ? "var(--green)" : "var(--text-1)", fontWeight: 600 }}>{p.yield}%</span>}</td>
-                    <td className="center">{dr ? <span className="muted">—</span> : <DonutChart value={p.score} size={36} />}</td>
+                    <td className="num">{dr ? <span className="muted">—</span> : `${p.payback} il`}</td>
+                    <td className="num">{dr ? <span className="muted">—</span> : `${p.liquidity} gün`}</td>
                     <td className="row-act" style={{ textAlign: "right" }}>
                       <div className="fl-row" style={{ gap: 2, justifyContent: "flex-end" }}>
                         <button className="icon-btn" style={{ width: 28, height: 28 }} title="Redaktə et" onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}><Icons.Edit size={13} /></button>

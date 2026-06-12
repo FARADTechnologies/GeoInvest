@@ -137,6 +137,13 @@ type FormState = {
   rooms: string;
 };
 
+// Residence options from the prototype's "Yaşayış kompleksi adı" select.
+const RESIDENCES = [
+  "Port Baku Residence", "White City", "Crescent Place", "Demirchi Tower",
+  "Khazar Islands", "Old City Plaza", "Caspian Plaza", "Park Bulvar Towers",
+  "Sea Breeze", "Garden Plaza", "Mətanət-A Yasamal", "AAAF Park"
+];
+
 const emptyForm = (): FormState => ({
   address: "", rayon: "", type: "", repair: "", extract: "", isResidence: "",
   residence: "", area: "", totalFloors: "", floor: "", rooms: ""
@@ -203,7 +210,8 @@ export function PropertyEntryModal({
   }, [open, initial]);
 
   const rayonOptions = useMemo(() => (meta?.rayons ?? []).map((r: RayonPrice) => r.rayon), [meta]);
-  const valid = !!form.type && !!form.area && !!form.rooms && (!!form.rayon || !!form.address);
+  // Same required fields as the prototype: ünvan, növ, sahə, otaq.
+  const valid = !!form.address && !!form.type && !!form.area && !!form.rooms;
 
   const build = (): ValuationInput => ({
     address: form.address.trim() || null,
@@ -248,6 +256,7 @@ export function PropertyEntryModal({
 
         <div className="modal-body" style={{ padding: "24px 28px 24px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "22px 24px" }}>
+            {/* Row 1 — exactly as the prototype: Ünvan (span 2) | Mənzil növü */}
             <div style={{ gridColumn: "span 2" }}>
               <FieldLabel>Ünvan</FieldLabel>
               <div style={{ position: "relative" }}>
@@ -256,25 +265,14 @@ export function PropertyEntryModal({
                   <Icons.MapPin size={13} /> Xəritədən seç
                 </button>
               </div>
-              <HintRow>Dəqiq qiymətləndirmə üçün rayonu seçin və ya tam ünvanı daxil edin.</HintRow>
+              <HintRow>Dəqiq qiymətləndirmə üçün tam ünvanı daxil edin (məs. Mir Cəlal küç. 89) və ya xəritədən mənzilin yerləşdiyi binanı seçin.</HintRow>
             </div>
-            <div>
-              <FieldLabel>Rayon</FieldLabel>
-              <div style={{ position: "relative" }}>
-                <select value={form.rayon} onChange={(e) => upd("rayon", e.target.value)} style={{ ...fieldStyle, appearance: "none", cursor: "pointer", color: form.rayon ? "var(--text-1)" : "var(--text-3)" }}>
-                  <option value="">Rayon seçin</option>
-                  {rayonOptions.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-                <Icons.ChevronDown size={16} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-3)" }} />
-              </div>
-            </div>
-
             <div>
               <FieldLabel>Mənzil növü</FieldLabel>
               <Select value={form.type} onChange={(v) => upd("type", v)} options={TYPE_OPTIONS} />
             </div>
+
+            {/* Row 2 — Təmir | Çıxarış | Rezidens (with hint) */}
             <div>
               <FieldLabel>Təmir vəziyyəti</FieldLabel>
               <Select value={form.repair} onChange={(v) => upd("repair", v)} options={REPAIR_OPTIONS} />
@@ -283,24 +281,30 @@ export function PropertyEntryModal({
               <FieldLabel>Çıxarış</FieldLabel>
               <Select value={form.extract} onChange={(v) => upd("extract", v)} options={EXTRACT_OPTIONS} />
             </div>
-
             <div>
               <FieldLabel>Yaşayış kompleksi (rezidens)</FieldLabel>
               <Select value={form.isResidence} onChange={(v) => upd("isResidence", v)} options={RESIDENCE_YN} />
+              <HintRow>Rezidensiya və ya kompleksdirsə — Bəli. Adi binalar bu kateqoriyaya aid deyil.</HintRow>
             </div>
+
+            {/* Row 3 — Kompleks adı | Sahə | Binanın mərtəbə sayı */}
             <div>
               <FieldLabel>Yaşayış kompleksi adı</FieldLabel>
-              <input value={form.residence} onChange={(e) => upd("residence", e.target.value)} placeholder="(opsional)" style={fieldStyle} />
+              <Select value={form.residence} onChange={(v) => upd("residence", v)} options={RESIDENCES} />
             </div>
             <div>
               <FieldLabel>Sahə kv.m</FieldLabel>
-              <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder="Sahə kv.m" inputMode="numeric" style={fieldStyle} />
+              <div style={{ position: "relative" }}>
+                <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder="Sahə kv.m" inputMode="numeric" style={{ ...fieldStyle, paddingRight: 48 }} />
+                <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-3)", fontSize: 12, fontWeight: 500, pointerEvents: "none" }}>m²</span>
+              </div>
             </div>
-
             <div>
               <FieldLabel>Binanın mərtəbə sayı</FieldLabel>
               <input value={form.totalFloors} onChange={(e) => upd("totalFloors", e.target.value)} placeholder="Binanın mərtəbə sayı" inputMode="numeric" style={fieldStyle} />
             </div>
+
+            {/* Row 4 — Yerləşdiyi mərtəbə | Otaq sayı | (empty) */}
             <div>
               <FieldLabel>Yerləşdiyi mərtəbə</FieldLabel>
               <input value={form.floor} onChange={(e) => upd("floor", e.target.value)} placeholder="Yerləşdiyi mərtəbə" inputMode="numeric" style={fieldStyle} />
@@ -309,12 +313,13 @@ export function PropertyEntryModal({
               <FieldLabel>Otaq sayı</FieldLabel>
               <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder="Otaq sayı" inputMode="numeric" style={fieldStyle} />
             </div>
+            <div />
           </div>
 
           <div style={{ marginTop: 22, padding: "12px 14px", background: "var(--orange-tint)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: "var(--text-2)" }}>
             <Icons.Sparkle size={14} style={{ color: "var(--orange)", flexShrink: 0 }} />
             <span>
-              <strong style={{ color: "var(--text-1)" }}>Yadda saxla</strong> — qaralama olaraq saxla.
+              <strong style={{ color: "var(--text-1)" }}>Yadda saxla</strong> — mənzili portfelə əlavə et, qaralama olaraq saxla.
               <strong style={{ color: "var(--text-1)", marginLeft: 6 }}>Qiymətləndir</strong> — dərhal fair value, kirayə və skoru hesabla.
             </span>
           </div>
