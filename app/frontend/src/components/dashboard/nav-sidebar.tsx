@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BarChart3,
   Bell,
   Boxes,
   Building2,
@@ -9,7 +10,9 @@ import {
   Heart,
   Layers,
   Mail,
+  Map,
   Network,
+  PieChart,
   Settings,
   Shield,
   TrendingUp,
@@ -32,6 +35,9 @@ export type DashboardView =
   | "trends"
   | "valuation-single"
   | "valuation-mass"
+  | "valuation-analysis"
+  | "valuation-market"
+  | "valuation-map"
   | "listings"
   | "b2c"
   | "reports"
@@ -55,6 +61,9 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
     { id: "trends", icon: TrendingUp, label: t.navTrends },
     { id: "valuation-single", icon: Calculator, label: t.navValSingle ?? "Tək qiymətləndirmə" },
     { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
+    { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
+    { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
+    { id: "valuation-map", icon: Map, label: t.navValMap ?? "Harita 2" },
     { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
     { id: "b2c", icon: Heart, label: t.navB2C ?? "B2C Görünüm" },
     { id: "reports", icon: Shield, label: t.navReports },

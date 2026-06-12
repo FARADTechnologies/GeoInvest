@@ -19,9 +19,8 @@ import {
   type Stats
 } from "@/components/dashboard/valuation/valuation-core";
 import { fetchValuationMeta, newId, valuateBatch } from "@/lib/valuation-data";
+import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
 import type { ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
-
-type Portfolio = { id: string; name: string; description: string; createdAt: string; createdBy: string; items: OProp[] };
 
 const SEED_RAYONS = ["Yasamal", "Səbail", "Nərimanov", "Xətai", "Nəsimi", "Binəqədi", "Nizami", "Sabunçu"];
 function seedInputs(n: number, salt: number): ValuationInput[] {
@@ -65,6 +64,14 @@ export function ValuationMassView() {
 
   useEffect(() => {
     if (seeded) return;
+    // Saved portfolios survive view switches and reloads.
+    const saved = loadPortfolios();
+    if (saved && saved.portfolios.length > 0) {
+      setPortfolios(saved.portfolios);
+      setSource(saved.source);
+      setSeeded(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       const built: Portfolio[] = [];
@@ -78,6 +85,11 @@ export function ValuationMassView() {
     })();
     return () => { cancelled = true; };
   }, [seeded]);
+
+  // Persist every change once the initial load/seed is done.
+  useEffect(() => {
+    if (seeded) savePortfolios(portfolios, source);
+  }, [seeded, portfolios, source]);
 
   const update = (pf: Portfolio) => setPortfolios((prev) => prev.map((p) => (p.id === pf.id ? pf : p)));
   const active = route.name !== "list" ? portfolios.find((p) => p.id === route.id) : undefined;
@@ -457,7 +469,7 @@ function niceBuckets(values: number[], n = 10) {
   return edges;
 }
 
-function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Portfolio; source: ValuationSource; onBack: () => void }) {
+export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Portfolio; source: ValuationSource; onBack: () => void }) {
   const items = portfolio.items.filter((x) => x.valued !== false);
   const stats = statsOf(portfolio.items);
   const [histMetric, setHistMetric] = useState("yield");

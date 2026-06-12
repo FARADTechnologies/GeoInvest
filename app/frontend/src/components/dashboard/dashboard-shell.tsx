@@ -21,6 +21,8 @@ import { B2CView, ListingsViewV3, RayonsViewV3 } from "@/components/dashboard/v3
 import { AdminView } from "@/components/dashboard/admin-view";
 import { ValuationSingleView } from "@/components/dashboard/valuation/valuation-single";
 import { ValuationMassView } from "@/components/dashboard/valuation/valuation-mass";
+import { ValuationAnalysisView } from "@/components/dashboard/valuation/valuation-analysis";
+import { ValuationMarketView } from "@/components/dashboard/valuation/valuation-market";
 
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
 import {
@@ -267,6 +269,17 @@ export function DashboardShell() {
             ) : null}
             {activeView === "valuation-single" ? <ValuationSingleView onNavigate={setActiveView} /> : null}
             {activeView === "valuation-mass" ? <ValuationMassView /> : null}
+            {activeView === "valuation-analysis" ? <ValuationAnalysisView onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-market" ? <ValuationMarketView /> : null}
+            {activeView === "valuation-map" ? (
+              // Bridged prototype (team's own HTML served as a static asset).
+              // Open the "Xəritə" item inside it; a native port comes later.
+              <iframe
+                src="/orange-b2b.html"
+                title="Xəritə (prototip)"
+                style={{ width: "100%", height: "calc(100vh - 120px)", border: "1px solid var(--border, #e4e7ef)", borderRadius: 12, background: "#F4F6FB" }}
+              />
+            ) : null}
             {activeView === "listings" ? (
               <ListingsViewV3
                 t={t}
