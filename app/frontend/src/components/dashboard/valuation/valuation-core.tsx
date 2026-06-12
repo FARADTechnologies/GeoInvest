@@ -6,6 +6,8 @@
 // (mapped from snake_case to the prototype's camelCase shape).
 
 import { useEffect, useMemo, useState } from "react";
+import { T } from "@/components/dashboard/valuation/valuation-i18n";
+
 
 import {
   Delta,
@@ -238,15 +240,15 @@ export function PropertyEntryModal({
               <span className="sep">/</span>
               <span>{isEdit ? "Mənzili redaktə et" : "Yeni qiymətləndirmə"}</span>
             </div>
-            <div className="modal-title">Mənzil haqqında məlumat</div>
+            <div className="modal-title">{T(`Mənzil haqqında məlumat`)}</div>
           </div>
           <div className="sp" />
           <div className="fl-row" style={{ gap: 6 }}>
             <button className="btn btn-secondary btn-sm" style={{ borderColor: "var(--orange)", color: "var(--orange)", borderRadius: 99, padding: "6px 14px" }}>
-              <Icons.Sort size={14} /> Parametrlə qiymətləndir
+              <Icons.Sort size={14} /> {T(`Parametrlə qiymətləndir`)}
             </button>
             <button className="btn btn-ghost btn-sm" style={{ borderRadius: 99, padding: "6px 14px" }}>
-              <Icons.Layers size={14} /> Elan linki ilə qiymətləndir
+              <Icons.Layers size={14} /> {T(`Elan linki ilə qiymətləndir`)}
             </button>
           </div>
           <button className="modal-close" onClick={onClose}>
@@ -258,60 +260,60 @@ export function PropertyEntryModal({
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "22px 24px" }}>
             {/* Row 1 — exactly as the prototype: Ünvan (span 2) | Mənzil növü */}
             <div style={{ gridColumn: "span 2" }}>
-              <FieldLabel>Ünvan</FieldLabel>
+              <FieldLabel>{T(`Ünvan`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input value={form.address} onChange={(e) => upd("address", e.target.value)} placeholder="Ünvan" style={fieldStyle} />
+                <input value={form.address} onChange={(e) => upd("address", e.target.value)} placeholder={T(`Ünvan`)} style={fieldStyle} />
                 <button className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
-                  <Icons.MapPin size={13} /> Xəritədən seç
+                  <Icons.MapPin size={13} /> {T(`Xəritədən seç`)}
                 </button>
               </div>
-              <HintRow>Dəqiq qiymətləndirmə üçün tam ünvanı daxil edin (məs. Mir Cəlal küç. 89) və ya xəritədən mənzilin yerləşdiyi binanı seçin.</HintRow>
+              <HintRow>{T(`Dəqiq qiymətləndirmə üçün tam ünvanı daxil edin (məs. Mir Cəlal küç. 89) və ya xəritədən mənzilin yerləşdiyi binanı seçin.`)}</HintRow>
             </div>
             <div>
-              <FieldLabel>Mənzil növü</FieldLabel>
+              <FieldLabel>{T(`Mənzil növü`)}</FieldLabel>
               <Select value={form.type} onChange={(v) => upd("type", v)} options={TYPE_OPTIONS} />
             </div>
 
             {/* Row 2 — Təmir | Çıxarış | Rezidens (with hint) */}
             <div>
-              <FieldLabel>Təmir vəziyyəti</FieldLabel>
+              <FieldLabel>{T(`Təmir vəziyyəti`)}</FieldLabel>
               <Select value={form.repair} onChange={(v) => upd("repair", v)} options={REPAIR_OPTIONS} />
             </div>
             <div>
-              <FieldLabel>Çıxarış</FieldLabel>
+              <FieldLabel>{T(`Çıxarış`)}</FieldLabel>
               <Select value={form.extract} onChange={(v) => upd("extract", v)} options={EXTRACT_OPTIONS} />
             </div>
             <div>
-              <FieldLabel>Yaşayış kompleksi (rezidens)</FieldLabel>
+              <FieldLabel>{T(`Yaşayış kompleksi (rezidens)`)}</FieldLabel>
               <Select value={form.isResidence} onChange={(v) => upd("isResidence", v)} options={RESIDENCE_YN} />
-              <HintRow>Rezidensiya və ya kompleksdirsə — Bəli. Adi binalar bu kateqoriyaya aid deyil.</HintRow>
+              <HintRow>{T(`Rezidensiya və ya kompleksdirsə — Bəli. Adi binalar bu kateqoriyaya aid deyil.`)}</HintRow>
             </div>
 
             {/* Row 3 — Kompleks adı | Sahə | Binanın mərtəbə sayı */}
             <div>
-              <FieldLabel>Yaşayış kompleksi adı</FieldLabel>
+              <FieldLabel>{T(`Yaşayış kompleksi adı`)}</FieldLabel>
               <Select value={form.residence} onChange={(v) => upd("residence", v)} options={RESIDENCES} />
             </div>
             <div>
-              <FieldLabel>Sahə kv.m</FieldLabel>
+              <FieldLabel>{T(`Sahə kv.m`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder="Sahə kv.m" inputMode="numeric" style={{ ...fieldStyle, paddingRight: 48 }} />
+                <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder={T(`Sahə kv.m`)} inputMode="numeric" style={{ ...fieldStyle, paddingRight: 48 }} />
                 <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-3)", fontSize: 12, fontWeight: 500, pointerEvents: "none" }}>m²</span>
               </div>
             </div>
             <div>
-              <FieldLabel>Binanın mərtəbə sayı</FieldLabel>
-              <input value={form.totalFloors} onChange={(e) => upd("totalFloors", e.target.value)} placeholder="Binanın mərtəbə sayı" inputMode="numeric" style={fieldStyle} />
+              <FieldLabel>{T(`Binanın mərtəbə sayı`)}</FieldLabel>
+              <input value={form.totalFloors} onChange={(e) => upd("totalFloors", e.target.value)} placeholder={T(`Binanın mərtəbə sayı`)} inputMode="numeric" style={fieldStyle} />
             </div>
 
             {/* Row 4 — Yerləşdiyi mərtəbə | Otaq sayı | (empty) */}
             <div>
-              <FieldLabel>Yerləşdiyi mərtəbə</FieldLabel>
-              <input value={form.floor} onChange={(e) => upd("floor", e.target.value)} placeholder="Yerləşdiyi mərtəbə" inputMode="numeric" style={fieldStyle} />
+              <FieldLabel>{T(`Yerləşdiyi mərtəbə`)}</FieldLabel>
+              <input value={form.floor} onChange={(e) => upd("floor", e.target.value)} placeholder={T(`Yerləşdiyi mərtəbə`)} inputMode="numeric" style={fieldStyle} />
             </div>
             <div>
-              <FieldLabel>Otaq sayı</FieldLabel>
-              <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder="Otaq sayı" inputMode="numeric" style={fieldStyle} />
+              <FieldLabel>{T(`Otaq sayı`)}</FieldLabel>
+              <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder={T(`Otaq sayı`)} inputMode="numeric" style={fieldStyle} />
             </div>
             <div />
           </div>
@@ -319,8 +321,8 @@ export function PropertyEntryModal({
           <div style={{ marginTop: 22, padding: "12px 14px", background: "var(--orange-tint)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: "var(--text-2)" }}>
             <Icons.Sparkle size={14} style={{ color: "var(--orange)", flexShrink: 0 }} />
             <span>
-              <strong style={{ color: "var(--text-1)" }}>Yadda saxla</strong> — mənzili portfelə əlavə et, qaralama olaraq saxla.
-              <strong style={{ color: "var(--text-1)", marginLeft: 6 }}>Qiymətləndir</strong> — dərhal fair value, kirayə və skoru hesabla.
+              <strong style={{ color: "var(--text-1)" }}>{T(`Yadda saxla`)}</strong> — mənzili portfelə əlavə et, qaralama olaraq saxla.
+              <strong style={{ color: "var(--text-1)", marginLeft: 6 }}>{T(`Qiymətləndir`)}</strong> — dərhal fair value, kirayə və skoru hesabla.
             </span>
           </div>
         </div>
@@ -333,9 +335,9 @@ export function PropertyEntryModal({
             </span>
           )}
           <span className="sp" />
-          <button className="btn btn-ghost" onClick={onClose}>Ləğv et</button>
+          <button className="btn btn-ghost" onClick={onClose}>{T(`Ləğv et`)}</button>
           <button className="btn btn-secondary" disabled={!valid || busy} onClick={() => onSubmit(build(), false)} style={{ opacity: valid ? 1 : 0.55 }}>
-            <Icons.Bookmark size={14} /> Yadda saxla
+            <Icons.Bookmark size={14} /> {T(`Yadda saxla`)}
           </button>
           <button className="btn btn-primary btn-lg" disabled={!valid || busy} onClick={() => onSubmit(build(), true)} style={{ opacity: valid ? 1 : 0.55 }}>
             <Icons.Sparkle size={16} /> {busy ? "Hesablanır…" : "Qiymətləndir"}
@@ -425,19 +427,19 @@ export function PropertyReport({
 
         <div className="modal-body">
           <div className="card" style={{ padding: "12px 16px", marginBottom: 14 }}>
-            <div className="cell-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>Ünvan</div>
+            <div className="cell-muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{T(`Ünvan`)}</div>
             <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{p.address}</div>
           </div>
 
           <div className="info-grid" style={{ marginBottom: 16 }}>
-            <InfoCell k="Mənzil növü">{p.type}</InfoCell>
-            <InfoCell k="Təmir vəziyyəti">{p.repair ?? "—"}</InfoCell>
-            <InfoCell k="Çıxarış">{p.extract ?? "—"}</InfoCell>
-            <InfoCell k="Sahə kv.m">{p.area} kv.m</InfoCell>
-            <InfoCell k="Binanın mərtəbə sayı">{p.totalFloors ?? "—"}</InfoCell>
-            <InfoCell k="Otaq sayı">{p.rooms ?? "—"}</InfoCell>
+            <InfoCell k={T(`Mənzil növü`)}>{p.type}</InfoCell>
+            <InfoCell k={T(`Təmir vəziyyəti`)}>{p.repair ?? "—"}</InfoCell>
+            <InfoCell k={T(`Çıxarış`)}>{p.extract ?? "—"}</InfoCell>
+            <InfoCell k={T(`Sahə kv.m`)}>{p.area} kv.m</InfoCell>
+            <InfoCell k={T(`Binanın mərtəbə sayı`)}>{p.totalFloors ?? "—"}</InfoCell>
+            <InfoCell k={T(`Otaq sayı`)}>{p.rooms ?? "—"}</InfoCell>
             <InfoCell k="Yaşayış kompleksi">{p.residence ? `Bəli (${p.residence})` : "Xeyr"}</InfoCell>
-            <InfoCell k="Yerləşdiyi mərtəbə">{p.floor ?? "—"}</InfoCell>
+            <InfoCell k={T(`Yerləşdiyi mərtəbə`)}>{p.floor ?? "—"}</InfoCell>
           </div>
 
           <div className="big-tiles" style={{ marginBottom: 18 }}>
@@ -464,7 +466,7 @@ export function PropertyReport({
 
           <div className="card" style={{ padding: 16, marginBottom: 18 }}>
             <div className="fl-row" style={{ gap: 16, flexWrap: "wrap" }}>
-              <DonutChart value={p.score} label="Sərmayə skoru" size={84} />
+              <DonutChart value={p.score} label={T(`Sərmayə skoru`)} size={84} />
               <div style={{ flex: 1, minWidth: 220 }}>
                 <div className="card-title">Sərmayə skoru: {p.score}/100</div>
                 <div className="card-sub" style={{ marginTop: 4, maxWidth: "52ch" }}>

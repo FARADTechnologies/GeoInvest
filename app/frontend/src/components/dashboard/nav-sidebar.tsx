@@ -37,6 +37,7 @@ export type DashboardView =
   | "valuation-mass"
   | "valuation-analysis"
   | "valuation-market"
+  | "valuation-hexmap"
   | "valuation-map"
   | "listings"
   | "b2c"
@@ -63,7 +64,8 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
     { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
     { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
     { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
-    { id: "valuation-map", icon: Map, label: t.navValMap ?? "Harita 2" },
+    { id: "valuation-hexmap", icon: Globe, label: t.navValHexMap ?? "Analiz xəritəsi" },
+    { id: "valuation-map", icon: Map, label: t.navValMap ?? "İkincil Sistem" },
     { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
     { id: "b2c", icon: Heart, label: t.navB2C ?? "B2C Görünüm" },
     { id: "reports", icon: Shield, label: t.navReports },

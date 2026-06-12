@@ -23,6 +23,7 @@ import { ValuationSingleView } from "@/components/dashboard/valuation/valuation-
 import { ValuationMassView } from "@/components/dashboard/valuation/valuation-mass";
 import { ValuationAnalysisView } from "@/components/dashboard/valuation/valuation-analysis";
 import { ValuationMarketView } from "@/components/dashboard/valuation/valuation-market";
+import { ValuationMapView } from "@/components/dashboard/valuation/valuation-map";
 
 import { fetchFilters, fetchMapData, fetchMetrics } from "@/lib/api";
 import {
@@ -267,10 +268,11 @@ export function DashboardShell() {
             {activeView === "trends" ? (
               <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
             ) : null}
-            {activeView === "valuation-single" ? <ValuationSingleView onNavigate={setActiveView} /> : null}
-            {activeView === "valuation-mass" ? <ValuationMassView /> : null}
-            {activeView === "valuation-analysis" ? <ValuationAnalysisView onNavigate={setActiveView} /> : null}
-            {activeView === "valuation-market" ? <ValuationMarketView /> : null}
+            {activeView === "valuation-single" ? <ValuationSingleView lang={lang} onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-mass" ? <ValuationMassView lang={lang} /> : null}
+            {activeView === "valuation-analysis" ? <ValuationAnalysisView lang={lang} onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-market" ? <ValuationMarketView lang={lang} /> : null}
+            {activeView === "valuation-hexmap" ? <ValuationMapView lang={lang} /> : null}
             {activeView === "valuation-map" ? (
               // Bridged prototype (team's own HTML served as a static asset).
               // Open the "Xəritə" item inside it; a native port comes later.

@@ -5,6 +5,9 @@
 // scoped under .hm-val. Dataset is the prototype's static baseline.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
+import type { Lang } from "@/lib/i18n";
+
 
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Delta, DonutChart, HBars, Icons, Pill, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
@@ -164,7 +167,8 @@ function MiniBar({ data, width = 80, height = 26, color = "#D9531E" }: { data: n
 
 // ─── Page ─────────────────────────────────────────────────────────────
 
-export function ValuationMarketView() {
+export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
+  setValLang(lang);
   const [range, setRange] = useState("12m");
   const [trendMetric, setTrendMetric] = useState("index");
   const [trendDistrict, setTrendDistrict] = useState("all");
@@ -236,14 +240,14 @@ export function ValuationMarketView() {
       <div className="page" style={{ padding: 0, maxWidth: "none" }}>
         <div className="page-header">
           <div>
-            <div className="crumbs"><span>Bazar analizi</span></div>
-            <h1 className="page-title">Bazar analizi · Bakı</h1>
-            <p className="page-sub">Şəhər üzrə əmlak bazarının canlı göstəriciləri — qiymət indeksi, kirayə gəlirliyi, likvidlik və əqd həcmi. Məlumat 12 rayon üzrə yenilənir.</p>
+            <div className="crumbs"><span>{T(`Bazar analizi`)}</span></div>
+            <h1 className="page-title">{T(`Bazar analizi · Bakı`)}</h1>
+            <p className="page-sub">{T(`Şəhər üzrə əmlak bazarının canlı göstəriciləri — qiymət indeksi, kirayə gəlirliyi, likvidlik və əqd həcmi. Məlumat 12 rayon üzrə yenilənir.`)}</p>
           </div>
           <div className="page-actions">
             <TimeRange value={range} onChange={setRange} />
-            <button className="btn btn-secondary"><Icons.Download size={14} /> İxrac</button>
-            <button className="btn btn-secondary"><Icons.PDF size={14} /> Hesabat</button>
+            <button className="btn btn-secondary"><Icons.Download size={14} /> {T(`İxrac`)}</button>
+            <button className="btn btn-secondary"><Icons.PDF size={14} /> {T(`Hesabat`)}</button>
           </div>
         </div>
 
@@ -255,18 +259,18 @@ export function ValuationMarketView() {
         <div className="card card-pad" style={{ marginBottom: 16 }}>
           <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ flex: 1, minWidth: 220 }}>
-              <div className="card-title">{trendMeta.label} dinamikası</div>
+              <div className="card-title">{T(trendMeta.label)} dinamikası</div>
               <div className="card-sub" style={{ marginTop: 4 }}>{trendDistrict === "all" ? "Bütün Bakı" : trendDistrict} üzrə son {months} ayın trendi.</div>
             </div>
             <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-              <MktSelect label="Metrika" value={trendMetric} onChange={setTrendMetric} options={MKT_METRIC_KEYS.map((k) => ({ value: k, label: MKT_METRICS[k].label }))} />
-              <MktSelect label="Rayon" value={trendDistrict} onChange={setTrendDistrict} options={distOptions} />
+              <MktSelect label={T(`Metrika`)} value={trendMetric} onChange={setTrendMetric} options={MKT_METRIC_KEYS.map((k) => ({ value: k, label: T(MKT_METRICS[k].label) }))} />
+              <MktSelect label={T(`Rayon`)} value={trendDistrict} onChange={setTrendDistrict} options={distOptions} />
             </div>
           </div>
           <div className="fl-row" style={{ gap: 22, margin: "14px 0 4px", flexWrap: "wrap" }}>
-            <TrendKpi k="Hal-hazırkı" v={trendMeta.fmt(endV)} tone="orange" />
+            <TrendKpi k={T(`Hal-hazırkı`)} v={trendMeta.fmt(endV)} tone="orange" />
             <TrendKpi k={`${months} ay əvvəl`} v={trendMeta.fmt(startV)} />
-            <TrendKpi k="Dəyişiklik" v={`${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`} tone={changePct > 0 ? "green" : changePct < 0 ? "red" : "gray"} />
+            <TrendKpi k={T(`Dəyişiklik`)} v={`${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`} tone={changePct > 0 ? "green" : changePct < 0 ? "red" : "gray"} />
           </div>
           <MarketLineChart series={trendSeries} labels={labels} metricKey={trendMetric} color={trendMetric === "liq" || trendMetric === "yield" ? "#2A6FDB" : "#D9531E"} />
         </div>
@@ -274,26 +278,26 @@ export function ValuationMarketView() {
         {/* District table */}
         <div className="table-wrap" style={{ marginBottom: 16 }}>
           <div className="table-tools">
-            <div className="card-title">Rayonlar üzrə müqayisə</div>
+            <div className="card-title">{T(`Rayonlar üzrə müqayisə`)}</div>
             <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>{MKT_DISTRICTS.length} rayon</span>
             <span className="sp" />
-            <span className="muted" style={{ fontSize: 11.5 }}>Sütun başlığına klikləyib sıralayın</span>
+            <span className="muted" style={{ fontSize: 11.5 }}>{T(`Sütun başlığına klikləyib sıralayın`)}</span>
           </div>
           <div className="table-scroll">
             <table className="data">
               <thead>
                 <tr>
-                  <th style={{ width: 130 }}>Rayon</th>
-                  <th>Seqment</th>
+                  <th style={{ width: 130 }}>{T(`Rayon`)}</th>
+                  <th>{T(`Seqment`)}</th>
                   <SortTh label="Yeni ₼/m²" k="ppmNew" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
                   <SortTh label="Köhnə ₼/m²" k="ppmOld" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Gəlirlilik" k="yield" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Kirayə ₼" k="rent" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Likvidlik" k="liq" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Əqd/ay" k="txn" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Təklif" k="supply" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <SortTh label="Artım (illik)" k="growth" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <th style={{ width: 90 }}>Trend</th>
+                  <SortTh label={T(`Gəlirlilik`)} k="yield" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <SortTh label={T(`Kirayə ₼`)} k="rent" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <SortTh label={T(`Likvidlik`)} k="liq" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <SortTh label={T(`Əqd/ay`)} k="txn" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <SortTh label={T(`Təklif`)} k="supply" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <SortTh label={T(`Artım (illik)`)} k="growth" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                  <th style={{ width: 90 }}>{T(`Trend`)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -325,15 +329,15 @@ export function ValuationMarketView() {
         <div className="card card-pad" style={{ marginBottom: 16 }}>
           <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ flex: 1, minWidth: 240 }}>
-              <div className="card-title">Qiymət aralığı və kateqoriyaya görə satış günlərinin ortalaması</div>
+              <div className="card-title">{T(`Qiymət aralığı və kateqoriyaya görə satış günlərinin ortalaması`)}</div>
               <div className="card-sub" style={{ marginTop: 4 }}>
                 Hər qiymət seqmentində mənzilin satılması üçün orta gün sayı. Açıq rəng — <strong>+{salesBuffer} gün</strong> ssenari fərziyyəsi (bəd-bin şərait / az likvid bazar).
               </div>
             </div>
             <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-              <MktSelect label="Kateqoriya" value={salesCat} onChange={setSalesCat} options={[{ value: "all", label: "Hamısı" }, { value: "new", label: "Yeni tikili" }, { value: "old", label: "Köhnə tikili" }]} minWidth={140} />
-              <MktSelect label="Rayon" value={salesRegion} onChange={setSalesRegion} options={distOptions} />
-              <MktSelect label="Mərkəz" value={salesAgg} onChange={setSalesAgg} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} minWidth={130} />
+              <MktSelect label={T(`Kateqoriya`)} value={salesCat} onChange={setSalesCat} options={[{ value: "all", label: "Hamısı" }, { value: "new", label: "Yeni tikili" }, { value: "old", label: "Köhnə tikili" }]} minWidth={140} />
+              <MktSelect label={T(`Rayon`)} value={salesRegion} onChange={setSalesRegion} options={distOptions} />
+              <MktSelect label={T(`Mərkəz`)} value={salesAgg} onChange={setSalesAgg} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} minWidth={130} />
             </div>
           </div>
           <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} />
@@ -342,18 +346,18 @@ export function ValuationMarketView() {
         {/* Yield + movers */}
         <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16, marginBottom: 16 }}>
           <div className="card card-pad">
-            <div className="card-title">Rayonlar üzrə kirayə gəlirliyi</div>
-            <div className="card-sub" style={{ margin: "4px 0 16px" }}>Əlçatan rayonlarda gəlirlilik daha yüksək, premium rayonlarda daha aşağıdır.</div>
+            <div className="card-title">{T(`Rayonlar üzrə kirayə gəlirliyi`)}</div>
+            <div className="card-sub" style={{ margin: "4px 0 16px" }}>{T(`Əlçatan rayonlarda gəlirlilik daha yüksək, premium rayonlarda daha aşağıdır.`)}</div>
             <HBars items={yieldBars} max={10} color="#2A8B7E" valueFmt={(v) => v.toFixed(1) + "%"} />
           </div>
           <div className="card card-pad">
-            <div className="card-title">Ən sürətli artan rayonlar</div>
-            <div className="card-sub" style={{ margin: "4px 0 14px" }}>İllik qiymət artımı üzrə.</div>
+            <div className="card-title">{T(`Ən sürətli artan rayonlar`)}</div>
+            <div className="card-sub" style={{ margin: "4px 0 14px" }}>{T(`İllik qiymət artımı üzrə.`)}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {rising.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="up" />)}
             </div>
             <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-            <div className="card-sub" style={{ marginBottom: 10 }}>Ən yavaş artan rayonlar</div>
+            <div className="card-sub" style={{ marginBottom: 10 }}>{T(`Ən yavaş artan rayonlar`)}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {falling.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="slow" />)}
             </div>
@@ -365,8 +369,8 @@ export function ValuationMarketView() {
           <div className="card card-pad">
             <div className="fl-row" style={{ gap: 12, alignItems: "flex-start" }}>
               <div style={{ flex: 1 }}>
-                <div className="card-title">Otaq sayına görə seqment</div>
-                <div className="card-sub" style={{ marginTop: 4 }}>Bazarın otaq sayı üzrə bölgüsü və göstəriciləri.</div>
+                <div className="card-title">{T(`Otaq sayına görə seqment`)}</div>
+                <div className="card-sub" style={{ marginTop: 4 }}>{T(`Bazarın otaq sayı üzrə bölgüsü və göstəriciləri.`)}</div>
               </div>
               <MktSelect value={segMetric} onChange={setSegMetric} options={[{ value: "ppm", label: "Qiymət ₼/m²" }, { value: "yield", label: "Gəlirlilik" }, { value: "rent", label: "Kirayə ₼" }, { value: "liq", label: "Likvidlik" }]} minWidth={140} />
             </div>
@@ -387,16 +391,16 @@ export function ValuationMarketView() {
           </div>
 
           <div className="card card-pad">
-            <div className="card-title">Yeni vs köhnə tikili</div>
-            <div className="card-sub" style={{ margin: "4px 0 16px" }}>Şəhər üzrə təklif strukturu.</div>
+            <div className="card-title">{T(`Yeni vs köhnə tikili`)}</div>
+            <div className="card-sub" style={{ margin: "4px 0 16px" }}>{T(`Şəhər üzrə təklif strukturu.`)}</div>
             <div className="fl-row" style={{ gap: 18, alignItems: "center" }}>
-              <DonutChart value={MKT_CITY.newShare} label="Yeni tikili" size={104} color="#2A8B7E" />
+              <DonutChart value={MKT_CITY.newShare} label={T(`Yeni tikili`)} size={104} color="#2A8B7E" />
               <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                <SplitRow color="#2A8B7E" label="Yeni tikili" ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmNew, 0) / MKT_DISTRICTS.length} share={MKT_CITY.newShare} />
-                <SplitRow color="#0F1E3D" label="Köhnə tikili" ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmOld, 0) / MKT_DISTRICTS.length} share={100 - MKT_CITY.newShare} />
+                <SplitRow color="#2A8B7E" label={T(`Yeni tikili`)} ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmNew, 0) / MKT_DISTRICTS.length} share={MKT_CITY.newShare} />
+                <SplitRow color="#0F1E3D" label={T(`Köhnə tikili`)} ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmOld, 0) / MKT_DISTRICTS.length} share={100 - MKT_CITY.newShare} />
                 <div style={{ height: 1, background: "var(--border)" }} />
                 <div className="fl-row" style={{ fontSize: 12.5 }}>
-                  <span className="muted">Yeni/köhnə qiymət fərqi</span>
+                  <span className="muted">{T(`Yeni/köhnə qiymət fərqi`)}</span>
                   <span className="sp" />
                   <strong style={{ color: "var(--orange)" }}>+38%</strong>
                 </div>
@@ -569,13 +573,13 @@ function SalesDaysChart({ category, region, buffer, agg, height = 420 }: { categ
       <div className="fl-row" style={{ gap: 16, flexWrap: "wrap", marginBottom: 10 }}>
         {showOld && (
           <>
-            <LegendSwatch color={COL.oldBase} label="Köhnə tikili" />
+            <LegendSwatch color={COL.oldBase} label={T(`Köhnə tikili`)} />
             {buffer > 0 && <LegendSwatch color={COL.oldBuf} label={`Köhnə tikili +${buffer} gün`} />}
           </>
         )}
         {showNew && (
           <>
-            <LegendSwatch color={COL.newBase} label="Yeni tikili" />
+            <LegendSwatch color={COL.newBase} label={T(`Yeni tikili`)} />
             {buffer > 0 && <LegendSwatch color={COL.newBuf} label={`Yeni tikili +${buffer} gün`} />}
           </>
         )}
@@ -617,7 +621,7 @@ function SalesDaysChart({ category, region, buffer, agg, height = 420 }: { categ
             </g>
           );
         })}
-        <text x={padL + innerW / 2} y={height - 8} textAnchor="middle" fontSize="11.5" fill="var(--text-2)" fontFamily="Manrope" fontWeight="600">Qiymət aralığı (₼)</text>
+        <text x={padL + innerW / 2} y={height - 8} textAnchor="middle" fontSize="11.5" fill="var(--text-2)" fontFamily="Manrope" fontWeight="600">{T(`Qiymət aralığı (₼)`)}</text>
       </svg>
     </div>
   );

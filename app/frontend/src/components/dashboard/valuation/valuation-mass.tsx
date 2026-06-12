@@ -7,6 +7,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
+import type { Lang } from "@/lib/i18n";
+
 
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons, DonutChart, HBars, Pill, RiskPill, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
@@ -54,7 +57,8 @@ const SEEDS = [
 
 type Sub = { name: "list" } | { name: "portfolio"; id: string } | { name: "analysis"; id: string };
 
-export function ValuationMassView() {
+export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
+  setValLang(lang);
   const metaQuery = useQuery({ queryKey: ["valuation", "meta"], queryFn: fetchValuationMeta });
   const meta = metaQuery.data?.data ?? null;
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
@@ -126,13 +130,13 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
     <>
       <div className="page-header">
         <div>
-          <div className="crumbs"><span>Kütləvi qiymətləndirmə</span></div>
-          <h1 className="page-title">Kütləvi qiymətləndirmə</h1>
-          <p className="page-sub">Hər portfel — bir qrup mənzilin yığını. Portfelə daxil olub mənzilləri əlavə edin və ya toplu qiymətləndirin.</p>
+          <div className="crumbs"><span>{T(`Kütləvi qiymətləndirmə`)}</span></div>
+          <h1 className="page-title">{T(`Kütləvi qiymətləndirmə`)}</h1>
+          <p className="page-sub">{T(`Hər portfel — bir qrup mənzilin yığını. Portfelə daxil olub mənzilləri əlavə edin və ya toplu qiymətləndirin.`)}</p>
         </div>
         <div className="page-actions">
           <SourceBadge source={source} />
-          <button className="btn btn-primary" onClick={() => setCreating(true)}><Icons.Plus size={14} /> Yeni portfel</button>
+          <button className="btn btn-primary" onClick={() => setCreating(true)}><Icons.Plus size={14} /> {T(`Yeni portfel`)}</button>
         </div>
       </div>
 
@@ -148,11 +152,11 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
                     <div className="card-title" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pf.name}</div>
                     <div className="cell-muted" style={{ marginTop: 4 }}>{pf.createdAt} · {pf.createdBy}</div>
                   </div>
-                  {st ? <DonutChart value={st.avgScore} size={56} label="skor" /> : <Pill tone="amber" dot>Qaralama</Pill>}
+                  {st ? <DonutChart value={st.avgScore} size={56} label="skor" /> : <Pill tone="amber" dot>{T(`Qaralama`)}</Pill>}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", marginTop: 14, gap: 10 }}>
-                  <CardMicro k="Mənzil" v={String(pf.items.length)} />
-                  <CardMicro k="Dəyər" v={st ? fmtMoney(st.totalValue) : "—"} />
+                  <CardMicro k={T(`Mənzil`)} v={String(pf.items.length)} />
+                  <CardMicro k={T(`Dəyər`)} v={st ? fmtMoney(st.totalValue) : "—"} />
                   <CardMicro k="Yield" v={st ? `${st.avgYield}%` : "—"} />
                 </div>
               </div>
@@ -162,24 +166,24 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
         <div className="card" style={{ display: "grid", placeItems: "center", minHeight: 180, cursor: "pointer", border: "2px dashed var(--border-strong)", background: "transparent", boxShadow: "none" }} onClick={() => setCreating(true)}>
           <div style={{ textAlign: "center" }}>
             <div className="empty-art" style={{ margin: "0 auto 8px" }}><Icons.Plus size={22} /></div>
-            <div className="card-title">Yeni portfel yarat</div>
-            <div className="cell-muted" style={{ marginTop: 4 }}>Boş portfeli yaradıb mənzil əlavə et</div>
+            <div className="card-title">{T(`Yeni portfel yarat`)}</div>
+            <div className="cell-muted" style={{ marginTop: 4 }}>{T(`Boş portfeli yaradıb mənzil əlavə et`)}</div>
           </div>
         </div>
       </div>
-      {loading ? <div className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>Portfellər qiymətləndirilir…</div> : null}
+      {loading ? <div className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>{T(`Portfellər qiymətləndirilir…`)}</div> : null}
 
       {creating && (
         <div className="modal-backdrop" onClick={() => setCreating(false)}>
           <div className="modal" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head"><div className="modal-title">Yeni portfel</div><div className="sp" /><button className="modal-close" onClick={() => setCreating(false)}><Icons.X size={14} /></button></div>
+            <div className="modal-head"><div className="modal-title">{T(`Yeni portfel`)}</div><div className="sp" /><button className="modal-close" onClick={() => setCreating(false)}><Icons.X size={14} /></button></div>
             <div className="modal-body" style={{ padding: "20px 22px 22px" }}>
-              <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Portfelin adı</label>
+              <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>{T(`Portfelin adı`)}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="məs. Yasamal — Q3 portfeli" autoFocus onKeyDown={(e) => e.key === "Enter" && (onCreate(name.trim()), setCreating(false))} style={{ width: "100%", padding: "12px 14px", fontSize: 14, border: "1.5px solid var(--border)", borderRadius: 10, color: "var(--text-1)", background: "var(--card)", outline: "none" }} />
               <div className="fl-row" style={{ gap: 8, marginTop: 18 }}>
                 <span className="sp" />
-                <button className="btn btn-ghost" onClick={() => setCreating(false)}>Ləğv et</button>
-                <button className="btn btn-primary" onClick={() => { onCreate(name.trim()); setCreating(false); }}><Icons.Plus size={14} /> Portfeli yarat</button>
+                <button className="btn btn-ghost" onClick={() => setCreating(false)}>{T(`Ləğv et`)}</button>
+                <button className="btn btn-primary" onClick={() => { onCreate(name.trim()); setCreating(false); }}><Icons.Plus size={14} /> {T(`Portfeli yarat`)}</button>
               </div>
             </div>
           </div>
@@ -280,16 +284,16 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
     <>
       <div className="page-header">
         <div style={{ flex: 1 }}>
-          <div className="crumbs"><a onClick={onBack}>Kütləvi qiymətləndirmə</a><span className="sep">/</span><span style={{ color: "var(--text-2)" }}>{portfolio.name}</span></div>
+          <div className="crumbs"><a onClick={onBack}>{T(`Kütləvi qiymətləndirmə`)}</a><span className="sep">/</span><span style={{ color: "var(--text-2)" }}>{portfolio.name}</span></div>
           <div className="fl-row" style={{ gap: 10, alignItems: "center" }}>
             <h1 className="page-title">{portfolio.name}</h1>
-            {draftCount > 0 ? <Pill tone="amber" dot>{draftCount} qaralama</Pill> : items.length > 0 ? <Pill tone="green" dot>Qiymətləndirildi</Pill> : <Pill tone="gray" dot>Boş</Pill>}
+            {draftCount > 0 ? <Pill tone="amber" dot>{draftCount} qaralama</Pill> : items.length > 0 ? <Pill tone="green" dot>{T(`Qiymətləndirildi`)}</Pill> : <Pill tone="gray" dot>{T(`Boş`)}</Pill>}
           </div>
           <p className="page-sub">{portfolio.description} · Yaradılıb {portfolio.createdAt} · {portfolio.createdBy}</p>
         </div>
         <div className="page-actions">
           <SourceBadge source={source} />
-          <button className="btn btn-ghost" onClick={onAnalysis} disabled={valued.length === 0} style={{ opacity: valued.length === 0 ? 0.5 : 1 }}><Icons.TrendUp size={14} /> Portfel analizi</button>
+          <button className="btn btn-ghost" onClick={onAnalysis} disabled={valued.length === 0} style={{ opacity: valued.length === 0 ? 0.5 : 1 }}><Icons.TrendUp size={14} /> {T(`Portfel analizi`)}</button>
           <button className="btn btn-secondary" disabled={items.length === 0} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Download size={14} /> Excel</button>
           <button className="btn btn-secondary" disabled={valued.length === 0} style={{ opacity: valued.length === 0 ? 0.5 : 1 }}><Icons.PDF size={14} /> PDF</button>
         </div>
@@ -298,35 +302,35 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
       <div className="drop" style={{ padding: 18, gap: 18, marginBottom: 14 }}>
         <div className="drop-art" style={{ width: 52, height: 52 }}><Icons.FileSpreadsheet size={26} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="drop-title">Excel cədvəli ilə əlavə et</div>
+          <div className="drop-title">{T(`Excel cədvəli ilə əlavə et`)}</div>
           <div className="drop-sub">.xlsx / .csv — hər sətir bir mənzil. (prototip: nümunə sətirlər API ilə qiymətləndirilir)</div>
         </div>
         <div className="fl-row" style={{ gap: 8, flexShrink: 0 }}>
-          <button className="btn btn-ghost btn-sm"><Icons.Download size={13} /> Şablon</button>
+          <button className="btn btn-ghost btn-sm"><Icons.Download size={13} /> {T(`Şablon`)}</button>
           <button className="btn btn-secondary btn-sm" onClick={() => simulateUpload(12)} disabled={busy}><Icons.Upload size={13} /> {busy ? "Oxunur…" : "Nümunə yüklə"}</button>
         </div>
       </div>
 
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 0, marginBottom: 14, background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-          <MiniStat k="Qiymətləndirilmiş" v={String(stats.n)} />
-          <MiniStat k="Ümumi dəyər" v={fmtMoney(stats.totalValue)} accent />
-          <MiniStat k="Aylıq kirayə" v={fmtMoney(stats.totalRent)} />
-          <MiniStat k="Orta gəlirlilik" v={`${stats.avgYield}%`} />
-          <MiniStat k="Orta skor" v={`${stats.avgScore}/100`} last />
+          <MiniStat k={T(`Qiymətləndirilmiş`)} v={String(stats.n)} />
+          <MiniStat k={T(`Ümumi dəyər`)} v={fmtMoney(stats.totalValue)} accent />
+          <MiniStat k={T(`Aylıq kirayə`)} v={fmtMoney(stats.totalRent)} />
+          <MiniStat k={T(`Orta gəlirlilik`)} v={`${stats.avgYield}%`} />
+          <MiniStat k={T(`Orta skor`)} v={`${stats.avgScore}/100`} last />
         </div>
       )}
 
       <div className="table-wrap">
         <div className="table-tools">
-          <input className="search" placeholder="Ünvan, rayon və ya ID ilə axtar…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input className="search" placeholder={T(`Ünvan, rayon və ya ID ilə axtar…`)} value={query} onChange={(e) => setQuery(e.target.value)} />
           <div className="fl-row" style={{ gap: 4 }}>
             {["Hamısı", "Yeni tikili", "Köhnə tikili"].map((tf) => (
-              <button key={tf} className={`btn btn-sm ${typeFilter === tf ? "btn-secondary" : "btn-ghost"}`} onClick={() => setTypeFilter(tf)}>{tf}</button>
+              <button key={tf} className={`btn btn-sm ${typeFilter === tf ? "btn-secondary" : "btn-ghost"}`} onClick={() => setTypeFilter(tf)}>{T(tf)}</button>
             ))}
           </div>
           <span className="sp" />
-          <button className="btn btn-primary btn-sm" onClick={() => setEntryOpen(true)}><Icons.Plus size={13} /> Yeni qiymətləndirmə</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setEntryOpen(true)}><Icons.Plus size={13} /> {T(`Yeni qiymətləndirmə`)}</button>
         </div>
 
         <div className="table-scroll" style={{ maxHeight: 560 }}>
@@ -334,17 +338,17 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
             <thead>
               <tr>
                 <th style={{ width: 70 }}>ID</th>
-                <th style={{ width: 110 }}>Növ</th>
-                <th style={{ width: 260 }}>Ünvan</th>
-                <th className="num" style={{ width: 70 }}>Sahə</th>
-                <th className="center" style={{ width: 60 }}>Otaq</th>
-                <th className="num" style={{ width: 130 }}>Fair value</th>
-                <th className="num" style={{ width: 110 }}>Qiymət/m²</th>
-                <th className="num" style={{ width: 110 }}>Aylıq kirayə</th>
-                <th className="num" style={{ width: 95 }}>Gəlirlilik</th>
-                <th className="num" style={{ width: 110 }}>Geri ödəmə</th>
-                <th className="num" style={{ width: 110 }}>Likvidlik</th>
-                <th style={{ width: 90, textAlign: "right" }}>Əməliyyat</th>
+                <th style={{ width: 110 }}>{T(`Növ`)}</th>
+                <th style={{ width: 260 }}>{T(`Ünvan`)}</th>
+                <th className="num" style={{ width: 70 }}>{T(`Sahə`)}</th>
+                <th className="center" style={{ width: 60 }}>{T(`Otaq`)}</th>
+                <th className="num" style={{ width: 130 }}>{T(`Fair value`)}</th>
+                <th className="num" style={{ width: 110 }}>{T(`Qiymət/m²`)}</th>
+                <th className="num" style={{ width: 110 }}>{T(`Aylıq kirayə`)}</th>
+                <th className="num" style={{ width: 95 }}>{T(`Gəlirlilik`)}</th>
+                <th className="num" style={{ width: 110 }}>{T(`Geri ödəmə`)}</th>
+                <th className="num" style={{ width: 110 }}>{T(`Likvidlik`)}</th>
+                <th style={{ width: 90, textAlign: "right" }}>{T(`Əməliyyat`)}</th>
               </tr>
             </thead>
             <tbody>
@@ -368,8 +372,8 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
                     <td className="num">{dr ? <span className="muted">—</span> : `${p.liquidity} gün`}</td>
                     <td className="row-act" style={{ textAlign: "right" }}>
                       <div className="fl-row" style={{ gap: 2, justifyContent: "flex-end" }}>
-                        <button className="icon-btn" style={{ width: 28, height: 28 }} title="Redaktə et" onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}><Icons.Edit size={13} /></button>
-                        <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--red)" }} title="Sil" onClick={(e) => { e.stopPropagation(); if (confirm(`${p.address}\n\nBu mənzili portfeldən silmək istədiyinizə əminsiniz?`)) removeItem(p.id); }}><Icons.Trash size={13} /></button>
+                        <button className="icon-btn" style={{ width: 28, height: 28 }} title={T(`Redaktə et`)} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}><Icons.Edit size={13} /></button>
+                        <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--red)" }} title={T(`Sil`)} onClick={(e) => { e.stopPropagation(); if (confirm(`${p.address}\n\nBu mənzili portfeldən silmək istədiyinizə əminsiniz?`)) removeItem(p.id); }}><Icons.Trash size={13} /></button>
                         <button className="icon-btn" style={{ width: 28, height: 28 }} title={dr ? "Hələ qiymətləndirilməyib" : "Hesabatı aç"} disabled={dr} onClick={(e) => { e.stopPropagation(); setOpenId(p.id); }}><Icons.Eye size={13} /></button>
                       </div>
                     </td>
@@ -383,7 +387,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
               <div className="empty-art">{items.length === 0 ? <Icons.Plus size={28} /> : <Icons.Search size={28} />}</div>
               <div className="empty-title">{items.length === 0 ? "Bu portfeldə hələ mənzil yoxdur" : "Nəticə tapılmadı"}</div>
               <div className="empty-sub">{items.length === 0 ? '"Nümunə yüklə" və ya "Yeni qiymətləndirmə" ilə mənzil əlavə edin.' : "Axtarış və ya filtri dəyişib yenidən cəhd edin."}</div>
-              {items.length === 0 && <button className="btn btn-primary" onClick={() => setEntryOpen(true)}><Icons.Plus size={14} /> İlk mənzili əlavə et</button>}
+              {items.length === 0 && <button className="btn btn-primary" onClick={() => setEntryOpen(true)}><Icons.Plus size={14} /> {T(`İlk mənzili əlavə et`)}</button>}
             </div>
           )}
         </div>
@@ -392,24 +396,24 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
       <div className="bottom-bar">
         <div className="fl-row" style={{ gap: 14, fontSize: 13 }}>
           <div className="fl-col">
-            <div className="cell-muted">Portfeldə mənzil sayı</div>
+            <div className="cell-muted">{T(`Portfeldə mənzil sayı`)}</div>
             <div style={{ fontWeight: 700, fontSize: 15 }}>{items.length} ədəd{draftCount > 0 && <span style={{ color: "var(--amber)", fontWeight: 600, marginLeft: 6, fontSize: 12 }}>({draftCount} qaralama)</span>}</div>
           </div>
           {stats && (<>
             <div className="divider-y" style={{ height: 32 }} />
-            <div className="fl-col"><div className="cell-muted">Ümumi dəyər</div><div style={{ fontWeight: 700, fontSize: 15 }}>{fmtMoney(stats.totalValue)}</div></div>
+            <div className="fl-col"><div className="cell-muted">{T(`Ümumi dəyər`)}</div><div style={{ fontWeight: 700, fontSize: 15 }}>{fmtMoney(stats.totalValue)}</div></div>
             <div className="divider-y" style={{ height: 32 }} />
-            <div className="fl-col"><div className="cell-muted">Orta gəlirlilik</div><div style={{ fontWeight: 700, fontSize: 15 }}>{stats.avgYield}%</div></div>
+            <div className="fl-col"><div className="cell-muted">{T(`Orta gəlirlilik`)}</div><div style={{ fontWeight: 700, fontSize: 15 }}>{stats.avgYield}%</div></div>
           </>)}
         </div>
         <span className="sp" />
         {draftCount > 0 && (
-          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy}>{busy ? <><Icons.Refresh size={16} /> Qiymətləndirilir…</> : <><Icons.Sparkle size={16} /> Portfolionu qiymətləndir ({draftCount})</>}</button>
+          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy}>{busy ? <><Icons.Refresh size={16} /> {T(`Qiymətləndirilir…`)}</> : <><Icons.Sparkle size={16} /> Portfolionu qiymətləndir ({draftCount})</>}</button>
         )}
         {draftCount === 0 && stats && (
-          <button className="btn btn-secondary" onClick={onAnalysis}><Icons.TrendUp size={14} /> Portfel analizi</button>
+          <button className="btn btn-secondary" onClick={onAnalysis}><Icons.TrendUp size={14} /> {T(`Portfel analizi`)}</button>
         )}
-        <button className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`} onClick={revaluate} disabled={items.length === 0 || revaluating} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Sparkle size={16} /> Portfeli qiymətləndir</button>
+        <button className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`} onClick={revaluate} disabled={items.length === 0 || revaluating} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Sparkle size={16} /> {T(`Portfeli qiymətləndir`)}</button>
       </div>
 
       {revaluating && (
@@ -417,7 +421,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
           <div style={{ background: "var(--card)", borderRadius: 18, padding: "32px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, boxShadow: "var(--shadow-lg)", minWidth: 320 }}>
             <div className="empty-art"><Icons.Sparkle size={28} /></div>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-1)" }}>Portfel qiymətləndirilir…</div>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-1)" }}>{T(`Portfel qiymətləndirilir…`)}</div>
               <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 4 }}>{items.length} mənzil yenidən hesablanır</div>
             </div>
           </div>
@@ -491,11 +495,11 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
     <>
       <div className="page-header">
         <div style={{ flex: 1 }}>
-          <div className="crumbs"><a onClick={onBack}>{portfolio.name}</a><span className="sep">/</span><span>Portfel analizi</span></div>
-          <h1 className="page-title">Portfel analizi</h1>
-          <p className="page-sub">Portfel üzrə zəngin analitika — risk profili, paylanma, top performans və müqayisə.</p>
+          <div className="crumbs"><a onClick={onBack}>{portfolio.name}</a><span className="sep">/</span><span>{T(`Portfel analizi`)}</span></div>
+          <h1 className="page-title">{T(`Portfel analizi`)}</h1>
+          <p className="page-sub">{T(`Portfel üzrə zəngin analitika — risk profili, paylanma, top performans və müqayisə.`)}</p>
         </div>
-        <div className="page-actions"><SourceBadge source={source} /><button className="btn btn-secondary"><Icons.PDF size={14} /> Analitik hesabat (PDF)</button></div>
+        <div className="page-actions"><SourceBadge source={source} /><button className="btn btn-secondary"><Icons.PDF size={14} /> {T(`Analitik hesabat (PDF)`)}</button></div>
       </div>
 
       <div className="summary-band" style={{ marginTop: 4 }}>
@@ -503,35 +507,35 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           <div className="fl-row" style={{ gap: 16 }}>
             <DonutChart value={Math.round(agg(items.map((x) => x.score), aggKind))} label={aggKind === "median" ? "Median skor" : "Orta skor"} size={96} />
             <div>
-              <div className="card-title">Portfel skoru</div>
+              <div className="card-title">{T(`Portfel skoru`)}</div>
               <div className="card-sub" style={{ marginTop: 4, maxWidth: "36ch" }}>{stats.n} mənzilin {aggKind === "median" ? "median" : "orta"} sərmayə skoru. 78+ aşağı, 60-77 orta, 60-dan aşağı yüksək risk.</div>
               <div className="fl-row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}><Pill tone="green">{low} aşağı risk</Pill><Pill tone="amber">{med} orta</Pill><Pill tone="red">{high} yüksək</Pill></div>
             </div>
           </div>
         </div>
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
-          <AggStat accent label="Ümumi dəyər" value={fmtMoney(stats.totalValue)} sub={`${stats.n} mənzil`} />
-          <AggStat label="Orta qiymət/m²" value={fmtMoney(stats.avgPricePerM2, "")} sub="min–max" items={items} metricKey="pricePerM2" />
-          <AggStat label="Orta aylıq kirayə" value={fmtMoney(stats.totalRent / Math.max(stats.n, 1))} items={items} metricKey="monthlyRent" />
-          <AggStat label="Orta gəlirlilik" value={`${stats.avgYield}%`} items={items} metricKey="yield" />
-          <AggStat label="Orta likvidlik" value={`${stats.avgLiquidity} gün`} items={items} metricKey="liquidity" />
+          <AggStat accent label={T(`Ümumi dəyər`)} value={fmtMoney(stats.totalValue)} sub={`${stats.n} mənzil`} />
+          <AggStat label={T(`Orta qiymət/m²`)} value={fmtMoney(stats.avgPricePerM2, "")} sub="min–max" items={items} metricKey="pricePerM2" />
+          <AggStat label={T(`Orta aylıq kirayə`)} value={fmtMoney(stats.totalRent / Math.max(stats.n, 1))} items={items} metricKey="monthlyRent" />
+          <AggStat label={T(`Orta gəlirlilik`)} value={`${stats.avgYield}%`} items={items} metricKey="yield" />
+          <AggStat label={T(`Orta likvidlik`)} value={`${stats.avgLiquidity} gün`} items={items} metricKey="liquidity" />
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 18 }}>
         <div className="card card-pad">
-          <div className="card-title">Rayon üzrə paylanma</div>
-          <div className="card-sub" style={{ margin: "4px 0 14px" }}>Portfeldəki mənzillərin coğrafi paylanması.</div>
+          <div className="card-title">{T(`Rayon üzrə paylanma`)}</div>
+          <div className="card-sub" style={{ margin: "4px 0 14px" }}>{T(`Portfeldəki mənzillərin coğrafi paylanması.`)}</div>
           <HBars items={districtBars} valueFmt={(v) => `${v} ədəd`} />
         </div>
         <div className="card card-pad">
-          <div className="card-title">Növ üzrə</div>
-          <div className="card-sub" style={{ margin: "4px 0 14px" }}>Yeni vs köhnə tikili.</div>
+          <div className="card-title">{T(`Növ üzrə`)}</div>
+          <div className="card-sub" style={{ margin: "4px 0 14px" }}>{T(`Yeni vs köhnə tikili.`)}</div>
           <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 12 }}>
             <DonutChart value={Math.round((stats.newCount / Math.max(stats.n, 1)) * 100)} label="Yeni tikili %" size={84} color="#2A8B7E" />
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-              <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#2A8B7E" }} /><span style={{ fontSize: 13 }}>Yeni tikili</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.newCount}</strong></div>
-              <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#0F1E3D" }} /><span style={{ fontSize: 13 }}>Köhnə tikili</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.n - stats.newCount}</strong></div>
+              <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#2A8B7E" }} /><span style={{ fontSize: 13 }}>{T(`Yeni tikili`)}</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.newCount}</strong></div>
+              <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#0F1E3D" }} /><span style={{ fontSize: 13 }}>{T(`Köhnə tikili`)}</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.n - stats.newCount}</strong></div>
             </div>
           </div>
         </div>
@@ -540,12 +544,12 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
       <div className="card card-pad" style={{ marginBottom: 18 }}>
         <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="card-title">{METRICS[histMetric].label} paylanması</div>
+            <div className="card-title">{T(METRICS[histMetric].label)} paylanması</div>
             <div className="card-sub" style={{ marginTop: 4 }}>Bin üzərinə klikləyib mənzilləri görün. Şaquli xətt portfel {aggKind === "median" ? "medyanı" : "ortası"}dır.</div>
           </div>
           <div className="fl-row" style={{ gap: 8, flexShrink: 0 }}>
-            <ChartSelect label="Metrika" value={histMetric} onChange={setHistMetric} options={MK.map((k) => ({ value: k, label: METRICS[k].label }))} />
-            <ChartSelect label="Mərkəz" value={aggKind} onChange={setAggKind} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} />
+            <ChartSelect label={T(`Metrika`)} value={histMetric} onChange={setHistMetric} options={MK.map((k) => ({ value: k, label: T(METRICS[k].label) }))} />
+            <ChartSelect label={T(`Mərkəz`)} value={aggKind} onChange={setAggKind} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} />
           </div>
         </div>
         <div style={{ marginTop: 16 }}><BigHistogram items={items} metricKey={histMetric} aggKind={aggKind} selBin={selBin} onBin={setSelBin} /></div>
@@ -553,19 +557,19 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-        <div className="card"><div className="card-head"><div className="card-title">Top 5 — ən yüksək skor</div><span className="sp" /><Icons.Star size={14} style={{ color: "var(--green)" }} /></div><RankList items={top} variant="top" /></div>
-        <div className="card"><div className="card-head"><div className="card-title">Aşağı 5 — diqqət lazımdır</div><span className="sp" /><Icons.TrendDown size={14} style={{ color: "var(--red)" }} /></div><RankList items={bottom} variant="bottom" /></div>
+        <div className="card"><div className="card-head"><div className="card-title">{T(`Top 5 — ən yüksək skor`)}</div><span className="sp" /><Icons.Star size={14} style={{ color: "var(--green)" }} /></div><RankList items={top} variant="top" /></div>
+        <div className="card"><div className="card-head"><div className="card-title">{T(`Aşağı 5 — diqqət lazımdır`)}</div><span className="sp" /><Icons.TrendDown size={14} style={{ color: "var(--red)" }} /></div><RankList items={bottom} variant="bottom" /></div>
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
         <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
-            <div className="card-title">{METRICS[scatterX].label} vs. {METRICS[scatterY].label}</div>
+            <div className="card-title">{T(METRICS[scatterX].label)} vs. {T(METRICS[scatterY].label)}</div>
             <div className="card-sub" style={{ marginTop: 4 }}>Hər nöqtə bir mənzil. Ölçü = sahə, rəng = risk səviyyəsi.</div>
           </div>
           <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-            <ChartSelect label="X oxu" value={scatterX} onChange={setScatterX} options={MK.map((k) => ({ value: k, label: METRICS[k].label }))} />
-            <ChartSelect label="Y oxu" value={scatterY} onChange={setScatterY} options={MK.map((k) => ({ value: k, label: METRICS[k].label }))} />
+            <ChartSelect label="X oxu" value={scatterX} onChange={setScatterX} options={MK.map((k) => ({ value: k, label: T(METRICS[k].label) }))} />
+            <ChartSelect label="Y oxu" value={scatterY} onChange={setScatterY} options={MK.map((k) => ({ value: k, label: T(METRICS[k].label) }))} />
           </div>
         </div>
         <div style={{ marginTop: 16 }}><BigScatter items={items} xKey={scatterX} yKey={scatterY} /></div>
@@ -650,11 +654,11 @@ function BinPanel({ items, metricKey, bin, onClose }: { items: OProp[]; metricKe
       <div style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid var(--border)" }}>
         <div style={{ width: 28, height: 28, borderRadius: 8, background: "var(--orange-tint)", color: "var(--orange)", display: "grid", placeItems: "center" }}><Icons.Filter size={14} /></div>
         <div><div style={{ fontWeight: 700, fontSize: 13.5 }}>Seçilmiş aralıq: {meta.fmt(from)} – {meta.fmt(to)}</div><div className="cell-muted">{matched.length} mənzil bu aralıqda</div></div>
-        <span className="sp" /><button className="btn btn-ghost btn-sm" onClick={onClose}><Icons.X size={13} /> Bağla</button>
+        <span className="sp" /><button className="btn btn-ghost btn-sm" onClick={onClose}><Icons.X size={13} /> {T(`Bağla`)}</button>
       </div>
       <div style={{ maxHeight: 320, overflowY: "auto" }}>
         <table className="data" style={{ width: "100%" }}>
-          <thead><tr><th style={{ width: 70 }}>ID</th><th>Ünvan</th><th className="num">{meta.label}</th><th className="num">Fair value</th><th className="num">Gəlirlilik</th><th className="num">Skor</th></tr></thead>
+          <thead><tr><th style={{ width: 70 }}>ID</th><th>{T(`Ünvan`)}</th><th className="num">{T(meta.label)}</th><th className="num">{T(`Fair value`)}</th><th className="num">{T(`Gəlirlilik`)}</th><th className="num">{T(`Skor`)}</th></tr></thead>
           <tbody>
             {matched.map((p) => (
               <tr key={p.id}>

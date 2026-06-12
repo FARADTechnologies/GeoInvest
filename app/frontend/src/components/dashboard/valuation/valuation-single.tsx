@@ -7,6 +7,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
+import type { Lang } from "@/lib/i18n";
+
 
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons, DonutChart, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
@@ -21,7 +24,8 @@ import { fetchValuationMeta, newId, valuateSingle } from "@/lib/valuation-data";
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
 import type { ValuationInput, ValuationSource } from "@/types/valuation";
 
-export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: DashboardView) => void }) {
+export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; onNavigate?: (v: DashboardView) => void }) {
+  setValLang(lang);
   const metaQuery = useQuery({ queryKey: ["valuation", "meta"], queryFn: fetchValuationMeta });
   const meta = metaQuery.data?.data ?? null;
 
@@ -76,17 +80,17 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
       <div className="page" style={{ padding: 0, maxWidth: "none" }}>
         <div className="page-header">
           <div>
-            <div className="crumbs"><span>Tək qiymətləndirmə</span></div>
-            <h1 className="page-title">Tək qiymətləndirmə</h1>
-            <p className="page-sub">Bir mənzili anında qiymətləndirin. Qiymətləndirilmiş mənzillər aşağıdakı siyahıda yadda saxlanılır.</p>
+            <div className="crumbs"><span>{T(`Tək qiymətləndirmə`)}</span></div>
+            <h1 className="page-title">{T(`Tək qiymətləndirmə`)}</h1>
+            <p className="page-sub">{T(`Bir mənzili anında qiymətləndirin. Qiymətləndirilmiş mənzillər aşağıdakı siyahıda yadda saxlanılır.`)}</p>
           </div>
           <div className="page-actions">
             {metaQuery.data ? <SourceBadge source={metaQuery.data.source} /> : null}
             <button className="btn btn-secondary" onClick={() => onNavigate?.("valuation-mass")}>
-              <Icons.ValueMass size={14} /> Kütləvi qiymətləndirməyə keç
+              <Icons.ValueMass size={14} /> {T(`Kütləvi qiymətləndirməyə keç`)}
             </button>
             <button className="btn btn-primary" onClick={() => setEntryOpen(true)}>
-              <Icons.Plus size={14} /> Yeni qiymətləndirmə
+              <Icons.Plus size={14} /> {T(`Yeni qiymətləndirmə`)}
             </button>
           </div>
         </div>
@@ -94,16 +98,16 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
         <div className="card card-pad" style={{ marginBottom: 14 }}>
           <div className="fl-row" style={{ gap: 12, flexWrap: "wrap" }}>
             <button className="btn btn-secondary btn-sm" style={{ borderColor: "var(--orange)", color: "var(--orange)" }} onClick={() => setEntryOpen(true)}>
-              <Icons.Sort size={14} /> Parametrlə qiymətləndir
+              <Icons.Sort size={14} /> {T(`Parametrlə qiymətləndir`)}
             </button>
             <button className="btn btn-ghost btn-sm">
-              <Icons.Layers size={14} /> Elan linki ilə qiymətləndir
+              <Icons.Layers size={14} /> {T(`Elan linki ilə qiymətləndir`)}
             </button>
             <span className="sp" />
             {items.length > 0 && (
               <span className="muted" style={{ fontSize: 12.5 }}>
                 <Icons.File size={13} style={{ verticalAlign: "-2px", marginRight: 4 }} />
-                <strong style={{ color: "var(--text-1)" }}>{items.length}</strong> qiymətləndirmə tarixçədə
+                <strong style={{ color: "var(--text-1)" }}>{items.length}</strong> {T(`qiymətləndirmə tarixçədə`)}
               </span>
             )}
           </div>
@@ -111,23 +115,23 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
 
         {stats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0, marginBottom: 14, background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
-            <SingleStat k="Qiymətləndirilmiş" v={String(stats.n)} />
-            <SingleStat k="Orta fair value" v={fmtMoney(Math.round(stats.totalValue / stats.n))} accent />
-            <SingleStat k="Orta gəlirlilik" v={`${stats.avgYield}%`} />
-            <SingleStat k="Orta skor" v={`${stats.avgScore}/100`} last />
+            <SingleStat k={T(`Qiymətləndirilmiş`)} v={String(stats.n)} />
+            <SingleStat k={T(`Orta fair value`)} v={fmtMoney(Math.round(stats.totalValue / stats.n))} accent />
+            <SingleStat k={T(`Orta gəlirlilik`)} v={`${stats.avgYield}%`} />
+            <SingleStat k={T(`Orta skor`)} v={`${stats.avgScore}/100`} last />
           </div>
         )}
 
         <div className="table-wrap">
           <div className="table-tools">
-            <div className="card-title">Qiymətləndirmə tarixçəsi</div>
+            <div className="card-title">{T(`Qiymətləndirmə tarixçəsi`)}</div>
             {source ? <SourceBadge source={source} /> : null}
             <span className="sp" />
             <button className="btn btn-secondary btn-sm" disabled={items.length === 0} style={{ opacity: items.length === 0 ? 0.5 : 1 }}>
-              <Icons.Download size={13} /> Excel ixrac
+              <Icons.Download size={13} /> {T(`Excel ixrac`)}
             </button>
             <button className="btn btn-primary btn-sm" onClick={() => setEntryOpen(true)}>
-              <Icons.Plus size={13} /> Yeni qiymətləndirmə
+              <Icons.Plus size={13} /> {T(`Yeni qiymətləndirmə`)}
             </button>
           </div>
 
@@ -136,16 +140,16 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
               <thead>
                 <tr>
                   <th style={{ width: 70 }}>ID</th>
-                  <th style={{ width: 110 }}>Növ</th>
-                  <th style={{ width: 280 }}>Ünvan</th>
-                  <th className="num" style={{ width: 70 }}>Sahə</th>
-                  <th className="center" style={{ width: 60 }}>Otaq</th>
-                  <th className="num" style={{ width: 130 }}>Fair value</th>
-                  <th className="num" style={{ width: 110 }}>Qiymət/m²</th>
-                  <th className="num" style={{ width: 110 }}>Aylıq kirayə</th>
-                  <th className="num" style={{ width: 95 }}>Gəlirlilik</th>
-                  <th className="num" style={{ width: 110 }}>Geri ödəmə</th>
-                  <th style={{ width: 90, textAlign: "right" }}>Əməliyyat</th>
+                  <th style={{ width: 110 }}>{T(`Növ`)}</th>
+                  <th style={{ width: 280 }}>{T(`Ünvan`)}</th>
+                  <th className="num" style={{ width: 70 }}>{T(`Sahə`)}</th>
+                  <th className="center" style={{ width: 60 }}>{T(`Otaq`)}</th>
+                  <th className="num" style={{ width: 130 }}>{T(`Fair value`)}</th>
+                  <th className="num" style={{ width: 110 }}>{T(`Qiymət/m²`)}</th>
+                  <th className="num" style={{ width: 110 }}>{T(`Aylıq kirayə`)}</th>
+                  <th className="num" style={{ width: 95 }}>{T(`Gəlirlilik`)}</th>
+                  <th className="num" style={{ width: 110 }}>{T(`Geri ödəmə`)}</th>
+                  <th style={{ width: 90, textAlign: "right" }}>{T(`Əməliyyat`)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,10 +176,10 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
                       <td className="num">{dr ? <span className="muted">—</span> : `${p.payback} il`}</td>
                       <td className="row-act" style={{ textAlign: "right" }}>
                         <div className="fl-row" style={{ gap: 2, justifyContent: "flex-end" }}>
-                          <button className="icon-btn" style={{ width: 28, height: 28 }} title="Redaktə et" onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>
+                          <button className="icon-btn" style={{ width: 28, height: 28 }} title={T(`Redaktə et`)} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>
                             <Icons.Edit size={13} />
                           </button>
-                          <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--red)" }} title="Sil" onClick={(e) => {
+                          <button className="icon-btn" style={{ width: 28, height: 28, color: "var(--red)" }} title={T(`Sil`)} onClick={(e) => {
                             e.stopPropagation();
                             if (confirm(`${p.address}\n\nBu qiymətləndirməni tarixçədən silmək istədiyinizə əminsiniz?`)) remove(p.id);
                           }}>
@@ -194,10 +198,10 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
             {items.length === 0 && (
               <div className="empty">
                 <div className="empty-art"><Icons.ValueSingle size={28} /></div>
-                <div className="empty-title">Hələ qiymətləndirmə yoxdur</div>
-                <div className="empty-sub">"Yeni qiymətləndirmə" düyməsi ilə ilk mənzili qiymətləndirin — nəticə burada görünəcək.</div>
+                <div className="empty-title">{T(`Hələ qiymətləndirmə yoxdur`)}</div>
+                <div className="empty-sub">{T(`"Yeni qiymətləndirmə" düyməsi ilə ilk mənzili qiymətləndirin — nəticə burada görünəcək.`)}</div>
                 <button className="btn btn-primary" onClick={() => setEntryOpen(true)}>
-                  <Icons.Plus size={14} /> Yeni qiymətləndirmə
+                  <Icons.Plus size={14} /> {T(`Yeni qiymətləndirmə`)}
                 </button>
               </div>
             )}
@@ -208,11 +212,11 @@ export function ValuationSingleView({ onNavigate }: { onNavigate?: (v: Dashboard
           <div className="fl-row" style={{ gap: 12 }}>
             <div className="empty-art" style={{ margin: 0 }}><Icons.Sparkle size={22} /></div>
             <div style={{ flex: 1 }}>
-              <div className="card-title">Çoxlu mənzil qiymətləndirməyiniz lazımdır?</div>
-              <div className="card-sub" style={{ marginTop: 4 }}>Excel cədvəlini yükləyin və ya 5-500 mənzili eyni anda qiymətləndirin.</div>
+              <div className="card-title">{T(`Çoxlu mənzil qiymətləndirməyiniz lazımdır?`)}</div>
+              <div className="card-sub" style={{ marginTop: 4 }}>{T(`Excel cədvəlini yükləyin və ya 5-500 mənzili eyni anda qiymətləndirin.`)}</div>
             </div>
             <button className="btn btn-secondary" onClick={() => onNavigate?.("valuation-mass")}>
-              <Icons.ValueMass size={14} /> Kütləvi qiymətləndirməyə keç
+              <Icons.ValueMass size={14} /> {T(`Kütləvi qiymətləndirməyə keç`)}
             </button>
           </div>
         </div>

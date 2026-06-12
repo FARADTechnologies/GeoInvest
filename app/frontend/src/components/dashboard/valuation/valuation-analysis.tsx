@@ -5,6 +5,9 @@
 // with a portfolio picker on top.
 
 import { useEffect, useState } from "react";
+import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
+import type { Lang } from "@/lib/i18n";
+
 
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons } from "@/components/dashboard/valuation/valuation-ui";
@@ -13,7 +16,8 @@ import { loadPortfolios, type Portfolio } from "@/components/dashboard/valuation
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
 import type { ValuationSource } from "@/types/valuation";
 
-export function ValuationAnalysisView({ onNavigate }: { onNavigate?: (v: DashboardView) => void }) {
+export function ValuationAnalysisView({ lang = "az", onNavigate }: { lang?: Lang; onNavigate?: (v: DashboardView) => void }) {
+  setValLang(lang);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [source, setSource] = useState<ValuationSource>("mock");
   const [pfId, setPfId] = useState<string | null>(null);
@@ -36,10 +40,10 @@ export function ValuationAnalysisView({ onNavigate }: { onNavigate?: (v: Dashboa
         <div className="page" style={{ padding: 0, maxWidth: "none" }}>
           <div className="empty">
             <div className="empty-art"><Icons.Folder size={28} /></div>
-            <div className="empty-title">Analiz üçün portfel tapılmadı</div>
-            <div className="empty-sub">Əvvəlcə Kütləvi qiymətləndirmə bölməsində portfel yaradın və mənzil əlavə edin.</div>
+            <div className="empty-title">{T(`Analiz üçün portfel tapılmadı`)}</div>
+            <div className="empty-sub">{T(`Əvvəlcə Kütləvi qiymətləndirmə bölməsində portfel yaradın və mənzil əlavə edin.`)}</div>
             <button className="btn btn-primary" onClick={() => onNavigate?.("valuation-mass")}>
-              <Icons.ValueMass size={14} /> Kütləvi qiymətləndirməyə keç
+              <Icons.ValueMass size={14} /> {T(`Kütləvi qiymətləndirməyə keç`)}
             </button>
           </div>
         </div>
@@ -53,7 +57,7 @@ export function ValuationAnalysisView({ onNavigate }: { onNavigate?: (v: Dashboa
         {/* Portfolio picker (prototype's analysis page has the same control) */}
         <div className="card card-pad" style={{ marginBottom: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <Icons.Folder size={16} className="muted" />
-          <span style={{ fontWeight: 600, fontSize: 13 }}>Portfel:</span>
+          <span style={{ fontWeight: 600, fontSize: 13 }}>{T(`Portfel:`)}</span>
           <select
             value={pfId ?? ""}
             onChange={(e) => setPfId(e.target.value)}
@@ -69,7 +73,7 @@ export function ValuationAnalysisView({ onNavigate }: { onNavigate?: (v: Dashboa
           </select>
           <span className="sp" />
           <button className="btn btn-ghost" onClick={() => onNavigate?.("valuation-mass")}>
-            <Icons.Eye size={14} /> Mənzillər siyahısı
+            <Icons.Eye size={14} /> {T(`Mənzillər siyahısı`)}
           </button>
         </div>
 

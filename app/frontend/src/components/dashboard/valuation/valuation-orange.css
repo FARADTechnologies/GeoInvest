@@ -460,3 +460,27 @@
 .hm-val .modal { max-height: calc(100vh - 24px) !important; border-radius: 12px !important; }
 .hm-val .modal-backdrop { padding: 12px !important; }
 }
+/* ── Dark theme (prototype's own dark tokens, wired to the app's
+      <html data-theme="dark"> switch so valuation pages flip with the rest) */
+[data-theme="dark"] .hm-val {
+  --bg: #0A1426;
+  --bg-subtle: #0E1A30;
+  --card: #131F36;
+  --card-2: #182742;
+  --border: #21314F;
+  --border-strong: #2D406A;
+  --text-1: #F1F4FA;
+  --text-2: #A8B0C2;
+  --text-3: #6F7B95;
+  --orange-tint: rgba(217,83,30,0.12);
+  --orange-fade: rgba(217,83,30,0.25);
+  --teal-soft: rgba(42,139,126,0.16);
+  --green-soft: rgba(31,138,91,0.18);
+  --amber-soft: rgba(197,138,26,0.18);
+  --red-soft: rgba(192,57,43,0.18);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow: 0 4px 16px -6px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+  --shadow-lg: 0 24px 48px -16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+[data-theme="dark"] .hm-val .modal-backdrop { background: rgba(0,0,0,0.6); }
+[data-theme="dark"] .hm-val .pill-navy { background: rgba(255,255,255,0.08); color: var(--text-1); }
