@@ -19,6 +19,11 @@ class ValuationRequest(BaseModel):
     repair: str | None = None
     extract: str | None = None
     residence: str | None = None
+    # Coordinates from the Google address picker (filled later); carried
+    # through to the predict server when integrated.
+    latitude: float | None = None
+    longitude: float | None = None
+    valuation_date: str | None = None
 
 
 class BatchValuationRequest(BaseModel):

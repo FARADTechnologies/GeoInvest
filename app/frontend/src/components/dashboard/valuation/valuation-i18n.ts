@@ -238,7 +238,31 @@ const D: Dict = {
   "Qiymət (₼/m²)": { tr: "Fiyat (₼/m²)", en: "Price (₼/m²)" },
   "Orta kirayə (₼/ay)": { tr: "Ort. kira (₼/ay)", en: "Avg rent (₼/mo)" },
   "Likvidlik (gün)": { tr: "Likidite (gün)", en: "Liquidity (days)" },
-  "Əqd həcmi": { tr: "İşlem hacmi", en: "Transactions" }
+  "Əqd həcmi": { tr: "İşlem hacmi", en: "Transactions" },
+  "Təmirli": { tr: "Tadilatlı", en: "Renovated" },
+  "Təmirsiz": { tr: "Tadilatsız", en: "Unrenovated" },
+  "Yoxdur": { tr: "Yok", en: "No" },
+  "Var": { tr: "Var", en: "Yes" },
+  "Bəli": { tr: "Evet", en: "Yes" },
+  "Xeyr": { tr: "Hayır", en: "No" },
+  "Qiymətləndirmə tarixi": { tr: "Değerleme tarihi", en: "Valuation date" },
+  "Köhnə tikili üçün yaşayış kompleksi seçimi tələb olunmur.": { tr: "Eski yapı için site/rezidans seçimi gerekmez.", en: "Residence complex is not required for old builds." },
+  "Bu sahə tələb olunur!": { tr: "Bu alan zorunludur!", en: "This field is required!" },
+  "Sahə 20 ilə 400 arası olmalıdır!": { tr: "Alan 20 ile 400 arasında olmalıdır!", en: "Area must be between 20 and 400!" },
+  "Otaq sayı 1 ilə 10 arası olmalıdır!": { tr: "Oda sayısı 1 ile 10 arasında olmalıdır!", en: "Rooms must be between 1 and 10!" },
+  "Binanın mərtəbə sayı 1 ilə 35 arası olmalıdır!": { tr: "Bina kat sayısı 1 ile 35 arasında olmalıdır!", en: "Building floors must be between 1 and 35!" },
+  "Yerləşdiyi mərtəbə 1 ilə 35 arası olmalıdır!": { tr: "Bulunduğu kat 1 ile 35 arasında olmalıdır!", en: "Floor must be between 1 and 35!" },
+  "Yerləşdiyi mərtəbə binanın mərtəbəsindən çox ola bilməz!": { tr: "Bulunduğu kat bina kat sayısından büyük olamaz!", en: "Floor cannot exceed the building's floor count!" },
+  "PDF yüklə": { tr: "PDF indir", en: "Download PDF" },
+  "Əlçatanlıq indeksləri": { tr: "Erişilebilirlik indeksleri", en: "Accessibility indices" },
+  "Əlçatanlıq məlumatları hazırlanır": { tr: "Erişilebilirlik verileri hazırlanıyor", en: "Accessibility data coming soon" },
+  "Təhsil, restoran, əyləncə, nəqliyyat, səyahət və gəzinti indeksləri API inteqrasiyasından sonra burada görünəcək.": { tr: "Eğitim, restoran, eğlence, ulaşım, seyahat ve gezinti indeksleri API entegrasyonundan sonra burada görünecek.", en: "Education, restaurant, entertainment, transport, travel and walk indices will appear here after the API integration." },
+  "Təhsil": { tr: "Eğitim", en: "Education" },
+  "Restoran": { tr: "Restoran", en: "Restaurant" },
+  "Əyləncə": { tr: "Eğlence", en: "Entertainment" },
+  "Nəqliyyat": { tr: "Ulaşım", en: "Transport" },
+  "Səyahət": { tr: "Seyahat", en: "Travel" },
+  "Gəzinti": { tr: "Gezinti", en: "Walk" }
 };
 
 export function T(s: string): string {

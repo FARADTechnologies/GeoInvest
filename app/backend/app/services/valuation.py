@@ -33,7 +33,11 @@ from app.services.analytics import format_period
 _ANALYSIS_TYPE = "geom"
 
 # Quality multipliers applied on top of the market median (documented + mild).
+# 2-option repair field (rate-my-apartment): Təmirli / Təmirsiz.
 _REPAIR_FACTOR = {
+    "Təmirli": 1.05,
+    "Təmirsiz": 0.92,
+    # legacy 4-option values kept for backward compatibility with old data
     "Əla": 1.06,
     "Var": 1.00,
     "Orta": 0.96,

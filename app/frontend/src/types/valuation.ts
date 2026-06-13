@@ -23,6 +23,10 @@ export type ValuationInput = {
   repair?: string | null;
   extract?: string | null;
   residence?: string | null;
+  // Filled by the Google address picker (team #1/#2) — optional for now.
+  latitude?: number | null;
+  longitude?: number | null;
+  valuation_date?: string | null;
 };
 
 // Computed valuation returned by the backend (and produced by the mock).

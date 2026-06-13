@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
+import { ReportPoiSection } from "@/components/dashboard/valuation/valuation-report-poi";
 
 
 import {
@@ -120,10 +121,20 @@ export function statsOf(items: OProp[]): Stats {
 
 // ── Entry form modal (ported markup; submits a ValuationInput) ─────────
 
-const REPAIR_OPTIONS = ["Əla", "Var", "Orta", "Yox"];
-const EXTRACT_OPTIONS = ["Var", "Yox"];
+// Repair is now a 2-option field (team task #4), per the rate-my-apartment form.
+const REPAIR_OPTIONS = ["Təmirli", "Təmirsiz"];
+const EXTRACT_OPTIONS = ["Var", "Yoxdur"];
 const TYPE_OPTIONS = ["Yeni tikili", "Köhnə tikili"];
 const RESIDENCE_YN = ["Bəli", "Xeyr"];
+const isOldBuild = (type: string) => (type || "").toLowerCase().includes("köhn") || (type || "").toLowerCase().includes("kohn");
+
+// Numeric validation ranges (BA prompt #11).
+const RANGES = {
+  area: [20, 400],
+  rooms: [1, 10],
+  totalFloors: [1, 35],
+  floor: [1, 35]
+} as const;
 
 type FormState = {
   address: string;
@@ -137,18 +148,21 @@ type FormState = {
   totalFloors: string;
   floor: string;
   rooms: string;
+  valuationDate: string;
 };
 
-// Residence options from the prototype's "Yaşayış kompleksi adı" select.
+// Residence options — placeholder until the team delivers the real list (#7).
 const RESIDENCES = [
   "Port Baku Residence", "White City", "Crescent Place", "Demirchi Tower",
   "Khazar Islands", "Old City Plaza", "Caspian Plaza", "Park Bulvar Towers",
   "Sea Breeze", "Garden Plaza", "Mətanət-A Yasamal", "AAAF Park"
 ];
 
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
 const emptyForm = (): FormState => ({
   address: "", rayon: "", type: "", repair: "", extract: "", isResidence: "",
-  residence: "", area: "", totalFloors: "", floor: "", rooms: ""
+  residence: "", area: "", totalFloors: "", floor: "", rooms: "", valuationDate: todayISO()
 });
 
 const fromOProp = (p: OProp): FormState => ({
@@ -157,13 +171,48 @@ const fromOProp = (p: OProp): FormState => ({
   type: p.type || "",
   repair: p.repair || "",
   extract: p.extract || "",
-  isResidence: p.residence ? "Bəli" : "",
+  isResidence: p.residence ? "Bəli" : isOldBuild(p.type) ? "Xeyr" : "",
   residence: p.residence || "",
   area: p.area != null ? String(p.area) : "",
   totalFloors: p.totalFloors != null ? String(p.totalFloors) : "",
   floor: p.floor != null ? String(p.floor) : "",
-  rooms: p.rooms != null ? String(p.rooms) : ""
+  rooms: p.rooms != null ? String(p.rooms) : "",
+  valuationDate: todayISO()
 });
+
+// ── Validation (BA prompt #11). Returns field→message map (AZ source). ──
+type FormErrors = Partial<Record<keyof FormState, string>>;
+function validateForm(f: FormState): FormErrors {
+  const e: FormErrors = {};
+  const req = "Bu sahə tələb olunur!";
+  if (!f.address.trim()) e.address = req;
+  if (!f.type) e.type = req;
+  if (!f.repair) e.repair = req;
+  if (!f.extract) e.extract = req;
+  if (!f.isResidence) e.isResidence = req;
+  if (!f.valuationDate) e.valuationDate = req;
+  // Residence name only required when "Bəli" (and not an old build).
+  if (f.isResidence === "Bəli" && !isOldBuild(f.type) && !f.residence) e.residence = req;
+
+  const num = (s: string) => (s.trim() === "" ? null : Number(s));
+  const checks: [keyof FormState, readonly [number, number], string][] = [
+    ["area", RANGES.area, "Sahə 20 ilə 400 arası olmalıdır!"],
+    ["rooms", RANGES.rooms, "Otaq sayı 1 ilə 10 arası olmalıdır!"],
+    ["totalFloors", RANGES.totalFloors, "Binanın mərtəbə sayı 1 ilə 35 arası olmalıdır!"],
+    ["floor", RANGES.floor, "Yerləşdiyi mərtəbə 1 ilə 35 arası olmalıdır!"]
+  ];
+  for (const [key, [lo, hi], msg] of checks) {
+    const v = num(f[key]);
+    if (v == null) e[key] = req;
+    else if (Number.isNaN(v) || v < lo || v > hi) e[key] = msg;
+  }
+  // Cross-field: floor cannot exceed building floors.
+  const fl = num(f.floor), tf = num(f.totalFloors);
+  if (fl != null && tf != null && !Number.isNaN(fl) && !Number.isNaN(tf) && fl > tf) {
+    e.floor = "Yerləşdiyi mərtəbə binanın mərtəbəsindən çox ola bilməz!";
+  }
+  return e;
+}
 
 function FieldLabel({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
@@ -185,6 +234,12 @@ const fieldStyle: React.CSSProperties = {
   width: "100%", padding: "12px 14px", fontSize: 14, border: "1.5px solid var(--border)", borderRadius: 12,
   background: "var(--card)", color: "var(--text-1)", font: "inherit", outline: "none"
 };
+const errBorder = (hasErr?: boolean): React.CSSProperties =>
+  hasErr ? { borderColor: "var(--red)", boxShadow: "0 0 0 3px var(--red-soft)" } : {};
+function FieldErr({ msg }: { msg?: string }) {
+  if (!msg) return null;
+  return <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--red)", fontWeight: 600 }}>{T(msg)}</div>;
+}
 
 export function PropertyEntryModal({
   open,
@@ -205,15 +260,29 @@ export function PropertyEntryModal({
 }) {
   const isEdit = !!initial;
   const [form, setForm] = useState<FormState>(() => (initial ? fromOProp(initial) : emptyForm()));
-  const upd = (k: keyof FormState, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [toast, setToast] = useState<string | null>(null);
+  const upd = (k: keyof FormState, v: string) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
-    if (open) setForm(initial ? fromOProp(initial) : emptyForm());
+    if (open) {
+      setForm(initial ? fromOProp(initial) : emptyForm());
+      setErrors({});
+      setToast(null);
+    }
   }, [open, initial]);
 
+  // Residence gating (#6 + validation rule): "Köhnə tikili" forces
+  // "Yaşayış kompleksi = Xeyr" and clears the complex name.
+  useEffect(() => {
+    if (isOldBuild(form.type) && (form.isResidence !== "Xeyr" || form.residence)) {
+      setForm((f) => ({ ...f, isResidence: "Xeyr", residence: "" }));
+    }
+  }, [form.type, form.isResidence, form.residence]);
+
+  const oldBuild = isOldBuild(form.type);
   const rayonOptions = useMemo(() => (meta?.rayons ?? []).map((r: RayonPrice) => r.rayon), [meta]);
-  // Same required fields as the prototype: ünvan, növ, sahə, otaq.
-  const valid = !!form.address && !!form.type && !!form.area && !!form.rooms;
 
   const build = (): ValuationInput => ({
     address: form.address.trim() || null,
@@ -225,8 +294,35 @@ export function PropertyEntryModal({
     total_floors: form.totalFloors ? +form.totalFloors : null,
     repair: form.repair || null,
     extract: form.extract || null,
-    residence: form.isResidence === "Bəli" ? form.residence || null : null
+    residence: form.isResidence === "Bəli" ? form.residence || null : null,
+    // valuation_date carried through; latitude/longitude wait for the
+    // Google address picker (team #1/#2) — null for now, flag-gated.
+    valuation_date: form.valuationDate || null,
+    latitude: null,
+    longitude: null
   });
+
+  // Validate before submit; on "Qiymətləndir" the full rule-set runs and no
+  // API request is sent when invalid. "Yadda saxla" (draft) only needs the
+  // basics so a partial entry can be stored.
+  const trySubmit = (valued: boolean) => {
+    let e: FormErrors;
+    if (valued) {
+      e = validateForm(form);
+    } else {
+      e = {};
+      if (!form.address.trim()) e.address = "Bu sahə tələb olunur!";
+      if (!form.type) e.type = "Bu sahə tələb olunur!";
+    }
+    setErrors(e);
+    const firstKey = Object.keys(e)[0] as keyof FormState | undefined;
+    if (firstKey) {
+      setToast(e[firstKey] ?? "Bu sahə tələb olunur!");
+      return;
+    }
+    setToast(null);
+    onSubmit(build(), valued);
+  };
 
   if (!open) return null;
 
@@ -257,65 +353,84 @@ export function PropertyEntryModal({
         </div>
 
         <div className="modal-body" style={{ padding: "24px 28px 24px" }}>
+          {toast && (
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--red-soft)", color: "var(--red)", borderRadius: 10, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+              <Icons.Info size={14} /> {T(toast)}
+            </div>
+          )}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "22px 24px" }}>
-            {/* Row 1 — exactly as the prototype: Ünvan (span 2) | Mənzil növü */}
+            {/* Row 1 — Ünvan (span 2) | Mənzil növü */}
             <div style={{ gridColumn: "span 2" }}>
               <FieldLabel>{T(`Ünvan`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input value={form.address} onChange={(e) => upd("address", e.target.value)} placeholder={T(`Ünvan`)} style={fieldStyle} />
+                <input value={form.address} onChange={(e) => upd("address", e.target.value)} placeholder={T(`Ünvan`)} style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
                 <button className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
                   <Icons.MapPin size={13} /> {T(`Xəritədən seç`)}
                 </button>
               </div>
+              <FieldErr msg={errors.address} />
               <HintRow>{T(`Dəqiq qiymətləndirmə üçün tam ünvanı daxil edin (məs. Mir Cəlal küç. 89) və ya xəritədən mənzilin yerləşdiyi binanı seçin.`)}</HintRow>
             </div>
             <div>
               <FieldLabel>{T(`Mənzil növü`)}</FieldLabel>
-              <Select value={form.type} onChange={(v) => upd("type", v)} options={TYPE_OPTIONS} />
+              <Select value={form.type} onChange={(v) => upd("type", v)} options={TYPE_OPTIONS} error={!!errors.type} />
+              <FieldErr msg={errors.type} />
             </div>
 
-            {/* Row 2 — Təmir | Çıxarış | Rezidens (with hint) */}
+            {/* Row 2 — Təmir | Çıxarış | Rezidens */}
             <div>
               <FieldLabel>{T(`Təmir vəziyyəti`)}</FieldLabel>
-              <Select value={form.repair} onChange={(v) => upd("repair", v)} options={REPAIR_OPTIONS} />
+              <Select value={form.repair} onChange={(v) => upd("repair", v)} options={REPAIR_OPTIONS} error={!!errors.repair} />
+              <FieldErr msg={errors.repair} />
             </div>
             <div>
               <FieldLabel>{T(`Çıxarış`)}</FieldLabel>
-              <Select value={form.extract} onChange={(v) => upd("extract", v)} options={EXTRACT_OPTIONS} />
+              <Select value={form.extract} onChange={(v) => upd("extract", v)} options={EXTRACT_OPTIONS} error={!!errors.extract} />
+              <FieldErr msg={errors.extract} />
             </div>
             <div>
               <FieldLabel>{T(`Yaşayış kompleksi (rezidens)`)}</FieldLabel>
-              <Select value={form.isResidence} onChange={(v) => upd("isResidence", v)} options={RESIDENCE_YN} />
-              <HintRow>{T(`Rezidensiya və ya kompleksdirsə — Bəli. Adi binalar bu kateqoriyaya aid deyil.`)}</HintRow>
+              <Select value={form.isResidence} onChange={(v) => upd("isResidence", v)} options={RESIDENCE_YN} error={!!errors.isResidence} disabled={oldBuild} />
+              <FieldErr msg={errors.isResidence} />
+              <HintRow>{oldBuild ? T(`Köhnə tikili üçün yaşayış kompleksi seçimi tələb olunmur.`) : T(`Rezidensiya və ya kompleksdirsə — Bəli. Adi binalar bu kateqoriyaya aid deyil.`)}</HintRow>
             </div>
 
             {/* Row 3 — Kompleks adı | Sahə | Binanın mərtəbə sayı */}
             <div>
               <FieldLabel>{T(`Yaşayış kompleksi adı`)}</FieldLabel>
-              <Select value={form.residence} onChange={(v) => upd("residence", v)} options={RESIDENCES} />
+              <Select value={form.residence} onChange={(v) => upd("residence", v)} options={RESIDENCES} error={!!errors.residence} disabled={form.isResidence !== "Bəli"} />
+              <FieldErr msg={errors.residence} />
             </div>
             <div>
               <FieldLabel>{T(`Sahə kv.m`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder={T(`Sahə kv.m`)} inputMode="numeric" style={{ ...fieldStyle, paddingRight: 48 }} />
+                <input value={form.area} onChange={(e) => upd("area", e.target.value)} placeholder={T(`Sahə kv.m`)} inputMode="numeric" style={{ ...fieldStyle, ...errBorder(!!errors.area), paddingRight: 48 }} />
                 <span style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-3)", fontSize: 12, fontWeight: 500, pointerEvents: "none" }}>m²</span>
               </div>
+              <FieldErr msg={errors.area} />
             </div>
             <div>
               <FieldLabel>{T(`Binanın mərtəbə sayı`)}</FieldLabel>
-              <input value={form.totalFloors} onChange={(e) => upd("totalFloors", e.target.value)} placeholder={T(`Binanın mərtəbə sayı`)} inputMode="numeric" style={fieldStyle} />
+              <input value={form.totalFloors} onChange={(e) => upd("totalFloors", e.target.value)} placeholder={T(`Binanın mərtəbə sayı`)} inputMode="numeric" style={{ ...fieldStyle, ...errBorder(!!errors.totalFloors) }} />
+              <FieldErr msg={errors.totalFloors} />
             </div>
 
-            {/* Row 4 — Yerləşdiyi mərtəbə | Otaq sayı | (empty) */}
+            {/* Row 4 — Yerləşdiyi mərtəbə | Otaq sayı | Qiymətləndirmə tarixi */}
             <div>
               <FieldLabel>{T(`Yerləşdiyi mərtəbə`)}</FieldLabel>
-              <input value={form.floor} onChange={(e) => upd("floor", e.target.value)} placeholder={T(`Yerləşdiyi mərtəbə`)} inputMode="numeric" style={fieldStyle} />
+              <input value={form.floor} onChange={(e) => upd("floor", e.target.value)} placeholder={T(`Yerləşdiyi mərtəbə`)} inputMode="numeric" style={{ ...fieldStyle, ...errBorder(!!errors.floor) }} />
+              <FieldErr msg={errors.floor} />
             </div>
             <div>
               <FieldLabel>{T(`Otaq sayı`)}</FieldLabel>
-              <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder={T(`Otaq sayı`)} inputMode="numeric" style={fieldStyle} />
+              <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder={T(`Otaq sayı`)} inputMode="numeric" style={{ ...fieldStyle, ...errBorder(!!errors.rooms) }} />
+              <FieldErr msg={errors.rooms} />
             </div>
-            <div />
+            <div>
+              <FieldLabel>{T(`Qiymətləndirmə tarixi`)}</FieldLabel>
+              <input type="date" value={form.valuationDate} onChange={(e) => upd("valuationDate", e.target.value)} style={{ ...fieldStyle, ...errBorder(!!errors.valuationDate) }} />
+              <FieldErr msg={errors.valuationDate} />
+            </div>
           </div>
 
           <div style={{ marginTop: 22, padding: "12px 14px", background: "var(--orange-tint)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: "var(--text-2)" }}>
@@ -336,11 +451,11 @@ export function PropertyEntryModal({
           )}
           <span className="sp" />
           <button className="btn btn-ghost" onClick={onClose}>{T(`Ləğv et`)}</button>
-          <button className="btn btn-secondary" disabled={!valid || busy} onClick={() => onSubmit(build(), false)} style={{ opacity: valid ? 1 : 0.55 }}>
+          <button className="btn btn-secondary" disabled={busy} onClick={() => trySubmit(false)}>
             <Icons.Bookmark size={14} /> {T(`Yadda saxla`)}
           </button>
-          <button className="btn btn-primary btn-lg" disabled={!valid || busy} onClick={() => onSubmit(build(), true)} style={{ opacity: valid ? 1 : 0.55 }}>
-            <Icons.Sparkle size={16} /> {busy ? "Hesablanır…" : "Qiymətləndir"}
+          <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => trySubmit(true)}>
+            <Icons.Sparkle size={16} /> {busy ? T(`Hesablanır…`) : T(`Qiymətləndir`)}
           </button>
         </div>
       </div>
@@ -348,13 +463,13 @@ export function PropertyEntryModal({
   );
 }
 
-function Select({ value, onChange, options, placeholder = "Seçin" }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string }) {
+function Select({ value, onChange, options, placeholder = "Seçin", error, disabled }: { value: string; onChange: (v: string) => void; options: string[]; placeholder?: string; error?: boolean; disabled?: boolean }) {
   return (
-    <div style={{ position: "relative" }}>
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...fieldStyle, appearance: "none", cursor: "pointer", paddingRight: 36, color: value ? "var(--text-1)" : "var(--text-3)" }}>
-        <option value="">{placeholder}</option>
+    <div style={{ position: "relative", opacity: disabled ? 0.55 : 1 }}>
+      <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} style={{ ...fieldStyle, ...errBorder(error), appearance: "none", cursor: disabled ? "not-allowed" : "pointer", paddingRight: 36, color: value ? "var(--text-1)" : "var(--text-3)" }}>
+        <option value="">{T(placeholder)}</option>
         {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
+          <option key={o} value={o}>{T(o)}</option>
         ))}
       </select>
       <Icons.ChevronDown size={16} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", color: "var(--text-3)" }} />
@@ -391,6 +506,17 @@ export function PropertyReport({
   onNext?: () => void;
 }) {
   const p = property;
+  // "PDF yüklə" — print the report (browser → Save as PDF). Dependency-free;
+  // the @media print rules in valuation-orange.css isolate the report modal.
+  const downloadPdf = () => {
+    document.body.classList.add("val-printing");
+    const cleanup = () => {
+      document.body.classList.remove("val-printing");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    setTimeout(() => window.print(), 60);
+  };
   const salesTrend = useMemo(() => genTrend(p.fairValue, 0.08, parseInt(p.id.slice(-3)) || 1), [p.id, p.fairValue]);
   const rentTrend = useMemo(() => genTrend(p.monthlyRent, 0.06, (parseInt(p.id.slice(-3)) || 1) + 3), [p.id, p.monthlyRent]);
   const labels = monthsLabels("2025-06");
@@ -421,7 +547,7 @@ export function PropertyReport({
           <button className="btn btn-ghost btn-sm" onClick={onPrev} title="Əvvəlki"><Icons.ChevronLeft size={14} /></button>
           <button className="btn btn-ghost btn-sm" onClick={onNext} title="Növbəti"><Icons.ChevronRight size={14} /></button>
           <div className="divider-y" style={{ height: 22, margin: "0 4px" }} />
-          <button className="btn btn-secondary btn-sm"><Icons.PDF size={14} /> PDF</button>
+          <button className="btn btn-secondary btn-sm" onClick={downloadPdf}><Icons.PDF size={14} /> {T(`PDF yüklə`)}</button>
           <button className="modal-close" onClick={onClose}><Icons.X size={14} /></button>
         </div>
 
@@ -511,6 +637,9 @@ export function PropertyReport({
             <div className="chart-sub">Qrafik son 1 ildə qiymətləndirilmiş potensial kirayə qiymətinin dinamikasını əks etdirir.</div>
             <LineChart data={rentTrend} labels={labels} height={200} color="#D9531E" />
           </div>
+
+          {/* Pages 4–6 of the official report — POI / accessibility (team API #9). */}
+          <ReportPoiSection />
 
           <div className="card card-pad">
             <div className="card-title" style={{ marginBottom: 6 }}>Analitik şərhi</div>
