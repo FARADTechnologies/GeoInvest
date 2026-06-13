@@ -7,8 +7,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
-import { ReportPoiSection } from "@/components/dashboard/valuation/valuation-report-poi";
-
 
 import {
   Delta,
@@ -148,7 +146,6 @@ type FormState = {
   totalFloors: string;
   floor: string;
   rooms: string;
-  valuationDate: string;
 };
 
 // Residence options — placeholder until the team delivers the real list (#7).
@@ -158,11 +155,9 @@ const RESIDENCES = [
   "Sea Breeze", "Garden Plaza", "Mətanət-A Yasamal", "AAAF Park"
 ];
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
 const emptyForm = (): FormState => ({
   address: "", rayon: "", type: "", repair: "", extract: "", isResidence: "",
-  residence: "", area: "", totalFloors: "", floor: "", rooms: "", valuationDate: todayISO()
+  residence: "", area: "", totalFloors: "", floor: "", rooms: ""
 });
 
 const fromOProp = (p: OProp): FormState => ({
@@ -176,8 +171,7 @@ const fromOProp = (p: OProp): FormState => ({
   area: p.area != null ? String(p.area) : "",
   totalFloors: p.totalFloors != null ? String(p.totalFloors) : "",
   floor: p.floor != null ? String(p.floor) : "",
-  rooms: p.rooms != null ? String(p.rooms) : "",
-  valuationDate: todayISO()
+  rooms: p.rooms != null ? String(p.rooms) : ""
 });
 
 // ── Validation (BA prompt #11). Returns field→message map (AZ source). ──
@@ -190,7 +184,6 @@ function validateForm(f: FormState): FormErrors {
   if (!f.repair) e.repair = req;
   if (!f.extract) e.extract = req;
   if (!f.isResidence) e.isResidence = req;
-  if (!f.valuationDate) e.valuationDate = req;
   // Residence name only required when "Bəli" (and not an old build).
   if (f.isResidence === "Bəli" && !isOldBuild(f.type) && !f.residence) e.residence = req;
 
@@ -295,9 +288,7 @@ export function PropertyEntryModal({
     repair: form.repair || null,
     extract: form.extract || null,
     residence: form.isResidence === "Bəli" ? form.residence || null : null,
-    // valuation_date carried through; latitude/longitude wait for the
-    // Google address picker (team #1/#2) — null for now, flag-gated.
-    valuation_date: form.valuationDate || null,
+    // latitude/longitude wait for the Google address picker (team #1/#2).
     latitude: null,
     longitude: null
   });
@@ -426,11 +417,7 @@ export function PropertyEntryModal({
               <input value={form.rooms} onChange={(e) => upd("rooms", e.target.value)} placeholder={T(`Otaq sayı`)} inputMode="numeric" style={{ ...fieldStyle, ...errBorder(!!errors.rooms) }} />
               <FieldErr msg={errors.rooms} />
             </div>
-            <div>
-              <FieldLabel>{T(`Qiymətləndirmə tarixi`)}</FieldLabel>
-              <input type="date" value={form.valuationDate} onChange={(e) => upd("valuationDate", e.target.value)} style={{ ...fieldStyle, ...errBorder(!!errors.valuationDate) }} />
-              <FieldErr msg={errors.valuationDate} />
-            </div>
+            <div />
           </div>
 
           <div style={{ marginTop: 22, padding: "12px 14px", background: "var(--orange-tint)", borderRadius: 10, display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: "var(--text-2)" }}>
@@ -637,9 +624,6 @@ export function PropertyReport({
             <div className="chart-sub">Qrafik son 1 ildə qiymətləndirilmiş potensial kirayə qiymətinin dinamikasını əks etdirir.</div>
             <LineChart data={rentTrend} labels={labels} height={200} color="#D9531E" />
           </div>
-
-          {/* Pages 4–6 of the official report — POI / accessibility (team API #9). */}
-          <ReportPoiSection />
 
           <div className="card card-pad">
             <div className="card-title" style={{ marginBottom: 6 }}>Analitik şərhi</div>

@@ -6,6 +6,7 @@ import {
   Boxes,
   Building2,
   Calculator,
+  ChevronDown,
   Globe,
   Heart,
   Layers,
@@ -19,6 +20,7 @@ import {
   User
 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -55,22 +57,25 @@ type NavItem = {
 };
 
 export function NavSidebar({ t, activeView, onViewChange }: Props) {
-  const nav: NavItem[] = [
+  // V1 = our original platform. V2 = features ported from the orange prototype.
+  const v1: NavItem[] = [
     { id: "overview", icon: Layers, label: t.navOverview },
     { id: "map", icon: Globe, label: t.navMap },
     { id: "rayons", icon: Building2, label: t.navRayons, pill: "12" },
     { id: "trends", icon: TrendingUp, label: t.navTrends },
-    { id: "valuation-single", icon: Calculator, label: t.navValSingle ?? "Tək qiymətləndirmə" },
-    { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
-    { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
-    { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
-    { id: "valuation-hexmap", icon: Globe, label: t.navValHexMap ?? "Analiz xəritəsi" },
-    { id: "valuation-map", icon: Map, label: t.navValMap ?? "İkincil Sistem" },
     { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
     { id: "b2c", icon: Heart, label: t.navB2C ?? "B2C Görünüm" },
     { id: "reports", icon: Shield, label: t.navReports },
     { id: "alerts", icon: Bell, label: t.navAlerts, pill: "3" },
     { id: "admin", icon: Network, label: t.navAdmin ?? "Admin / Companies" }
+  ];
+  const v2: NavItem[] = [
+    { id: "valuation-single", icon: Calculator, label: t.navValSingle ?? "Tək qiymətləndirmə" },
+    { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
+    { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
+    { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
+    { id: "valuation-hexmap", icon: Globe, label: t.navValHexMap ?? "Analiz xəritəsi" },
+    { id: "valuation-map", icon: Map, label: t.navValMap ?? "İkincil Sistem" }
   ];
   const settings: NavItem[] = [
     { id: "settings", icon: Settings, label: t.navSettings },
@@ -78,7 +83,7 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
   ];
 
   return (
-    <nav className="flex flex-col gap-4 px-3 py-4">
+    <nav className="flex flex-col gap-3 px-3 py-4">
       {/* Brand — clickable, returns to /(dashboard) */}
       <Link
         href="/"
@@ -108,35 +113,59 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
         </div>
       </Link>
 
-      {/* Main nav */}
-      <div className="flex flex-col gap-0.5">
-        <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {t.dashTitle}
-        </div>
-        {nav.map((n) => (
-          <NavRow
-            key={n.id}
-            item={n}
-            active={activeView === n.id}
-            onClick={() => onViewChange(n.id)}
-          />
-        ))}
-      </div>
+      {/* Two collapsible trees: Homora V1 (original) / Homora V2 (ported) */}
+      <NavTree title="Homora V1" items={v1} activeView={activeView} onViewChange={onViewChange} defaultOpen />
+      <NavTree title="Homora V2" items={v2} activeView={activeView} onViewChange={onViewChange} defaultOpen />
 
       <div className="flex flex-col gap-0.5">
         <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           {t.navAccount}
         </div>
         {settings.map((n) => (
-          <NavRow
-            key={n.id}
-            item={n}
-            active={activeView === n.id}
-            onClick={() => onViewChange(n.id)}
-          />
+          <NavRow key={n.id} item={n} active={activeView === n.id} onClick={() => onViewChange(n.id)} />
         ))}
       </div>
     </nav>
+  );
+}
+
+function NavTree({
+  title,
+  items,
+  activeView,
+  onViewChange,
+  defaultOpen
+}: {
+  title: string;
+  items: NavItem[];
+  activeView: DashboardView;
+  onViewChange: (v: DashboardView) => void;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  const hasActive = items.some((n) => n.id === activeView);
+  return (
+    <div className="flex flex-col gap-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+          hasActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+        )}
+      >
+        <ChevronDown className={cn("h-3 w-3 transition-transform", open ? "" : "-rotate-90")} />
+        <span className="flex-1 text-left">{title}</span>
+        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold text-muted-foreground">{items.length}</span>
+      </button>
+      {open ? (
+        <div className="flex flex-col gap-0.5">
+          {items.map((n) => (
+            <NavRow key={n.id} item={n} active={activeView === n.id} onClick={() => onViewChange(n.id)} />
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
