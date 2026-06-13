@@ -46,3 +46,6 @@ Thumbs.db
 .gstack/
 nextgen_h3_analytics/.gstack/
 screenshots/
+.firebase/
+app/frontend/out/
+/Homora B2B*.html
