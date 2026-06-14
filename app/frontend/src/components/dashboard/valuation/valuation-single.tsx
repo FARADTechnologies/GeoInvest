@@ -15,14 +15,15 @@ import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons, DonutChart, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
 import {
   PropertyEntryModal,
-  PropertyReport,
   statsOf,
   toOProp,
   type OProp
 } from "@/components/dashboard/valuation/valuation-core";
+import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { fetchValuationMeta, newId, valuateSingle } from "@/lib/valuation-data";
+import { reportFromResult, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
-import type { ValuationInput, ValuationSource } from "@/types/valuation";
+import type { RateReportData, ValuationInput, ValuationSource } from "@/types/valuation";
 
 export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; onNavigate?: (v: DashboardView) => void }) {
   setValLang(lang);
@@ -30,17 +31,19 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
   const meta = metaQuery.data?.data ?? null;
 
   const [items, setItems] = useState<OProp[]>([]);
+  // Report payloads (predict contract) keyed by item id. The new RateReport
+  // renders from these; drafts have none until valued.
+  const [reports, setReports] = useState<Record<string, RateReportData>>({});
   const [source, setSource] = useState<ValuationSource>("db");
   const [entryOpen, setEntryOpen] = useState(false);
+  const [entryMode, setEntryMode] = useState<"form" | "link">("form");
   const [editTarget, setEditTarget] = useState<OProp | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const valued = items.filter((x) => x.valued !== false);
   const stats = valued.length > 0 ? statsOf(items) : null;
-
-  const openIdx = openId ? items.findIndex((x) => x.id === openId) : -1;
-  const openItem = openIdx >= 0 ? items[openIdx] : null;
 
   const submit = async (input: ValuationInput, doValuate: boolean, existingId?: string) => {
     if (!doValuate) {
@@ -67,13 +70,45 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
     const { data, source: src } = await valuateSingle(input);
     setSource(src);
     const item = toOProp(data, existingId ?? newId("H"), true);
+    const report = reportFromResult(data, input);
     setItems((prev) => (existingId ? prev.map((x) => (x.id === existingId ? item : x)) : [item, ...prev]));
+    setReports((prev) => ({ ...prev, [item.id]: report }));
     setBusy(false);
     setEntryOpen(false);
     setEditTarget(null);
   };
 
-  const remove = (id: string) => setItems((prev) => prev.filter((x) => x.id !== id));
+  // Elan linki flow. Sends URL-only (valuateByLink), never form state. Any
+  // stale open report is cleared before the request so a previous form report
+  // can't flash on the first link submit (BA §15). On error the report does
+  // NOT open; the reason is surfaced in a banner (BA §17).
+  const submitLink = async (url: string) => {
+    setLinkError(null);
+    setOpenId(null);
+    setEntryOpen(false);
+    setBusy(true);
+    try {
+      const { data, source: src } = await valuateByLink(url);
+      setSource(src);
+      const id = newId("L");
+      setReports((prev) => ({ ...prev, [id]: data }));
+      setItems((prev) => [opropFromReport(id, data), ...prev]);
+      setOpenId(id);
+    } catch (err) {
+      setLinkError(linkErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = (id: string) =>
+    setItems((prev) => {
+      setReports((r) => {
+        const { [id]: _drop, ...rest } = r;
+        return rest;
+      });
+      return prev.filter((x) => x.id !== id);
+    });
 
   return (
     <div className="hm-val">
@@ -89,18 +124,28 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
             <button className="btn btn-secondary" onClick={() => onNavigate?.("valuation-mass")}>
               <Icons.ValueMass size={14} /> {T(`Kütləvi qiymətləndirməyə keç`)}
             </button>
-            <button className="btn btn-primary" onClick={() => setEntryOpen(true)}>
+            <button className="btn btn-primary" onClick={() => { setEntryMode("form"); setEntryOpen(true); }}>
               <Icons.Plus size={14} /> {T(`Yeni qiymətləndirmə`)}
             </button>
           </div>
         </div>
 
+        {linkError && (
+          <div className="card" style={{ padding: "12px 16px", marginBottom: 14, background: "var(--red-soft)", color: "var(--red)", display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
+            <Icons.Info size={15} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{linkError}</span>
+            <button className="icon-btn" style={{ width: 26, height: 26, color: "var(--red)" }} onClick={() => setLinkError(null)} title={T(`Bağla`)}>
+              <Icons.X size={13} />
+            </button>
+          </div>
+        )}
+
         <div className="card card-pad" style={{ marginBottom: 14 }}>
           <div className="fl-row" style={{ gap: 12, flexWrap: "wrap" }}>
-            <button className="btn btn-secondary btn-sm" style={{ borderColor: "var(--orange)", color: "var(--orange)" }} onClick={() => setEntryOpen(true)}>
+            <button className="btn btn-secondary btn-sm" style={{ borderColor: "var(--orange)", color: "var(--orange)" }} onClick={() => { setEntryMode("form"); setEntryOpen(true); }}>
               <Icons.Sort size={14} /> {T(`Parametrlə qiymətləndir`)}
             </button>
-            <button className="btn btn-ghost btn-sm">
+            <button className="btn btn-ghost btn-sm" onClick={() => { setEntryMode("link"); setEntryOpen(true); }}>
               <Icons.Layers size={14} /> {T(`Elan linki ilə qiymətləndir`)}
             </button>
             <span className="sp" />
@@ -130,7 +175,7 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
             <button className="btn btn-secondary btn-sm" disabled={items.length === 0} style={{ opacity: items.length === 0 ? 0.5 : 1 }}>
               <Icons.Download size={13} /> {T(`Excel ixrac`)}
             </button>
-            <button className="btn btn-primary btn-sm" onClick={() => setEntryOpen(true)}>
+            <button className="btn btn-primary btn-sm" onClick={() => { setEntryMode("form"); setEntryOpen(true); }}>
               <Icons.Plus size={13} /> {T(`Yeni qiymətləndirmə`)}
             </button>
           </div>
@@ -200,7 +245,7 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
                 <div className="empty-art"><Icons.ValueSingle size={28} /></div>
                 <div className="empty-title">{T(`Hələ qiymətləndirmə yoxdur`)}</div>
                 <div className="empty-sub">{T(`"Yeni qiymətləndirmə" düyməsi ilə ilk mənzili qiymətləndirin — nəticə burada görünəcək.`)}</div>
-                <button className="btn btn-primary" onClick={() => setEntryOpen(true)}>
+                <button className="btn btn-primary" onClick={() => { setEntryMode("form"); setEntryOpen(true); }}>
                   <Icons.Plus size={14} /> {T(`Yeni qiymətləndirmə`)}
                 </button>
               </div>
@@ -222,23 +267,70 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
         </div>
       </div>
 
-      {openItem && openItem.valued !== false && stats && (
-        <PropertyReport
-          property={openItem}
-          portfolioName="Tək qiymətləndirmə tarixçəsi"
-          itemsCount={valued.length}
-          stats={stats}
-          rank={[...valued].sort((a, b) => b.score - a.score).findIndex((x) => x.id === openItem.id) + 1}
-          onClose={() => setOpenId(null)}
-          onPrev={() => openIdx > 0 && setOpenId(items[openIdx - 1].id)}
-          onNext={() => openIdx >= 0 && openIdx < items.length - 1 && setOpenId(items[openIdx + 1].id)}
-        />
+      {openId && reports[openId] && (
+        <RateReport data={reports[openId]} onClose={() => setOpenId(null)} />
       )}
 
-      <PropertyEntryModal open={entryOpen} portfolioName="Tək qiymətləndirmə" meta={meta} busy={busy} onClose={() => setEntryOpen(false)} onSubmit={(input, v) => submit(input, v)} />
+      <PropertyEntryModal open={entryOpen} allowLink initialMode={entryMode} portfolioName="Tək qiymətləndirmə" meta={meta} busy={busy} onClose={() => setEntryOpen(false)} onSubmit={(input, v) => submit(input, v)} onSubmitLink={submitLink} />
       <PropertyEntryModal open={!!editTarget} portfolioName="Tək qiymətləndirmə" meta={meta} initial={editTarget} busy={busy} onClose={() => setEditTarget(null)} onSubmit={(input, v) => submit(input, v, editTarget?.id)} />
     </div>
   );
+}
+
+// Minimal history-row projection of a link report (the link flow has no form
+// features). Drives the table row; the full report lives in `reports[id]`.
+function opropFromReport(id: string, data: RateReportData): OProp {
+  const sale = data.ai_data.sale_estimate.current_valuation;
+  const rentv = data.ai_data.rent_estimate.current_valuation;
+  const inv = data.ai_data.investment_metrics;
+  const f = data.features;
+  let label = f?.address ?? "";
+  if (!label && data.source.kind === "link") {
+    try {
+      label = new URL(data.source.url).hostname.replace(/^www\./, "");
+    } catch {
+      label = data.source.url;
+    }
+  }
+  return {
+    id,
+    valued: true,
+    address: label || "Elan linki",
+    district: "—",
+    type: f?.type || "—",
+    area: f?.area ?? 0,
+    rooms: f?.rooms ?? null,
+    floor: f?.floor ?? null,
+    totalFloors: f?.total_floors ?? null,
+    fairValue: sale.point_estimate,
+    pricePerM2: inv.price_per_sqm,
+    monthlyRent: rentv.point_estimate,
+    yield: inv.rent_yield_percent,
+    payback: inv.payback_period_years,
+    liquidity: 0,
+    score: 0,
+    risk: "Orta",
+    residence: f?.residence_owner ?? null,
+    repair: f?.repair ?? null,
+    extract: f?.extract ?? null,
+    range: [sale.lower_bound, sale.upper_bound],
+    rentRange: [rentv.lower_bound, rentv.upper_bound]
+  };
+}
+
+// BA §17 — map predict-link HTTP failures to user-facing copy.
+function linkErrorMessage(err: unknown): string {
+  if (err instanceof LinkValuationError) {
+    const msg = (err.message || "").trim();
+    if (err.status === 400) return msg ? `${T("Link formatı düzgün deyil")}: ${msg}` : T("Link formatı düzgün deyil");
+    if (err.status === 404) {
+      if (/qiymət|valuation|estimate/i.test(msg)) return T("Qiymətləndirmə məlumatı yoxdur");
+      return msg || T("Elan bazamızda tapılmadı");
+    }
+    if (err.status === 401) return T("Giriş tələb olunur. Zəhmət olmasa yenidən daxil olun");
+    return msg || T("Link üzrə qiymətləndirmə alınmadı");
+  }
+  return T("Link üzrə qiymətləndirmə alınmadı");
 }
 
 function SingleStat({ k, v, accent, last }: { k: string; v: string; accent?: boolean; last?: boolean }) {

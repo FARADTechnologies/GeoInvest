@@ -238,6 +238,9 @@ export function PropertyEntryModal({
   open,
   onClose,
   onSubmit,
+  onSubmitLink,
+  allowLink = false,
+  initialMode = "form",
   portfolioName,
   meta,
   initial,
@@ -246,12 +249,20 @@ export function PropertyEntryModal({
   open: boolean;
   onClose: () => void;
   onSubmit: (input: ValuationInput, valued: boolean) => void;
+  // Elan linki flow (single view only). When provided + allowLink, a link tab
+  // is offered; submitting sends ONLY the URL (BA §2.2).
+  onSubmitLink?: (url: string) => void;
+  allowLink?: boolean;
+  initialMode?: "form" | "link";
   portfolioName: string;
   meta?: ValuationMeta | null;
   initial?: OProp | null;
   busy?: boolean;
 }) {
   const isEdit = !!initial;
+  const [mode, setMode] = useState<"form" | "link">("form");
+  const [link, setLink] = useState("");
+  const [linkErr, setLinkErr] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(() => (initial ? fromOProp(initial) : emptyForm()));
   const [errors, setErrors] = useState<FormErrors>({});
   const [toast, setToast] = useState<string | null>(null);
@@ -263,8 +274,36 @@ export function PropertyEntryModal({
       setForm(initial ? fromOProp(initial) : emptyForm());
       setErrors({});
       setToast(null);
+      // Edit always opens the form; new entries honour the requested tab.
+      setMode(initial ? "form" : allowLink ? initialMode : "form");
+      setLink("");
+      setLinkErr(null);
     }
   }, [open, initial]);
+
+  // Validate + submit a listing link. Only bina.az / emlak.az are accepted;
+  // the payload is URL-only — no form state ever leaks into the link flow.
+  const trySubmitLink = () => {
+    const raw = link.trim();
+    if (!raw) {
+      setLinkErr("Elan linkini daxil edin (bina.az və ya emlak.az)");
+      return;
+    }
+    const href = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    let host = "";
+    try {
+      host = new URL(href).hostname.toLowerCase();
+    } catch {
+      setLinkErr("Link formatı düzgün deyil");
+      return;
+    }
+    if (!/(^|\.)(bina\.az|emlak\.az)$/.test(host)) {
+      setLinkErr("Yalnız bina.az və ya emlak.az linki daxil edin");
+      return;
+    }
+    setLinkErr(null);
+    onSubmitLink?.(href);
+  };
 
   // Residence gating (#6 + validation rule): "Köhnə tikili" forces
   // "Yaşayış kompleksi = Xeyr" and clears the complex name.
@@ -330,14 +369,24 @@ export function PropertyEntryModal({
             <div className="modal-title">{T(`Mənzil haqqında məlumat`)}</div>
           </div>
           <div className="sp" />
-          <div className="fl-row" style={{ gap: 6 }}>
-            <button className="btn btn-secondary btn-sm" style={{ borderColor: "var(--orange)", color: "var(--orange)", borderRadius: 99, padding: "6px 14px" }}>
-              <Icons.Sort size={14} /> {T(`Parametrlə qiymətləndir`)}
-            </button>
-            <button className="btn btn-ghost btn-sm" style={{ borderRadius: 99, padding: "6px 14px" }}>
-              <Icons.Layers size={14} /> {T(`Elan linki ilə qiymətləndir`)}
-            </button>
-          </div>
+          {allowLink && !isEdit && (
+            <div className="fl-row" style={{ gap: 6 }}>
+              <button
+                className={`btn btn-sm ${mode === "form" ? "btn-secondary" : "btn-ghost"}`}
+                style={{ borderRadius: 99, padding: "6px 14px", ...(mode === "form" ? { borderColor: "var(--orange)", color: "var(--orange)" } : {}) }}
+                onClick={() => setMode("form")}
+              >
+                <Icons.Sort size={14} /> {T(`Parametrlə qiymətləndir`)}
+              </button>
+              <button
+                className={`btn btn-sm ${mode === "link" ? "btn-secondary" : "btn-ghost"}`}
+                style={{ borderRadius: 99, padding: "6px 14px", ...(mode === "link" ? { borderColor: "var(--orange)", color: "var(--orange)" } : {}) }}
+                onClick={() => setMode("link")}
+              >
+                <Icons.Layers size={14} /> {T(`Elan linki ilə qiymətləndir`)}
+              </button>
+            </div>
+          )}
           <button className="modal-close" onClick={onClose}>
             <Icons.X size={14} />
           </button>
@@ -349,6 +398,22 @@ export function PropertyEntryModal({
               <Icons.Info size={14} /> {T(toast)}
             </div>
           )}
+          {mode === "link" && (
+            <div>
+              <FieldLabel>{T(`Elan linki ilə qiymətləndir`)}</FieldLabel>
+              <input
+                value={link}
+                onChange={(e) => { setLink(e.target.value); if (linkErr) setLinkErr(null); }}
+                onKeyDown={(e) => { if (e.key === "Enter") trySubmitLink(); }}
+                placeholder="https://bina.az/items/..."
+                style={{ ...fieldStyle, ...errBorder(!!linkErr) }}
+              />
+              <FieldErr msg={linkErr ?? undefined} />
+              <HintRow>{T(`Elan linkini daxil edin (bina.az və ya emlak.az)`)}</HintRow>
+            </div>
+          )}
+          {mode === "form" && (
+          <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "22px 24px" }}>
             {/* Row 1 — Ünvan (span 2) | Mənzil növü */}
             <div style={{ gridColumn: "span 2" }}>
@@ -427,6 +492,8 @@ export function PropertyEntryModal({
               <strong style={{ color: "var(--text-1)", marginLeft: 6 }}>{T(`Qiymətləndir`)}</strong> — dərhal fair value, kirayə və skoru hesabla.
             </span>
           </div>
+          </>
+          )}
         </div>
 
         <div style={{ padding: "14px 22px", borderTop: "1px solid var(--border)", background: "var(--card-2)", display: "flex", gap: 10, alignItems: "center" }}>
@@ -438,12 +505,20 @@ export function PropertyEntryModal({
           )}
           <span className="sp" />
           <button className="btn btn-ghost" onClick={onClose}>{T(`Ləğv et`)}</button>
-          <button className="btn btn-secondary" disabled={busy} onClick={() => trySubmit(false)}>
-            <Icons.Bookmark size={14} /> {T(`Yadda saxla`)}
-          </button>
-          <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => trySubmit(true)}>
-            <Icons.Sparkle size={16} /> {busy ? T(`Hesablanır…`) : T(`Qiymətləndir`)}
-          </button>
+          {mode === "link" ? (
+            <button className="btn btn-primary btn-lg" disabled={busy} onClick={trySubmitLink}>
+              <Icons.Sparkle size={16} /> {busy ? T(`Hesablanır…`) : T(`Qiymətləndir`)}
+            </button>
+          ) : (
+            <>
+              <button className="btn btn-secondary" disabled={busy} onClick={() => trySubmit(false)}>
+                <Icons.Bookmark size={14} /> {T(`Yadda saxla`)}
+              </button>
+              <button className="btn btn-primary btn-lg" disabled={busy} onClick={() => trySubmit(true)}>
+                <Icons.Sparkle size={16} /> {busy ? T(`Hesablanır…`) : T(`Qiymətləndir`)}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

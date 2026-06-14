@@ -262,7 +262,76 @@ const D: Dict = {
   "Əyləncə": { tr: "Eğlence", en: "Entertainment" },
   "Nəqliyyat": { tr: "Ulaşım", en: "Transport" },
   "Səyahət": { tr: "Seyahat", en: "Travel" },
-  "Gəzinti": { tr: "Gezinti", en: "Walk" }
+  "Gəzinti": { tr: "Gezinti", en: "Walk" },
+
+  // ── B2C rate report (Mənzili qiymətləndir) ──
+  "Nəticə": { tr: "Sonuç", en: "Result" },
+  "ay": { tr: "ay", en: "mo" },
+  "Mənbə": { tr: "Kaynak", en: "Source" },
+  "Satış qiyməti": { tr: "Satış fiyatı", en: "Sale price" },
+  "Kirayə qiyməti": { tr: "Kira fiyatı", en: "Rent price" },
+  "Qiymət aralığı": { tr: "Fiyat aralığı", en: "Price range" },
+  "Kirayə aralığı": { tr: "Kira aralığı", en: "Rent range" },
+  "Mənzilin süni intellekt modeli ilə dəyərləndirilmiş satış qiyməti": {
+    tr: "Konutun yapay zekâ modeliyle değerlendirilmiş satış fiyatı",
+    en: "AI-model-estimated sale price of the property"
+  },
+  "Mənzilin süni intellekt modeli ilə dəyərləndirilmiş kirayə qiyməti": {
+    tr: "Konutun yapay zekâ modeliyle değerlendirilmiş kira fiyatı",
+    en: "AI-model-estimated rent price of the property"
+  },
+  "Sərmayə dəyərləndirməsi": { tr: "Yatırım değerlendirmesi", en: "Investment assessment" },
+  "İllik kirayə gəliri": { tr: "Yıllık kira geliri", en: "Annual rent income" },
+  "Kirayə gəlirliliyi": { tr: "Kira getirisi", en: "Rental yield" },
+  "Geri ödəmə müddəti": { tr: "Geri ödeme süresi", en: "Payback period" },
+  "1 m² qiyməti": { tr: "1 m² fiyatı", en: "Price per m²" },
+  "Satış qiymətinin trendi": { tr: "Satış fiyatı trendi", en: "Sale price trend" },
+  "Kirayə qiymətinin trendi": { tr: "Kira fiyatı trendi", en: "Rent price trend" },
+  "Qrafik son 1 ildə qiymətləndirilmiş potensial satış dəyərinin dinamikasını əks etdirir.": {
+    tr: "Grafik son 1 yılda değerlendirilmiş potansiyel satış değerinin dinamiğini gösterir.",
+    en: "The chart shows the dynamics of the estimated potential sale value over the last year."
+  },
+  "Qrafik son 1 ildə qiymətləndirilmiş potensial kirayə qiymətinin dinamikasını əks etdirir.": {
+    tr: "Grafik son 1 yılda değerlendirilmiş potansiyel kira fiyatının dinamiğini gösterir.",
+    en: "The chart shows the dynamics of the estimated potential rent price over the last year."
+  },
+  "Lokasiya": { tr: "Konum", en: "Location" },
+  "Mənzilin xəritə üzrə yerləşməsi və ətraf kontekst.": {
+    tr: "Konutun harita üzerindeki konumu ve çevresel bağlam.",
+    en: "The property's location on the map and surrounding context."
+  },
+  "İpoteka kalkulyatoru": { tr: "İpotek hesaplayıcı", en: "Mortgage calculator" },
+  "Homora qiymətləndirməsinə əsasən": { tr: "Homora değerlemesine göre", en: "Based on the Homora valuation" },
+  "İlkin ödəniş": { tr: "Peşinat", en: "Down payment" },
+  "Kredit müddəti": { tr: "Kredi süresi", en: "Loan term" },
+  "Faiz dərəcəsi": { tr: "Faiz oranı", en: "Interest rate" },
+  "Mənzilin qiyməti": { tr: "Konutun fiyatı", en: "Property price" },
+  "Kredit məbləği": { tr: "Kredi tutarı", en: "Loan amount" },
+  "Aylıq ödəniş": { tr: "Aylık ödeme", en: "Monthly payment" },
+  "Ümumi faiz": { tr: "Toplam faiz", en: "Total interest" },
+  "Ümumi ödəniş": { tr: "Toplam ödeme", en: "Total payment" },
+  "Tələb olunan minimum aylıq gəlir": { tr: "Gerekli minimum aylık gelir", en: "Required minimum monthly income" },
+  "Yaşayış kompleksi": { tr: "Site/rezidans", en: "Residence complex" },
+  "Bu əmlak üzrə qiymətləndirmə hesabatı Homora süni intellekt modeli əsasında hazırlanmışdır.": {
+    tr: "Bu mülke ilişkin değerleme raporu Homora yapay zekâ modeli temel alınarak hazırlanmıştır.",
+    en: "This valuation report for the property was prepared based on the Homora AI model."
+  },
+  "Link formatı düzgün deyil": { tr: "Link formatı geçersiz", en: "Invalid link format" },
+  "Qiymətləndirmə məlumatı yoxdur": { tr: "Değerleme verisi yok", en: "No valuation data" },
+  "Elan bazamızda tapılmadı": { tr: "İlan veritabanımızda bulunamadı", en: "Listing not found in our database" },
+  "Link üzrə qiymətləndirmə alınmadı": { tr: "Link ile değerleme alınamadı", en: "Could not valuate by link" },
+  "Yalnız bina.az və ya emlak.az linki daxil edin": {
+    tr: "Yalnızca bina.az veya emlak.az linki girin",
+    en: "Enter only a bina.az or emlak.az link"
+  },
+  "Elan linkini daxil edin (bina.az və ya emlak.az)": {
+    tr: "İlan linkini girin (bina.az veya emlak.az)",
+    en: "Enter the listing link (bina.az or emlak.az)"
+  },
+  "Giriş tələb olunur. Zəhmət olmasa yenidən daxil olun": {
+    tr: "Giriş gerekli. Lütfen tekrar giriş yapın",
+    en: "Sign-in required. Please log in again"
+  }
 };
 
 export function T(s: string): string {

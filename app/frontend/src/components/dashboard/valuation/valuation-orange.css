@@ -505,3 +505,23 @@
   body.val-printing .hm-val .modal-head .divider-y { display: none !important; }
   @page { margin: 12mm; }
 }
+
+/* ── B2C rate report (Mənzili qiymətləndir) ─────────────────────────── */
+.hm-val .print-only { display: none; }
+.hm-val .rate-report-print-logo {
+  font-weight: 800; font-size: 22px; color: var(--orange);
+  letter-spacing: -0.02em; margin-bottom: 14px;
+}
+.hm-val .mortgage-inputs {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}
+@media (max-width: 640px) {
+  .hm-val .mortgage-inputs { grid-template-columns: 1fr; }
+}
+@media print {
+  /* BA §19 — show the print-only logo + disclaimer, keep sections whole. */
+  body.val-printing .hm-val .print-only { display: block !important; visibility: visible !important; }
+  body.val-printing .hm-val .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  /* The OSM map embed doesn't print reliably — hide it in the PDF. */
+  body.val-printing .hm-val .rate-report iframe { display: none !important; }
+}
