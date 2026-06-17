@@ -39,6 +39,7 @@ out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.tsbuildinfo
 
 # ── Data files (large / generated) ───────────────────────────────────────────
 data/raw_data_template.csv
