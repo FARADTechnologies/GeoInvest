@@ -5,8 +5,9 @@
 // modal, and the detail report modal. Data is fed from our /valuation/* API
 // (mapped from snake_case to the prototype's camelCase shape).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
+import { useAddressAutocomplete } from "@/components/dashboard/valuation/valuation-maps";
 
 import {
   Delta,
@@ -269,9 +270,24 @@ export function PropertyEntryModal({
   const upd = (k: keyof FormState, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // Coordinates from the Google address picker (#1/#2). Present only when the
+  // user selects an autocomplete suggestion; cleared on manual typing. Drive
+  // the real predict model — when absent the form falls back to DB-median.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const addressRef = useRef<HTMLInputElement>(null);
+  useAddressAutocomplete(
+    addressRef,
+    (addr, lat, lng) => {
+      setForm((f) => ({ ...f, address: addr }));
+      setCoords({ lat, lng });
+    },
+    mode === "form"
+  );
+
   useEffect(() => {
     if (open) {
       setForm(initial ? fromOProp(initial) : emptyForm());
+      setCoords(null);
       setErrors({});
       setToast(null);
       // Edit always opens the form; new entries honour the requested tab.
@@ -327,9 +343,10 @@ export function PropertyEntryModal({
     repair: form.repair || null,
     extract: form.extract || null,
     residence: form.isResidence === "Bəli" ? form.residence || null : null,
-    // latitude/longitude wait for the Google address picker (team #1/#2).
-    latitude: null,
-    longitude: null
+    // Coordinates from the Google address picker (#1/#2); null when the user
+    // typed the address by hand (→ DB-median fallback rather than predict).
+    latitude: coords?.lat ?? null,
+    longitude: coords?.lng ?? null
   });
 
   // Validate before submit; on "Qiymətləndir" the full rule-set runs and no
@@ -419,7 +436,7 @@ export function PropertyEntryModal({
             <div style={{ gridColumn: "span 2" }}>
               <FieldLabel>{T(`Ünvan`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input value={form.address} onChange={(e) => upd("address", e.target.value)} placeholder={T(`Ünvan`)} style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
+                <input ref={addressRef} value={form.address} onChange={(e) => { upd("address", e.target.value); setCoords(null); }} placeholder={T(`Ünvan`)} autoComplete="off" style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
                 <button className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
                   <Icons.MapPin size={13} /> {T(`Xəritədən seç`)}
                 </button>
