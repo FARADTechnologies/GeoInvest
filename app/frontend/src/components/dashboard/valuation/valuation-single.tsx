@@ -21,7 +21,7 @@ import {
 } from "@/components/dashboard/valuation/valuation-core";
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { fetchValuationMeta, newId, valuateSingle } from "@/lib/valuation-data";
-import { reportFromResult, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
+import { reportFromResult, predictByParams, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
 import type { RateReportData, ValuationInput, ValuationSource } from "@/types/valuation";
 
@@ -70,7 +70,19 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
     const { data, source: src } = await valuateSingle(input);
     setSource(src);
     const item = toOProp(data, existingId ?? newId("H"), true);
-    const report = reportFromResult(data, input);
+    // Report source: prefer the real predict model when the form carries
+    // coordinates (Maps autocomplete, #1/#2); otherwise (or if the model is
+    // unreachable) fall back to the DB-median synthesis. The list row stays
+    // DB-derived as a quick summary; the report modal shows the richer model.
+    let report: RateReportData;
+    try {
+      report =
+        input.latitude != null && input.longitude != null
+          ? await predictByParams(input)
+          : reportFromResult(data, input);
+    } catch {
+      report = reportFromResult(data, input);
+    }
     setItems((prev) => (existingId ? prev.map((x) => (x.id === existingId ? item : x)) : [item, ...prev]));
     setReports((prev) => ({ ...prev, [item.id]: report }));
     setBusy(false);

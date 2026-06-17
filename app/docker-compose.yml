@@ -35,6 +35,11 @@ services:
     build:
       context: ./backend
     container_name: geoinvest_backend
+    # Secrets (predict client id/secret, source DB url) come from the
+    # gitignored backend/.env — never hard-coded here. Optional: if the file
+    # is absent the predict routes report "not configured".
+    env_file:
+      - ./backend/.env
     environment:
       PYTHONPATH: /app
       APP_NAME: GeoInvest Analytics API

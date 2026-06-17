@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 120
     source_database_url: str = ""  # Ana DB — postgresql://user:pass@host:port/dbname
 
+    # Predict server (team) — used by the backend proxy so the secret never
+    # reaches the browser. Left empty until the .env supplies them; routes
+    # return a clear "not configured" error in that case.
+    predict_url: str = ""
+    predict_client_id: str = ""
+    predict_client_secret: str = ""
+    predict_timeout_seconds: float = 120.0
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

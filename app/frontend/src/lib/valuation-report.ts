@@ -124,6 +124,111 @@ export function reportFromResult(result: ValuationResult, input: ValuationInput)
   };
 }
 
+// ── Parametrlə flow: REAL predict server (team #3/#12) ──────────────────
+//
+// When the form carries coordinates (filled by the Maps autocomplete, #1/#2)
+// we call the real model via our backend proxy (/api/v1/model/predict, which
+// keeps the secret server-side). The predict response is top-level
+// (sale_estimate / rent_estimate / investment_metrics — no `ai_data` wrapper),
+// so the mapping into our report contract is a near pass-through. When there
+// are no coordinates, or the model is unreachable, valuation-single falls back
+// to reportFromResult (DB-median synthesis) so the feature still works.
+
+const todayISO = (): string => new Date().toISOString().slice(0, 10);
+
+type PredictPayload = {
+  latitude: number;
+  longitude: number;
+  otaq_sayi: number;
+  sahe_kvm: number;
+  mertebe_yer: number;
+  mertebe_say: number;
+  date2: string;
+  kateqoriya: string;
+  temir: string;
+  cixaris: string;
+  residential_complex: number;
+  residence_owner: string;
+};
+
+// Map our form input to the predict server's exact contract (proven by the
+// team's sample payload): kateqoriya lowercase ("köhnə tikili"), təmir/çıxarış
+// as "var"/"yox", residence_owner defaults to "mülkiyyətçi" when there is no
+// residential complex.
+export function buildPredictPayload(input: ValuationInput): PredictPayload {
+  return {
+    latitude: input.latitude ?? 0,
+    longitude: input.longitude ?? 0,
+    otaq_sayi: input.rooms ?? 0,
+    sahe_kvm: input.area ?? 0,
+    mertebe_yer: input.floor ?? 0,
+    mertebe_say: input.total_floors ?? 0,
+    date2: input.valuation_date || todayISO(),
+    kateqoriya: (input.type || "").toLowerCase(),
+    temir: (input.repair || "").trim() === "Təmirli" ? "var" : "yox",
+    cixaris: (input.extract || "").trim() === "Var" ? "var" : "yox",
+    residential_complex: input.residence ? 1 : 0,
+    residence_owner: input.residence || "mülkiyyətçi"
+  };
+}
+
+// The predict server's raw response shape (top-level, no ai_data wrapper).
+type PredictResponse = {
+  sale_estimate: AiEstimate;
+  rent_estimate: AiEstimate;
+  investment_metrics: RateReportData["ai_data"]["investment_metrics"];
+  as_of_date?: string | null;
+  accessibility_data?: RateReportData["accessibility_data"];
+};
+
+export function reportFromPredict(resp: PredictResponse, input: ValuationInput): RateReportData {
+  return {
+    ai_data: {
+      sale_estimate: resp.sale_estimate,
+      rent_estimate: resp.rent_estimate,
+      investment_metrics: resp.investment_metrics,
+      as_of_date: resp.as_of_date ?? null
+    },
+    accessibility_data: resp.accessibility_data ?? {},
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
+    listing_price: null, // form flow → mortgage uses predicted sale price
+    features: featuresFromInput(input),
+    source: { kind: "form" }
+  };
+}
+
+// Call the real predict model through our backend proxy. Slow (~19–60s; cold
+// start can exceed a minute), so the timeout is generous. Throws a typed
+// LinkValuationError on HTTP failure so the caller can fall back.
+export async function predictByParams(input: ValuationInput): Promise<RateReportData> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 125000);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/predict`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(buildPredictPayload(input)),
+      signal: controller.signal
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    let msg = "";
+    try {
+      const j = (await res.json()) as { message?: string; detail?: string };
+      msg = j?.detail || j?.message || "";
+    } catch {
+      /* no body */
+    }
+    throw new LinkValuationError(res.status, msg);
+  }
+  const resp = (await res.json()) as PredictResponse;
+  return reportFromPredict(resp, input);
+}
+
 // ── Elan linki flow ────────────────────────────────────────────────────
 //
 // The real predict-link endpoint (team #3/#12) is not wired yet, so when it
