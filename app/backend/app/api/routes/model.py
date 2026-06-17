@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.predict import PredictRequest
-from app.services.predict import PredictError, call_predict
+from app.schemas.predict import LinkRequest, PredictRequest
+from app.services.predict import PredictError, call_predict, predict_by_link
 
 router = APIRouter()
 
@@ -18,5 +18,19 @@ async def model_predict(payload: PredictRequest) -> dict:
     """
     try:
         return await call_predict(payload.model_dump())
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.post("/model/predict/link")
+async def model_predict_link(payload: LinkRequest) -> dict:
+    """Resolve a listing link to its precomputed prediction (source DB).
+
+    Matches item_app_items.source_url and returns prediction_info as ai_data
+    plus latitude/longitude and the actual listing price. The link report
+    shows no form feature grid (features stays null on the frontend, BA §6).
+    """
+    try:
+        return await predict_by_link(payload.flat_link)
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc

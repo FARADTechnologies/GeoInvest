@@ -23,3 +23,13 @@ class PredictRequest(BaseModel):
     residential_complex: int
     residence_owner: str | None = None
     cixaris: str
+
+
+class LinkRequest(BaseModel):
+    """Elan linki ilə qiymətləndirmə — only the listing URL (BA §2.2 / §15).
+
+    No form fields: the link flow reads the precomputed prediction from the
+    source DB (item_app_items.prediction_info) matched by source_url.
+    """
+
+    flat_link: str

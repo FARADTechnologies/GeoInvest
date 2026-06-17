@@ -273,7 +273,7 @@ export async function valuateByLink(url: string): Promise<LinkResult> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/predict/link/`, {
+      res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/predict/link`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ flat_link: url }),
