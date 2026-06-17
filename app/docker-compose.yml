@@ -35,11 +35,6 @@ services:
     build:
       context: ./backend
     container_name: geoinvest_backend
-    # Secrets (predict client id/secret, source DB url) come from the
-    # gitignored backend/.env — never hard-coded here. Optional: if the file
-    # is absent the predict routes report "not configured".
-    env_file:
-      - ./backend/.env
     environment:
       PYTHONPATH: /app
       APP_NAME: GeoInvest Analytics API
@@ -55,6 +50,11 @@ services:
       - "8000:8000"
     volumes:
       - ../data:/data:ro
+      # Secrets (predict client id/secret, source DB url) are read by pydantic
+      # from this gitignored file at /app/.env. Mounted (not env_file) so Docker
+      # Compose never interpolates the "$" in the pbkdf2 secret. Override via
+      # the `environment:` block above still wins (e.g. DATABASE_URL).
+      - ./backend/.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
