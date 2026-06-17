@@ -36,7 +36,10 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
-    allow_methods=["GET", "OPTIONS"],
+    # POST is needed by the valuation endpoints (single/batch/model proxy/link);
+    # without it the browser's preflight blocks them and the UI silently falls
+    # back to local data.
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 

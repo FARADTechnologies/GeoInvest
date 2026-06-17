@@ -283,7 +283,11 @@ export async function valuateByLink(url: string): Promise<LinkResult> {
       clearTimeout(timer);
     }
   } catch {
-    return { data: reportFromLinkMock(url), source: "mock" };
+    // Network/abort: never show fabricated numbers for a real listing (BA §17).
+    throw new LinkValuationError(
+      0,
+      "Qiymətləndirmə xidmətinə qoşulmaq mümkün olmadı, yenidən cəhd edin."
+    );
   }
   if (!res.ok) {
     let msg = "";
