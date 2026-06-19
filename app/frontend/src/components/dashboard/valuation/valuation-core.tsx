@@ -5,9 +5,9 @@
 // modal, and the detail report modal. Data is fed from our /valuation/* API
 // (mapped from snake_case to the prototype's camelCase shape).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
-import { useAddressAutocomplete } from "@/components/dashboard/valuation/valuation-maps";
+import { usePlacesAutocomplete } from "@/components/dashboard/valuation/valuation-maps";
 
 import {
   Delta,
@@ -292,20 +292,30 @@ export function PropertyEntryModal({
   // user selects an autocomplete suggestion; cleared on manual typing. Drive
   // the real predict model — when absent the form falls back to DB-median.
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const addressRef = useRef<HTMLInputElement>(null);
-  useAddressAutocomplete(
-    addressRef,
-    (addr, lat, lng) => {
-      setForm((f) => ({ ...f, address: addr }));
-      setCoords({ lat, lng });
-    },
-    mode === "form"
-  );
+  const [addrFocus, setAddrFocus] = useState(false);
+  const addrAc = usePlacesAutocomplete();
+
+  // Address typing → fetch suggestions + invalidate any previous coordinates.
+  const onAddressChange = (v: string) => {
+    upd("address", v);
+    setCoords(null);
+    addrAc.search(v);
+  };
+  // Picking a suggestion fills the address + locks in its coordinates.
+  const onPickAddress = async (id: string) => {
+    const r = await addrAc.pick(id);
+    if (!r) return;
+    setForm((f) => ({ ...f, address: r.address }));
+    setCoords({ lat: r.lat, lng: r.lng });
+    setAddrFocus(false);
+  };
 
   useEffect(() => {
     if (open) {
       setForm(initial ? fromOProp(initial) : emptyForm());
       setCoords(null);
+      setAddrFocus(false);
+      addrAc.clear();
       setErrors({});
       setToast(null);
       // Edit always opens the form; new entries honour the requested tab.
@@ -454,10 +464,19 @@ export function PropertyEntryModal({
             <div style={{ gridColumn: "span 2" }}>
               <FieldLabel>{T(`Ünvan`)}</FieldLabel>
               <div style={{ position: "relative" }}>
-                <input ref={addressRef} value={form.address} onChange={(e) => { upd("address", e.target.value); setCoords(null); }} placeholder={T(`Ünvan`)} autoComplete="off" style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
-                <button className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
+                <input value={form.address} onChange={(e) => onAddressChange(e.target.value)} onFocus={() => setAddrFocus(true)} onBlur={() => setTimeout(() => setAddrFocus(false), 150)} placeholder={T(`Ünvan`)} autoComplete="off" style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
+                <button type="button" className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
                   <Icons.MapPin size={13} /> {T(`Xəritədən seç`)}
                 </button>
+                {addrFocus && addrAc.suggestions.length > 0 && (
+                  <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 50, background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, boxShadow: "0 12px 30px rgba(0,0,0,0.18)", overflow: "hidden", maxHeight: 264, overflowY: "auto" }}>
+                    {addrAc.suggestions.map((s) => (
+                      <button key={s.id} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => onPickAddress(s.id)} style={{ display: "flex", gap: 9, alignItems: "center", width: "100%", textAlign: "left", padding: "10px 14px", background: "transparent", border: "none", borderBottom: "1px solid var(--border)", cursor: "pointer", fontSize: 14, color: "inherit", lineHeight: 1.3 }}>
+                        <Icons.MapPin size={14} /> <span>{s.text}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <FieldErr msg={errors.address} />
               <HintRow>{T(`Dəqiq qiymətləndirmə üçün tam ünvanı daxil edin (məs. Mir Cəlal küç. 89) və ya xəritədən mənzilin yerləşdiyi binanı seçin.`)}</HintRow>
