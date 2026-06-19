@@ -198,20 +198,59 @@ function SourceLink({ url }: { url: string }) {
 }
 
 // ── §12 Xəritə / lokasiya ────────────────────────────────────────────────
-// Token-free OpenStreetMap embed (Google Maps token is team #1/#2). Renders
-// only when coordinates are present and never crashes without them.
+// Static OpenStreetMap tile mosaic (no token). Built from <img> tiles rather
+// than an <iframe> embed so it survives print/PDF export — browsers don't
+// render iframe content when printing, which previously dropped the map from
+// the PDF. Renders only when coordinates are present.
+
+function StaticOsmMap({ lat, lon, zoom = 15, width = 560, height = 280 }: {
+  lat: number; lon: number; zoom?: number; width?: number; height?: number;
+}) {
+  const n = 2 ** zoom;
+  const latRad = (lat * Math.PI) / 180;
+  const xf = ((lon + 180) / 360) * n;
+  const yf = ((1 - Math.asinh(Math.tan(latRad)) / Math.PI) / 2) * n;
+  const left = xf * 256 - width / 2;
+  const top = yf * 256 - height / 2;
+  const tiles: React.ReactElement[] = [];
+  for (let x = Math.floor(left / 256); x <= Math.floor((left + width) / 256); x++) {
+    for (let y = Math.floor(top / 256); y <= Math.floor((top + height) / 256); y++) {
+      if (y < 0 || y >= n) continue;
+      const tx = ((x % n) + n) % n;
+      tiles.push(
+        <img
+          key={`${x}_${y}`}
+          src={`https://tile.openstreetmap.org/${zoom}/${tx}/${y}.png`}
+          alt=""
+          width={256}
+          height={256}
+          style={{ position: "absolute", left: x * 256 - left, top: y * 256 - top, maxWidth: "none" }}
+        />
+      );
+    }
+  }
+  return (
+    <div style={{ position: "relative", height, marginTop: 8, overflow: "hidden", borderRadius: 12, border: "1px solid var(--border)" }}>
+      <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width, height }}>
+        {tiles}
+        <svg width={26} height={34} viewBox="0 0 26 34" style={{ position: "absolute", left: width / 2 - 13, top: height / 2 - 34 }}>
+          <path d="M13 0C6 0 0 5.6 0 12.6 0 22 13 34 13 34s13-12 13-21.4C26 5.6 20 0 13 0z" fill="#D9531E" />
+          <circle cx="13" cy="12.5" r="5" fill="#fff" />
+        </svg>
+      </div>
+      <div style={{ position: "absolute", right: 4, bottom: 2, fontSize: 9, color: "#333", background: "rgba(255,255,255,0.72)", padding: "0 4px", borderRadius: 3 }}>
+        © OpenStreetMap
+      </div>
+    </div>
+  );
+}
 
 function LocationSection({ lat, lon }: { lat: number; lon: number }) {
-  const d = 0.006;
-  const bbox = `${lon - d}%2C${lat - d}%2C${lon + d}%2C${lat + d}`;
-  const src = `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lon}`;
   return (
     <div className="card chart-card print-avoid-break" style={{ marginBottom: 14 }}>
       <div className="chart-title">{T("Lokasiya")}</div>
       <div className="chart-sub">{T("Mənzilin xəritə üzrə yerləşməsi və ətraf kontekst.")}</div>
-      <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", marginTop: 8 }}>
-        <iframe title="map" src={src} style={{ width: "100%", height: 280, border: 0, display: "block" }} loading="lazy" />
-      </div>
+      <StaticOsmMap lat={lat} lon={lon} />
     </div>
   );
 }

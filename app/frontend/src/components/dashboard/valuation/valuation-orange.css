@@ -522,6 +522,7 @@
   /* BA §19 — show the print-only logo + disclaimer, keep sections whole. */
   body.val-printing .hm-val .print-only { display: block !important; visibility: visible !important; }
   body.val-printing .hm-val .print-avoid-break { break-inside: avoid; page-break-inside: avoid; }
-  /* The OSM map embed doesn't print reliably — hide it in the PDF. */
-  body.val-printing .hm-val .rate-report iframe { display: none !important; }
+  /* The location map is now a static OSM tile mosaic (<img>), so it prints —
+     the old iframe-hiding rule is gone. Ensure the tiles render in the PDF. */
+  body.val-printing .hm-val .rate-report img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
