@@ -149,11 +149,29 @@ type FormState = {
   rooms: string;
 };
 
-// Residence options — placeholder until the team delivers the real list (#7).
+// Residence / yaşayış kompleksi list (team #7 — official list).
 const RESIDENCES = [
-  "Port Baku Residence", "White City", "Crescent Place", "Demirchi Tower",
-  "Khazar Islands", "Old City Plaza", "Caspian Plaza", "Park Bulvar Towers",
-  "Sea Breeze", "Garden Plaza", "Mətanət-A Yasamal", "AAAF Park"
+  "Digər", "28 Residence", "4You Baku", "Akhundov Residence", "Ark Azure",
+  "Avant Vista", "Avenue 8", "Bahar Residence", "Baki Müasir Yaşayış Kompleksi",
+  "Baku City Residence", "Bakı Ağ Şəhər - Majestic Palace", "Bakı Bağları",
+  "Bakı Müasir Yaşayış Kompleksi", "Bağça Şəhər", "Belvedere", "Boulevard Palace",
+  "Central Towers", "Delmar Residense", "East Park", "Eleven Park", "Firavan Park",
+  "Galaxy-Park", "Grand Plaza", "Green Palace", "Greenville Residence",
+  "Inci Residence Günəşli", "Jasmin Park", "Kempinski Residences Bayıl Bay",
+  "Knightsbridge Residence", "Koroğlu Residence", "Kristal Abşeron", "Lake City",
+  "Lux Residence", "Luxe Home", "Malibo Residence", "Mardi Mekan Estate",
+  "Mayak Residence", "Mehli Yaşayış Kompleksi", "Melissa Group",
+  "Mida Yaşayış Kompleksi", "Mirvari Park", "Nizami City", "Park Academy",
+  "Park Nərimanov", "Park Çinar", "Qaya Qala Residence", "Qurtuluş 93",
+  "Renessans Palace", "Riva Residence", "Sea Breeze Arabian Ranches",
+  "Sea Breeze Blue Waters", "Sea Breeze Gardens Residences",
+  "Sea Breeze Lighthouse 2", "Sea Breeze Marina Village",
+  "Sea Breeze Miami Residence", "Sea Breeze Palazzo Del Mare",
+  "Sea Breeze Palm Beach", "Sea Breeze Park Lane", "Sea Breeze Park Residences",
+  "Sea Breeze Polo Residences", "Sea Breeze Prime Residence", "Sea Breeze Sky Park",
+  "Sea Breeze Swissôtel & Raffle Residences", "Triumf Palace", "West Town",
+  "White Garden", "Xətai Park", "Yacht Club Residences",
+  "Yaşamal By Azadlıq Residence", "Zirvə Park", "Zümrüd Residence", "Çinarlı Park"
 ];
 
 const emptyForm = (): FormState => ({
