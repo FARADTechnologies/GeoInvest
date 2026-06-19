@@ -1,7 +1,12 @@
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.predict import LinkRequest, PredictRequest
-from app.services.predict import PredictError, call_predict, predict_by_link
+from app.schemas.predict import LinkRequest, NearbyRequest, PredictRequest
+from app.services.predict import (
+    PredictError,
+    call_predict,
+    nearby_objects,
+    predict_by_link,
+)
 
 router = APIRouter()
 
@@ -32,5 +37,15 @@ async def model_predict_link(payload: LinkRequest) -> dict:
     """
     try:
         return await predict_by_link(payload.flat_link)
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.post("/model/nearby")
+async def model_nearby(payload: NearbyRequest) -> dict:
+    """Nearby objects grouped by accessibility category for the report's map
+    section (BA §9/§12). Sourced from the read-only DB function."""
+    try:
+        return await nearby_objects(payload.latitude, payload.longitude)
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc

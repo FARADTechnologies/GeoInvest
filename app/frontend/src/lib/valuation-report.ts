@@ -359,3 +359,25 @@ export function reportFromLinkMock(url: string): RateReportData {
     source: { kind: "link", url }
   };
 }
+
+// ── §9/§12 Nearby objects (accessibility) ───────────────────────────────
+// Fetched on demand by the report when coordinates are present, from our
+// backend proxy over the source-DB function get_nearby_objects_by_lon_lat.
+
+export type NearbyObject = { name: string; latitude: number; longitude: number; distance: number };
+export type NearbyCategory = { category: string; items: NearbyObject[] };
+
+export async function fetchNearby(lat: number, lon: number): Promise<NearbyCategory[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/nearby`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ latitude: lat, longitude: lon })
+    });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { categories?: NearbyCategory[] };
+    return j.categories ?? [];
+  } catch {
+    return [];
+  }
+}

@@ -8,9 +8,10 @@
 // Distinct from the B2B portfolio report (valuation-core → PropertyReport,
 // still used by Kütləvi): no portfolio ranking, no synthetic benchmarks.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
 import { Icons, LineChart, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
+import { fetchNearby, type NearbyCategory } from "@/lib/valuation-report";
 import type { RateReportData, TrendPoint } from "@/types/valuation";
 
 const rent = (n: number | null | undefined) => (n == null ? "—" : `${fmtMoney(n)} / ${T("ay")}`);
@@ -24,6 +25,24 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
   const inv = ai_data.investment_metrics;
   const saleTrend = ai_data.sale_estimate.price_trend ?? [];
   const rentTrend = ai_data.rent_estimate.price_trend ?? [];
+
+  // §9/§12 nearby objects — loaded when coordinates are present (both flows).
+  const [nearby, setNearby] = useState<NearbyCategory[]>([]);
+  const lat = data.latitude;
+  const lon = data.longitude;
+  useEffect(() => {
+    if (lat == null || lon == null) {
+      setNearby([]);
+      return;
+    }
+    let alive = true;
+    fetchNearby(lat, lon).then((c) => {
+      if (alive) setNearby(c);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [lat, lon]);
 
   // "PDF yüklə" → browser print (Save as PDF). val-printing isolates the
   // report modal; the @media print rules surface the print-only logo.
@@ -140,7 +159,7 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
 
           {/* ── §12 Xəritə / lokasiya — only when coordinates exist ──────── */}
           {data.latitude != null && data.longitude != null && (
-            <LocationSection lat={data.latitude} lon={data.longitude} />
+            <LocationSection lat={data.latitude} lon={data.longitude} nearby={nearby} />
           )}
 
           {/* ── §14 İpoteka kalkulyatoru ────────────────────────────────── */}
@@ -245,12 +264,45 @@ function StaticOsmMap({ lat, lon, zoom = 15, width = 560, height = 280 }: {
   );
 }
 
-function LocationSection({ lat, lon }: { lat: number; lon: number }) {
+const CAT_LABEL: Record<string, string> = {
+  "yemək": "Yemək", "Yemək": "Yemək",
+  "Təhsil indeksi": "Təhsil", "Təhsil": "Təhsil",
+  "Nəqliyyat": "Nəqliyyat", "Əyləncə": "Əyləncə",
+  "Recreation": "İstirahət", "Turizm": "Turizm",
+  "Unknown": "Digər", "Digər": "Digər"
+};
+const catLabel = (c: string) => CAT_LABEL[c] ?? c;
+const fmtDist = (d: number) => (d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${d} m`);
+
+function LocationSection({ lat, lon, nearby }: { lat: number; lon: number; nearby: NearbyCategory[] }) {
   return (
     <div className="card chart-card print-avoid-break" style={{ marginBottom: 14 }}>
       <div className="chart-title">{T("Lokasiya")}</div>
       <div className="chart-sub">{T("Mənzilin xəritə üzrə yerləşməsi və ətraf kontekst.")}</div>
       <StaticOsmMap lat={lat} lon={lon} />
+      {nearby.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="chart-sub" style={{ marginBottom: 8, fontWeight: 600 }}>{T("Yaxın obyektlər")}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+            {nearby.map((cat) => (
+              <div key={cat.category} className="print-avoid-break" style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                  {catLabel(cat.category)} <span style={{ opacity: 0.45, fontWeight: 500 }}>· {cat.items.length}</span>
+                </div>
+                {cat.items.slice(0, 5).map((o, i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12.5, padding: "3px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
+                    <span style={{ opacity: 0.6, flexShrink: 0 }}>{fmtDist(o.distance)}</span>
+                  </div>
+                ))}
+                {cat.items.length > 5 && (
+                  <div style={{ fontSize: 11.5, opacity: 0.5, marginTop: 4 }}>+{cat.items.length - 5} {T("daha")}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

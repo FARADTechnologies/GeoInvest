@@ -147,3 +147,53 @@ async def predict_by_link(flat_link: str) -> dict:
         "listing_price": owner_price if owner_price else None,
         "accessibility_data": {},
     }
+
+
+# ── §9/§12 Nearby objects (team: get_nearby_objects_by_lon_lat) ──────────────
+#
+# Source-DB function returning nearby POIs grouped by accessibility category
+# (Nəqliyyat / Əyləncə / Təhsil / …) with the distance in metres. Drives the
+# report's "Lokasiya / əlçatanlıq" section. Read-only.
+
+def _query_nearby(conn_str: str, lat: float, lon: float) -> list[tuple]:
+    """Runs synchronously in a thread (psycopg). Function args are (lat, lon)."""
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=20000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT name, latitude, longitude, accessibility_index, distance "
+                "FROM public.get_nearby_objects_by_lon_lat(%s, %s)",
+                (lat, lon),
+            )
+            return cur.fetchall()
+
+
+async def nearby_objects(lat: float, lon: float) -> dict:
+    """Group nearby POIs by category, each sorted by distance.
+
+    Returns { "categories": [ {category, items:[{name, latitude, longitude,
+    distance}]} ] } ordered by the nearest object in each category.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Əlçatanlıq bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        rows = await asyncio.to_thread(_query_nearby, conn_str, lat, lon)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Əlçatanlıq məlumatı alınmadı.") from exc
+
+    groups: dict[str, list] = {}
+    for name, la, lo, category, dist in rows:
+        groups.setdefault(category or "Digər", []).append(
+            {"name": name, "latitude": la, "longitude": lo, "distance": dist}
+        )
+    cats = []
+    for category, items in groups.items():
+        items.sort(key=lambda o: o["distance"] if o["distance"] is not None else 10**9)
+        cats.append({"category": category, "items": items})
+    # Categories ordered by their nearest object so the most relevant lead.
+    cats.sort(key=lambda c: c["items"][0]["distance"] if c["items"] else 10**9)
+    return {"categories": cats}

@@ -33,3 +33,10 @@ class LinkRequest(BaseModel):
     """
 
     flat_link: str
+
+
+class NearbyRequest(BaseModel):
+    """Coordinates for the report's §12 nearby-objects / accessibility section."""
+
+    latitude: float
+    longitude: float
