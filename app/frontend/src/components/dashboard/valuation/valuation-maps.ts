@@ -24,7 +24,10 @@ export function loadMaps(): Promise<any> {
   mapsPromise = new Promise((resolve) => {
     if (typeof window === "undefined" || !MAPS_KEY) return resolve(null);
     const w = window as any;
-    if (w.google?.maps?.importLibrary) return resolve(w.google.maps);
+    // Classic eager load: Map / Marker / Geocoder and places.AutocompleteSuggestion
+    // are all available without importLibrary, which avoids the loading=async
+    // race ("Map is not a constructor" / "importLibrary is not a function").
+    if (w.google?.maps?.Map) return resolve(w.google.maps);
     const existing = document.getElementById("gmaps-js") as HTMLScriptElement | null;
     if (existing) {
       existing.addEventListener("load", () => resolve(w.google?.maps ?? null));
@@ -36,7 +39,7 @@ export function loadMaps(): Promise<any> {
     s.async = true;
     s.src =
       `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(MAPS_KEY)}` +
-      `&libraries=places&language=az&region=AZ&loading=async`;
+      `&libraries=places&language=az&region=AZ`;
     s.onload = () => resolve(w.google?.maps ?? null);
     s.onerror = () => resolve(null);
     document.head.appendChild(s);
@@ -65,13 +68,8 @@ export function usePlacesAutocomplete() {
     }
     const seq = ++seqRef.current;
     const maps = await loadMaps();
-    if (!maps) return;
-    let places: any;
-    try {
-      places = await maps.importLibrary("places");
-    } catch {
-      return;
-    }
+    const places: any = maps?.places;
+    if (!places?.AutocompleteSuggestion) return;
     if (!sessionRef.current) sessionRef.current = new places.AutocompleteSessionToken();
     let res: any[] | undefined;
     try {

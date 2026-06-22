@@ -31,17 +31,11 @@ export function MapPicker({
 
   useEffect(() => {
     let cancelled = false;
-    loadMaps().then(async (maps) => {
-      if (cancelled || !maps || !mapRef.current) return;
-      // With loading=async the classes load on demand — import them rather than
-      // touching google.maps.Map directly (which races / "is not a constructor").
-      const [{ Map }, markerLib, { Geocoder }] = await Promise.all([
-        maps.importLibrary("maps"),
-        maps.importLibrary("marker"),
-        maps.importLibrary("geocoding")
-      ]);
-      if (cancelled || !mapRef.current) return;
-      const Marker = markerLib.Marker;
+    loadMaps().then((maps) => {
+      if (cancelled || !maps?.Map || !mapRef.current) return;
+      // loadMaps does a classic eager load, so Map / Marker / Geocoder are
+      // available directly (no importLibrary, no loading=async race).
+      const { Map, Marker, Geocoder } = maps;
 
       const map = new Map(mapRef.current, {
         center: initial ?? BAKU,
