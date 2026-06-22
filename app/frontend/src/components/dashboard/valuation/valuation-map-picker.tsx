@@ -31,27 +31,35 @@ export function MapPicker({
 
   useEffect(() => {
     let cancelled = false;
-    loadMaps().then((maps) => {
+    loadMaps().then(async (maps) => {
       if (cancelled || !maps || !mapRef.current) return;
-      const map = new maps.Map(mapRef.current, {
+      // With loading=async the classes load on demand — import them rather than
+      // touching google.maps.Map directly (which races / "is not a constructor").
+      const [{ Map }, markerLib, { Geocoder }] = await Promise.all([
+        maps.importLibrary("maps"),
+        maps.importLibrary("marker"),
+        maps.importLibrary("geocoding")
+      ]);
+      if (cancelled || !mapRef.current) return;
+      const Marker = markerLib.Marker;
+
+      const map = new Map(mapRef.current, {
         center: initial ?? BAKU,
         zoom: initial ? 16 : 12,
         mapTypeControl: false,
         streetViewControl: false,
         fullscreenControl: false
       });
-      geocoderRef.current = new maps.Geocoder();
+      geocoderRef.current = new Geocoder();
 
-      const place = (latLng: any) => {
+      const place = (lat: number, lng: number) => {
+        const pos = { lat, lng };
         if (markerRef.current) markerRef.current.setMap(null);
-        markerRef.current = new maps.Marker({ position: latLng, map });
-        const lat = latLng.lat();
-        const lng = latLng.lng();
+        markerRef.current = new Marker({ position: pos, map });
         setPicked({ lat, lng });
-        // Reverse geocode is best-effort — if the Geocoding API isn't enabled
-        // we just fall back to showing the coordinates.
+        // Reverse geocode is best-effort — if it fails we just show coordinates.
         try {
-          geocoderRef.current.geocode({ location: latLng }, (res: any, status: string) => {
+          geocoderRef.current.geocode({ location: pos }, (res: any, status: string) => {
             setAddr(status === "OK" && res?.[0] ? res[0].formatted_address : "");
           });
         } catch {
@@ -59,8 +67,10 @@ export function MapPicker({
         }
       };
 
-      if (initial) place(new maps.LatLng(initial.lat, initial.lng));
-      map.addListener("click", (e: any) => e.latLng && place(e.latLng));
+      if (initial) place(initial.lat, initial.lng);
+      map.addListener("click", (e: any) => {
+        if (e.latLng) place(e.latLng.lat(), e.latLng.lng());
+      });
     });
     return () => {
       cancelled = true;
