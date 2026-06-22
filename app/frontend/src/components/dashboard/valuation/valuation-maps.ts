@@ -19,7 +19,7 @@ const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
 let mapsPromise: Promise<any> | null = null;
 
-function loadMaps(): Promise<any> {
+export function loadMaps(): Promise<any> {
   if (mapsPromise) return mapsPromise;
   mapsPromise = new Promise((resolve) => {
     if (typeof window === "undefined" || !MAPS_KEY) return resolve(null);

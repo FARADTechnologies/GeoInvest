@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
 import { usePlacesAutocomplete } from "@/components/dashboard/valuation/valuation-maps";
+import { MapPicker } from "@/components/dashboard/valuation/valuation-map-picker";
 
 import {
   Delta,
@@ -310,11 +311,25 @@ export function PropertyEntryModal({
     setAddrFocus(false);
   };
 
+  // "Xəritədən seç" — pick a point on the map; same effect as an autocomplete
+  // pick (address + coordinates). Falls back to the coordinates as the address
+  // text when reverse-geocoding isn't available.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const onMapPick = (lat: number, lng: number, address: string) => {
+    const a = address || `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    setForm((f) => ({ ...f, address: a }));
+    setCoords({ lat, lng });
+    setAddrFocus(false);
+    addrAc.clear();
+    setPickerOpen(false);
+  };
+
   useEffect(() => {
     if (open) {
       setForm(initial ? fromOProp(initial) : emptyForm());
       setCoords(null);
       setAddrFocus(false);
+      setPickerOpen(false);
       addrAc.clear();
       setErrors({});
       setToast(null);
@@ -402,6 +417,7 @@ export function PropertyEntryModal({
   if (!open) return null;
 
   return (
+    <>
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 1100 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
@@ -465,7 +481,7 @@ export function PropertyEntryModal({
               <FieldLabel>{T(`Ünvan`)}</FieldLabel>
               <div style={{ position: "relative" }}>
                 <input value={form.address} onChange={(e) => onAddressChange(e.target.value)} onFocus={() => setAddrFocus(true)} onBlur={() => setTimeout(() => setAddrFocus(false), 150)} placeholder={T(`Ünvan`)} autoComplete="off" style={{ ...fieldStyle, ...errBorder(!!errors.address) }} />
-                <button type="button" className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
+                <button type="button" onClick={() => setPickerOpen(true)} className="btn btn-sm" style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", borderRadius: 99, border: "1.5px solid var(--orange)", color: "var(--orange)", background: "var(--card)", padding: "6px 14px", fontWeight: 600 }}>
                   <Icons.MapPin size={13} /> {T(`Xəritədən seç`)}
                 </button>
                 {addrFocus && addrAc.suggestions.length > 0 && (
@@ -576,6 +592,10 @@ export function PropertyEntryModal({
         </div>
       </div>
     </div>
+    {pickerOpen && (
+      <MapPicker initial={coords} onClose={() => setPickerOpen(false)} onConfirm={onMapPick} />
+    )}
+    </>
   );
 }
 
