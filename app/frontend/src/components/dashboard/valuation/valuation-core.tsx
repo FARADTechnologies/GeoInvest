@@ -247,8 +247,10 @@ const fieldStyle: React.CSSProperties = {
   width: "100%", padding: "12px 14px", fontSize: 14, border: "1.5px solid var(--border)", borderRadius: 12,
   background: "var(--card)", color: "var(--text-1)", font: "inherit", outline: "none"
 };
+// Use the `border` shorthand (not borderColor) so it doesn't conflict with
+// fieldStyle's shorthand border across rerenders (React warns on mixing them).
 const errBorder = (hasErr?: boolean): React.CSSProperties =>
-  hasErr ? { borderColor: "var(--red)", boxShadow: "0 0 0 3px var(--red-soft)" } : {};
+  hasErr ? { border: "1.5px solid var(--red)", boxShadow: "0 0 0 3px var(--red-soft)" } : {};
 function FieldErr({ msg }: { msg?: string }) {
   if (!msg) return null;
   return <div style={{ marginTop: 4, fontSize: 11.5, color: "var(--red)", fontWeight: 600 }}>{T(msg)}</div>;
