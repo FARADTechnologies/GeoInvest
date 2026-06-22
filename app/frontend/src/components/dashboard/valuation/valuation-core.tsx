@@ -195,17 +195,22 @@ const fromOProp = (p: OProp): FormState => ({
 });
 
 // ── Validation (BA prompt #11). Returns field→message map (AZ source). ──
+// `draft` (Yadda saxla / Kaydet) skips the "required" checks so a partial
+// entry can be saved, but still rejects out-of-range values that ARE filled
+// (e.g. Oda = 200) — empty fields are accepted, bad values are not.
 type FormErrors = Partial<Record<keyof FormState, string>>;
-function validateForm(f: FormState): FormErrors {
+function validateForm(f: FormState, draft = false): FormErrors {
   const e: FormErrors = {};
   const req = "Bu sahə tələb olunur!";
-  if (!f.address.trim()) e.address = req;
-  if (!f.type) e.type = req;
-  if (!f.repair) e.repair = req;
-  if (!f.extract) e.extract = req;
-  if (!f.isResidence) e.isResidence = req;
-  // Residence name only required when "Bəli" (and not an old build).
-  if (f.isResidence === "Bəli" && !isOldBuild(f.type) && !f.residence) e.residence = req;
+  if (!draft) {
+    if (!f.address.trim()) e.address = req;
+    if (!f.type) e.type = req;
+    if (!f.repair) e.repair = req;
+    if (!f.extract) e.extract = req;
+    if (!f.isResidence) e.isResidence = req;
+    // Residence name only required when "Bəli" (and not an old build).
+    if (f.isResidence === "Bəli" && !isOldBuild(f.type) && !f.residence) e.residence = req;
+  }
 
   const num = (s: string) => (s.trim() === "" ? null : Number(s));
   const checks: [keyof FormState, readonly [number, number], string][] = [
@@ -216,8 +221,11 @@ function validateForm(f: FormState): FormErrors {
   ];
   for (const [key, [lo, hi], msg] of checks) {
     const v = num(f[key]);
-    if (v == null) e[key] = req;
-    else if (Number.isNaN(v) || v < lo || v > hi) e[key] = msg;
+    if (v == null) {
+      if (!draft) e[key] = req; // empty: required only when finalising
+    } else if (Number.isNaN(v) || v < lo || v > hi) {
+      e[key] = msg; // filled but out of range → rejected even for a draft
+    }
   }
   // Cross-field: floor cannot exceed building floors.
   const fl = num(f.floor), tf = num(f.totalFloors);
@@ -394,18 +402,11 @@ export function PropertyEntryModal({
     longitude: coords?.lng ?? null
   });
 
-  // Validate before submit; on "Qiymətləndir" the full rule-set runs and no
-  // API request is sent when invalid. "Yadda saxla" (draft) only needs the
-  // basics so a partial entry can be stored.
+  // Validate before submit. "Qiymətləndir" runs the full rule-set; "Yadda saxla"
+  // (draft) skips required-field checks but still rejects out-of-range values
+  // that are filled in (BA + team: drafts allow blanks, not bad values).
   const trySubmit = (valued: boolean) => {
-    let e: FormErrors;
-    if (valued) {
-      e = validateForm(form);
-    } else {
-      e = {};
-      if (!form.address.trim()) e.address = "Bu sahə tələb olunur!";
-      if (!form.type) e.type = "Bu sahə tələb olunur!";
-    }
+    const e = validateForm(form, !valued);
     setErrors(e);
     const firstKey = Object.keys(e)[0] as keyof FormState | undefined;
     if (firstKey) {

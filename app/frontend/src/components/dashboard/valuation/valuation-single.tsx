@@ -20,6 +20,7 @@ import {
   type OProp
 } from "@/components/dashboard/valuation/valuation-core";
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
+import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/dashboard/valuation/valuation-columns";
 import { fetchValuationMeta, newId, valuateSingle } from "@/lib/valuation-data";
 import { reportFromResult, predictByParams, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
@@ -41,6 +42,8 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const { visible, toggle, reset } = useVisibleCols("hm-cols-single");
+  const shown = COLUMNS.filter((c) => visible.has(c.key));
 
   const valued = items.filter((x) => x.valued !== false);
   const stats = valued.length > 0 ? statsOf(items) : null;
@@ -184,6 +187,7 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
             <div className="card-title">{T(`Qiymətləndirmə tarixçəsi`)}</div>
             {source ? <SourceBadge source={source} /> : null}
             <span className="sp" />
+            <ColumnPicker visible={visible} toggle={toggle} reset={reset} />
             <button className="btn btn-secondary btn-sm" disabled={items.length === 0} style={{ opacity: items.length === 0 ? 0.5 : 1 }}>
               <Icons.Download size={13} /> {T(`Excel ixrac`)}
             </button>
@@ -197,15 +201,9 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
               <thead>
                 <tr>
                   <th style={{ width: 70 }}>ID</th>
-                  <th style={{ width: 110 }}>{T(`Növ`)}</th>
-                  <th style={{ width: 280 }}>{T(`Ünvan`)}</th>
-                  <th className="num" style={{ width: 70 }}>{T(`Sahə`)}</th>
-                  <th className="center" style={{ width: 60 }}>{T(`Otaq`)}</th>
-                  <th className="num" style={{ width: 130 }}>{T(`Fair value`)}</th>
-                  <th className="num" style={{ width: 110 }}>{T(`Qiymət/m²`)}</th>
-                  <th className="num" style={{ width: 110 }}>{T(`Aylıq kirayə`)}</th>
-                  <th className="num" style={{ width: 95 }}>{T(`Gəlirlilik`)}</th>
-                  <th className="num" style={{ width: 110 }}>{T(`Geri ödəmə`)}</th>
+                  {shown.map((c) => (
+                    <th key={c.key} className={colClass(c.align)} style={c.width ? { width: c.width } : undefined}>{T(c.label)}</th>
+                  ))}
                   <th style={{ width: 90, textAlign: "right" }}>{T(`Əməliyyat`)}</th>
                 </tr>
               </thead>
@@ -219,18 +217,9 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
                       else setOpenId(p.id);
                     }}>
                       <td className="cell-muted mono">{p.id}</td>
-                      <td className="pill-cell"><TypePill type={p.type} /></td>
-                      <td>
-                        <div className="cell-primary" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 280 }}>{p.address}</div>
-                        <div className="cell-muted">{p.district}{p.floor ? ` · ${p.floor}/${p.totalFloors ?? "—"} mərt.` : ""}</div>
-                      </td>
-                      <td className="num">{p.area} m²</td>
-                      <td className="center">{p.rooms ?? "—"}</td>
-                      <td className="num cell-strong">{dr ? <span className="muted">—</span> : fmtMoney(p.fairValue)}</td>
-                      <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.pricePerM2, "")}</td>
-                      <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.monthlyRent)}</td>
-                      <td className="num">{dr ? <span className="muted">—</span> : `${p.yield}%`}</td>
-                      <td className="num">{dr ? <span className="muted">—</span> : `${p.payback} il`}</td>
+                      {shown.map((c) => (
+                        <td key={c.key} className={`${colClass(c.align)}${c.key === "type" ? " pill-cell" : ""}`.trim()}>{c.render(p, dr)}</td>
+                      ))}
                       <td className="row-act" style={{ textAlign: "right" }}>
                         <div className="fl-row" style={{ gap: 2, justifyContent: "flex-end" }}>
                           <button className="icon-btn" style={{ width: 28, height: 28 }} title={T(`Redaktə et`)} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}>

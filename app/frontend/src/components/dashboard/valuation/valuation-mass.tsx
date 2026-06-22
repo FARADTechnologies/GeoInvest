@@ -21,6 +21,7 @@ import {
   type OProp,
   type Stats
 } from "@/components/dashboard/valuation/valuation-core";
+import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/dashboard/valuation/valuation-columns";
 import { fetchValuationMeta, newId, valuateBatch } from "@/lib/valuation-data";
 import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
 import type { ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
@@ -217,6 +218,8 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
   const valued = items.filter((x) => x.valued !== false);
   const draftCount = items.length - valued.length;
   const stats = valued.length > 0 ? statsOf(items) : null;
+  const { visible, toggle, reset } = useVisibleCols("hm-cols-mass");
+  const shown = COLUMNS.filter((c) => visible.has(c.key));
 
   const filtered = useMemo(() => {
     let xs = items;
@@ -330,6 +333,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
             ))}
           </div>
           <span className="sp" />
+          <ColumnPicker visible={visible} toggle={toggle} reset={reset} />
           <button className="btn btn-primary btn-sm" onClick={() => setEntryOpen(true)}><Icons.Plus size={13} /> {T(`Yeni qiymətləndirmə`)}</button>
         </div>
 
@@ -338,16 +342,9 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
             <thead>
               <tr>
                 <th style={{ width: 70 }}>ID</th>
-                <th style={{ width: 110 }}>{T(`Növ`)}</th>
-                <th style={{ width: 260 }}>{T(`Ünvan`)}</th>
-                <th className="num" style={{ width: 70 }}>{T(`Sahə`)}</th>
-                <th className="center" style={{ width: 60 }}>{T(`Otaq`)}</th>
-                <th className="num" style={{ width: 130 }}>{T(`Fair value`)}</th>
-                <th className="num" style={{ width: 110 }}>{T(`Qiymət/m²`)}</th>
-                <th className="num" style={{ width: 110 }}>{T(`Aylıq kirayə`)}</th>
-                <th className="num" style={{ width: 95 }}>{T(`Gəlirlilik`)}</th>
-                <th className="num" style={{ width: 110 }}>{T(`Geri ödəmə`)}</th>
-                <th className="num" style={{ width: 110 }}>{T(`Likvidlik`)}</th>
+                {shown.map((c) => (
+                  <th key={c.key} className={colClass(c.align)} style={c.width ? { width: c.width } : undefined}>{T(c.label)}</th>
+                ))}
                 <th style={{ width: 90, textAlign: "right" }}>{T(`Əməliyyat`)}</th>
               </tr>
             </thead>
@@ -357,19 +354,9 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
                 return (
                   <tr key={p.id} className="row-click" onClick={(e) => { if ((e.target as HTMLElement).closest(".row-act")) return; if (dr) setEditTarget(p); else setOpenId(p.id); }}>
                     <td className="cell-muted mono">{p.id}</td>
-                    <td className="pill-cell"><TypePill type={p.type} /></td>
-                    <td>
-                      <div className="cell-primary" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 260 }}>{p.address}</div>
-                      <div className="cell-muted">{p.district}{p.floor ? ` · ${p.floor}/${p.totalFloors ?? "—"} mərt.` : ""}</div>
-                    </td>
-                    <td className="num">{p.area} m²</td>
-                    <td className="center">{p.rooms ?? "—"}</td>
-                    <td className="num cell-strong">{dr ? <span className="muted">—</span> : fmtMoney(p.fairValue)}</td>
-                    <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.pricePerM2, "")}</td>
-                    <td className="num">{dr ? <span className="muted">—</span> : fmtMoney(p.monthlyRent)}</td>
-                    <td className="num">{dr ? <span className="muted">—</span> : <span style={{ color: stats && p.yield >= stats.avgYield ? "var(--green)" : "var(--text-1)", fontWeight: 600 }}>{p.yield}%</span>}</td>
-                    <td className="num">{dr ? <span className="muted">—</span> : `${p.payback} il`}</td>
-                    <td className="num">{dr ? <span className="muted">—</span> : `${p.liquidity} gün`}</td>
+                    {shown.map((c) => (
+                      <td key={c.key} className={`${colClass(c.align)}${c.key === "type" ? " pill-cell" : ""}`.trim()}>{c.render(p, dr)}</td>
+                    ))}
                     <td className="row-act" style={{ textAlign: "right" }}>
                       <div className="fl-row" style={{ gap: 2, justifyContent: "flex-end" }}>
                         <button className="icon-btn" style={{ width: 28, height: 28 }} title={T(`Redaktə et`)} onClick={(e) => { e.stopPropagation(); setEditTarget(p); }}><Icons.Edit size={13} /></button>
@@ -482,6 +469,10 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
   const [scatterY, setScatterY] = useState("payback");
   const [selBin, setSelBin] = useState<number | null>(null);
   useEffect(() => setSelBin(null), [histMetric]);
+  // Clicking a listing in the selected-range list opens its property report.
+  const [reportId, setReportId] = useState<string | null>(null);
+  const reportIdx = reportId ? items.findIndex((x) => x.id === reportId) : -1;
+  const reportItem = reportIdx >= 0 ? items[reportIdx] : null;
 
   const low = items.filter((x) => x.score >= 78).length;
   const med = items.filter((x) => x.score >= 60 && x.score < 78).length;
@@ -553,7 +544,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           </div>
         </div>
         <div style={{ marginTop: 16 }}><BigHistogram items={items} metricKey={histMetric} aggKind={aggKind} selBin={selBin} onBin={setSelBin} /></div>
-        {selBin != null && <BinPanel items={items} metricKey={histMetric} bin={selBin} onClose={() => setSelBin(null)} />}
+        {selBin != null && <BinPanel items={items} metricKey={histMetric} bin={selBin} onClose={() => setSelBin(null)} onOpen={setReportId} />}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
@@ -577,6 +568,19 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           <LegendDot color="#1F8A5B" label="Aşağı risk (78+)" /><LegendDot color="#C58A1A" label="Orta risk (60-77)" /><LegendDot color="#C0392B" label="Yüksək risk (<60)" />
         </div>
       </div>
+
+      {reportItem && (
+        <PropertyReport
+          property={reportItem}
+          portfolioName={portfolio.name}
+          itemsCount={items.length}
+          stats={stats}
+          rank={[...items].sort((a, b) => b.score - a.score).findIndex((x) => x.id === reportItem.id) + 1}
+          onClose={() => setReportId(null)}
+          onPrev={() => reportIdx > 0 && setReportId(items[reportIdx - 1].id)}
+          onNext={() => reportIdx >= 0 && reportIdx < items.length - 1 && setReportId(items[reportIdx + 1].id)}
+        />
+      )}
     </>
   );
 }
@@ -644,7 +648,7 @@ function BigHistogram({ items, metricKey, aggKind, selBin, onBin }: { items: OPr
   );
 }
 
-function BinPanel({ items, metricKey, bin, onClose }: { items: OProp[]; metricKey: string; bin: number; onClose: () => void }) {
+function BinPanel({ items, metricKey, bin, onClose, onOpen }: { items: OProp[]; metricKey: string; bin: number; onClose: () => void; onOpen: (id: string) => void }) {
   const meta = METRICS[metricKey];
   const edges = niceBuckets(items.map(meta.get), 10);
   const from = edges[bin], to = edges[bin + 1];
@@ -661,7 +665,7 @@ function BinPanel({ items, metricKey, bin, onClose }: { items: OProp[]; metricKe
           <thead><tr><th style={{ width: 70 }}>ID</th><th>{T(`Ünvan`)}</th><th className="num">{T(meta.label)}</th><th className="num">{T(`Fair value`)}</th><th className="num">{T(`Gəlirlilik`)}</th><th className="num">{T(`Skor`)}</th></tr></thead>
           <tbody>
             {matched.map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} className="row-click" style={{ cursor: "pointer" }} onClick={() => onOpen(p.id)} title={T(`Hesabatı aç`)}>
                 <td className="cell-muted mono">{p.id}</td>
                 <td><div className="cell-primary" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 280 }}>{p.address}</div><div className="cell-muted">{p.district}</div></td>
                 <td className="num cell-strong" style={{ color: "var(--orange)" }}>{meta.fmt(meta.get(p))}</td>
