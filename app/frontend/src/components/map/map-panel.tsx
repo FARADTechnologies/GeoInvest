@@ -24,10 +24,17 @@ type Props = {
   loading?: boolean;
   error?: boolean;
   t: Record<string, string>;
+  // Optional controlled colour metric. When set (e.g. by the Xəritə analizi
+  // "Göstərici" toolbar) the panel colours by it and hides its own toggle;
+  // otherwise the panel manages the toggle itself (V1 dashboard).
+  metric?: "price" | "listings";
 };
 
-export function MapPanel({ data, loading, error, t }: Props) {
-  const [colorMetric, setColorMetric] = useState<ColorMetric>("median_price_kvm");
+export function MapPanel({ data, loading, error, t, metric }: Props) {
+  const [internalMetric, setInternalMetric] = useState<ColorMetric>("median_price_kvm");
+  const colorMetric: ColorMetric = metric
+    ? metric === "listings" ? "ad_count" : "median_price_kvm"
+    : internalMetric;
 
   const COLOR_OPTIONS: ColorOption[] = [
     { value: "median_price_kvm", label: t.byPrice },
@@ -46,24 +53,26 @@ export function MapPanel({ data, loading, error, t }: Props) {
         ) : null}
       </div>
 
-      {/* top-right: color-by toggle */}
-      <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border bg-card/90 p-1 backdrop-blur">
-        <span className="px-1 text-[11px] text-muted-foreground">{t.colorBy}</span>
-        {COLOR_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setColorMetric(opt.value)}
-            className={cn(
-              "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-              colorMetric === opt.value
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      {/* top-right: color-by toggle (only when the panel is uncontrolled) */}
+      {!metric ? (
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border bg-card/90 p-1 backdrop-blur">
+          <span className="px-1 text-[11px] text-muted-foreground">{t.colorBy}</span>
+          {COLOR_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setInternalMetric(opt.value)}
+              className={cn(
+                "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                colorMetric === opt.value
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* bottom-left: legend */}
       <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-md border bg-card/90 px-2.5 py-1.5 backdrop-blur">

@@ -137,7 +137,7 @@ export function HMProductMock({ t, style }: ProductMockProps) {
             }}
           />
           <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9 }}>
-            Baku · H3 res 8
+            Bakı · İstilik xəritəsi
           </span>
         </div>
         <span
@@ -385,7 +385,7 @@ export function HMBrandHeader({
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
           type="button"
-          onClick={() => onLang(lang === "tr" ? "en" : lang === "en" ? "az" : "tr")}
+          onClick={() => onLang(lang === "az" ? "en" : "az")}
           style={{
             appearance: "none",
             border: `1px solid ${border}`,

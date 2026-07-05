@@ -2,7 +2,7 @@
 // TR is canonical; EN is mirrored. Both maps share the same keys so the
 // type lookup `t.X` is safe at any callsite regardless of language.
 
-export type Lang = "tr" | "en" | "az";
+export type Lang = "en" | "az";
 
 type Strings = Record<string, string>;
 
@@ -361,7 +361,7 @@ const EN: Strings = {
   terms: "Terms",
 
   dashTitle: "Analytics",
-  dashSub: "H3 hexagonal real estate intelligence · Baku",
+  dashSub: "Real estate intelligence · Baku",
   searchPh: "Search rayon, cell, listing...",
   geom: "Geom",
   h3: "H3",
@@ -376,7 +376,7 @@ const EN: Strings = {
   navValMass: "Mass Valuation",
   navValAnalysis: "Portfolio Analysis",
   navValMarket: "Market Analysis",
-  navValHexMap: "Analysis Map",
+  navValHexMap: "Map Analysis",
   navValMap: "Secondary System",
   navListings: "Listings",
   navB2C: "B2C View",
@@ -442,6 +442,9 @@ const EN: Strings = {
   menuSignOut: "Sign out",
 
   analysisType: "Analysis Type",
+  cellLarge: "Large",
+  cellMedium: "Medium",
+  cellSmall: "Small",
   period: "Period",
   categoriesL: "Categories",
   resolution: "Resolution",
@@ -455,10 +458,10 @@ const EN: Strings = {
   kpiTotalAds: "Total Ads",
   kpiMedian: "Median Price",
   kpiTrend: "Trend",
-  kpiCells: "Active H3 Cells",
+  kpiCells: "Active cells",
   perM2: "AZN/m²",
 
-  secMap: "Baku H3 Heatmap",
+  secMap: "Baku Heatmap",
   secMapSub: "Median price and listing density per cell",
   secRayons: "Rayon Ranking",
   secRayonsSub: "Median price and trend",
@@ -557,8 +560,10 @@ const EN: Strings = {
   admDoAdd: "Add company"
 };
 
+// AZ is the active source language. Any key not overridden here falls back to
+// EN (never TR) so no Turkish ever leaks into the Azerbaijani UI.
 const AZ: Strings = {
-  ...TR,
+  ...EN,
   workspace: "İş sahəsi",
   brandTag: "Məkan əsaslı əmlak analitikası",
   tagline:
@@ -595,7 +600,7 @@ const AZ: Strings = {
   statListings: "Elan",
   statRayons: "Rayon",
   dashTitle: "Analitika paneli",
-  dashSub: "H3 hexagonal əmlak analitikası - Bakı",
+  dashSub: "Əmlak analitikası · Bakı",
   searchPh: "Rayon, hüceyrə, elan axtar...",
   refresh: "Yenile",
   export: "İxrac et",
@@ -607,7 +612,7 @@ const AZ: Strings = {
   navValMass: "Kütləvi qiymətləndirmə",
   navValAnalysis: "Portfel analizi",
   navValMarket: "Bazar analizi",
-  navValHexMap: "Analiz xəritəsi",
+  navValHexMap: "Xəritə analizi",
   navValMap: "İkincil sistem",
   navListings: "Elanlar",
   navB2C: "B2C Görünüş",
@@ -672,6 +677,9 @@ const AZ: Strings = {
   menuTheme: "Tema",
   menuSignOut: "Çıxış et",
   analysisType: "Analiz növü",
+  cellLarge: "Böyük",
+  cellMedium: "Orta",
+  cellSmall: "Kiçik",
   period: "Dövr",
   categoriesL: "Kateqoriyalar",
   resolution: "Çözünürlük",
@@ -684,8 +692,8 @@ const AZ: Strings = {
   kpiTotalAds: "Umumi elan",
   kpiMedian: "Median qiymət",
   kpiTrend: "Trend",
-  kpiCells: "Aktiv H3 hüceyrə",
-  secMap: "Bakı H3 istilik xəritəsi",
+  kpiCells: "Aktiv hüceyrə",
+  secMap: "Bakı istilik xəritəsi",
   secMapSub: "Hüceyrə üzrə median qiymət və elan sıxlığı",
   secRayons: "Rayon sıralaması",
   secRayonsSub: "Median qiymət və trend",
@@ -796,8 +804,8 @@ const AZ: Strings = {
   admDoAdd: "Şirkəti əlavə et"
 };
 
-export const I18N: Record<Lang, Strings> = { tr: TR, en: EN, az: AZ };
+export const I18N: Record<Lang, Strings> = { en: EN, az: AZ };
 
 export function useStrings(lang: Lang): Strings {
-  return I18N[lang] ?? I18N.tr;
+  return I18N[lang] ?? I18N.az;
 }

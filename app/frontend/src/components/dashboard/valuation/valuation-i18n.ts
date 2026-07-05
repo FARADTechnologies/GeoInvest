@@ -17,6 +17,14 @@ type Dict = Record<string, { tr: string; en: string }>;
 const D: Dict = {
   // ── shared ──
   "Tək qiymətləndirmə": { tr: "Tek Fiyatlandırma", en: "Single Valuation" },
+  // Xəritə analizi (map analysis) — renamed / de-jargoned per team request
+  "Xəritə analizi": { tr: "Harita Analizi", en: "Map Analysis" },
+  "Əmlak istilik xəritəsi — hücrə başına göstəricilər və elan sıxlığı.": { tr: "Emlak ısı haritası — hücre başına göstergeler ve ilan yoğunluğu.", en: "Property heatmap — per-cell indicators and listing density." },
+  "Aktiv hücrə": { tr: "Aktif hücre", en: "Active cells" },
+  "Dəqiqlik": { tr: "Hassasiyet", en: "Precision" },
+  "Böyük": { tr: "Büyük", en: "Large" },
+  "Kiçik": { tr: "Küçük", en: "Small" },
+  "Bakı İstilik Xəritəsi": { tr: "Bakü Isı Haritası", en: "Baku Heatmap" },
   "Kütləvi qiymətləndirmə": { tr: "Kütlesel Fiyatlandırma", en: "Mass Valuation" },
   "Portfel analizi": { tr: "Portföy Analizi", en: "Portfolio Analysis" },
   "Yeni qiymətləndirmə": { tr: "Yeni fiyatlandırma", en: "New valuation" },
@@ -345,5 +353,5 @@ export function T(s: string): string {
   if (cur === "az") return s;
   const hit = D[s];
   if (!hit) return s;
-  return cur === "tr" ? hit.tr : hit.en;
+  return hit.en;
 }

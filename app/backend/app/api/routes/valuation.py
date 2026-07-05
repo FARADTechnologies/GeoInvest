@@ -7,6 +7,7 @@ from app.api.deps import get_session
 from app.schemas.valuation import (
     BatchValuationRequest,
     BatchValuationResponse,
+    MarketAnalysis,
     ValuationMeta,
     ValuationRequest,
     ValuationResult,
@@ -23,6 +24,15 @@ async def get_valuation_meta(
 ) -> ValuationMeta:
     """Real rayons / categories / latest period to populate the form + landing."""
     return await ValuationService(session).get_meta()
+
+
+@router.get("/valuation/market", response_model=MarketAnalysis)
+async def get_market_analysis(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> MarketAnalysis:
+    """Real city-market aggregates (per-rayon median ₼/m² by build type) for
+    the Bazar analizi page."""
+    return await ValuationService(session).market_analysis()
 
 
 @router.post("/valuation/single", response_model=ValuationResult)

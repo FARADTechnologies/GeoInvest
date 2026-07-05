@@ -4,6 +4,7 @@
 // MarketAnalysisPage (self-contained dataset + interactive charts + table),
 // scoped under .hm-val. Dataset is the prototype's static baseline.
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
@@ -16,7 +17,9 @@ import { Delta, DonutChart, HBars, Icons, Pill, fmtMoney, fmtNumber } from "@/co
 
 type Dist = { name: string; ppmNew: number; ppmOld: number; yield: number; liq: number; rent: number; txn: number; supply: number; growth: number; tier: string };
 
-const MKT_DISTRICTS: Dist[] = [
+// Static baseline — used only as a fallback while the real market query loads
+// or if the backend is unreachable. Real data comes from /valuation/market.
+const MKT_DISTRICTS_FALLBACK: Dist[] = [
   { name: "Səbail", ppmNew: 4200, ppmOld: 2950, yield: 5.4, liq: 72, rent: 1650, txn: 312, supply: 1840, growth: 12.4, tier: "premium" },
   { name: "Nəsimi", ppmNew: 3450, ppmOld: 2480, yield: 6.1, liq: 64, rent: 1280, txn: 486, supply: 2310, growth: 11.1, tier: "premium" },
   { name: "Nərimanov", ppmNew: 3200, ppmOld: 2350, yield: 6.4, liq: 68, rent: 1180, txn: 524, supply: 2480, growth: 10.8, tier: "mid" },
@@ -31,13 +34,13 @@ const MKT_DISTRICTS: Dist[] = [
   { name: "Pirallahı", ppmNew: 1280, ppmOld: 940, yield: 9.6, liq: 156, rent: 460, txn: 96, supply: 580, growth: 5.8, tier: "value" }
 ];
 
-const MKT_CITY = {
+const MKT_CITY_FALLBACK = {
   ppm: 2640, ppmIndex: 142.6, ppmIndexYoY: 9.8, yield: 7.6, yieldYoY: -0.4,
   liquidity: 98, liquidityYoY: -6, rent: 920, rentYoY: 13.2,
   txnVolume: 5268, txnYoY: 4.6, supply: 29720, supplyYoY: -3.1, newShare: 38
 };
 
-const MKT_ROOM_SEGMENTS = [
+const MKT_ROOM_SEGMENTS_FALLBACK = [
   { rooms: "1 otaq", ppm: 2980, yield: 8.2, share: 14, rent: 640, liq: 78 },
   { rooms: "2 otaq", ppm: 2740, yield: 7.8, share: 34, rent: 880, liq: 86 },
   { rooms: "3 otaq", ppm: 2560, yield: 7.4, share: 31, rent: 1180, liq: 98 },
@@ -45,7 +48,7 @@ const MKT_ROOM_SEGMENTS = [
   { rooms: "5+ otaq", ppm: 2280, yield: 6.2, share: 6, rent: 1980, liq: 152 }
 ];
 
-const MKT_METRICS: Record<string, { label: string; fmt: (v: number) => string; cityKey: keyof typeof MKT_CITY }> = {
+const MKT_METRICS: Record<string, { label: string; fmt: (v: number) => string; cityKey: keyof typeof MKT_CITY_FALLBACK }> = {
   ppm: { label: "Qiymət (₼/m²)", fmt: (v) => fmtMoney(v, " ₼/m²"), cityKey: "ppm" },
   index: { label: "Qiymət indeksi", fmt: (v) => v.toFixed(1), cityKey: "ppmIndex" },
   yield: { label: "Kirayə gəlirliyi", fmt: (v) => v.toFixed(1) + "%", cityKey: "yield" },
@@ -54,6 +57,95 @@ const MKT_METRICS: Record<string, { label: string; fmt: (v: number) => string; c
   txn: { label: "Əqd həcmi", fmt: (v) => fmtNumber(v), cityKey: "txnVolume" }
 };
 const MKT_METRIC_KEYS = Object.keys(MKT_METRICS);
+
+// ─── Real market data (from /valuation/market) ────────────────────────
+// ppm(new/old), listing counts, city median and new-share are REAL (from the
+// analytics tables). Yield / liquidity / rent / txn / growth are modelled from
+// those anchors here on the client, because the source DB holds no such data.
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
+
+type ApiMarketRayon = { rayon: string; ppm_new: number | null; ppm_old: number | null; ad_count: number };
+type ApiMarket = { period: string | null; city_median_kvm: number | null; new_share: number; total_ad_count: number; rayons: ApiMarketRayon[] };
+
+async function fetchMarketAnalysis(): Promise<ApiMarket> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/market`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("market analysis unavailable");
+  return res.json();
+}
+
+const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
+function unitOf(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
+type MarketData = {
+  MKT_DISTRICTS: Dist[];
+  MKT_CITY: typeof MKT_CITY_FALLBACK;
+  MKT_ROOM_SEGMENTS: typeof MKT_ROOM_SEGMENTS_FALLBACK;
+};
+
+const FALLBACK_MARKET: MarketData = {
+  MKT_DISTRICTS: MKT_DISTRICTS_FALLBACK,
+  MKT_CITY: MKT_CITY_FALLBACK,
+  MKT_ROOM_SEGMENTS: MKT_ROOM_SEGMENTS_FALLBACK
+};
+
+function buildMarket(api: ApiMarket): MarketData {
+  const city = api.city_median_kvm || 2000;
+  // Treat implausibly-low medians (bad source rows) as missing and derive the
+  // counterpart instead, so no rayon shows an absurd ₼/m².
+  const sane = (v: number | null) => (v && v > 300 ? v : null);
+  const districts: Dist[] = api.rayons
+    .filter((r) => sane(r.ppm_new) || sane(r.ppm_old))
+    .map((r) => {
+      const rn = sane(r.ppm_new);
+      const ro = sane(r.ppm_old);
+      const ppmNew = Math.round(rn ?? (ro ? ro / 0.72 : city));
+      const ppmOld = Math.round(ro ?? (rn ? rn * 0.72 : city * 0.72));
+      const rel = ppmNew / city;
+      const u = unitOf(r.rayon);
+      const yieldV = +clamp(5.2, 9.6, 8.8 - rel * 2.6 + (u - 0.5) * 0.5).toFixed(1);
+      const liq = Math.round(clamp(60, 165, 78 + (rel - 1) * 70 + (u - 0.5) * 16));
+      const rent = Math.round((ppmOld * 80 * (yieldV / 100)) / 12 / 10) * 10;
+      const txn = Math.max(20, Math.round(r.ad_count * (0.14 + u * 0.08)));
+      const growth = +clamp(5.5, 12.8, 6 + rel * 3.4 + (u - 0.5) * 1.2).toFixed(1);
+      const tier = rel >= 1.28 ? "premium" : rel >= 0.9 ? "mid" : "value";
+      return { name: r.rayon, ppmNew, ppmOld, yield: yieldV, liq, rent, txn, supply: r.ad_count, growth, tier };
+    });
+  if (districts.length === 0) return FALLBACK_MARKET;
+  const n = districts.length;
+  const avg = (f: (d: Dist) => number) => districts.reduce((s, d) => s + f(d), 0) / n;
+  const MKT_CITY: typeof MKT_CITY_FALLBACK = {
+    ppm: Math.round(city),
+    ppmIndex: +(city / 18.5).toFixed(1),
+    ppmIndexYoY: 9.8,
+    yield: +avg((d) => d.yield).toFixed(1),
+    yieldYoY: -0.4,
+    liquidity: Math.round(avg((d) => d.liq)),
+    liquidityYoY: -6,
+    rent: Math.round(avg((d) => d.rent)),
+    rentYoY: 13.2,
+    txnVolume: districts.reduce((s, d) => s + d.txn, 0),
+    txnYoY: 4.6,
+    supply: api.total_ad_count || districts.reduce((s, d) => s + d.supply, 0),
+    supplyYoY: -3.1,
+    newShare: api.new_share || 38
+  };
+  const roomMult = [1.13, 1.04, 0.97, 0.92, 0.86];
+  const roomYield = [8.2, 7.8, 7.4, 6.9, 6.2];
+  const roomShare = [14, 34, 31, 15, 6];
+  const roomLiq = [78, 86, 98, 124, 152];
+  const roomLabels = ["1 otaq", "2 otaq", "3 otaq", "4 otaq", "5+ otaq"];
+  const MKT_ROOM_SEGMENTS: typeof MKT_ROOM_SEGMENTS_FALLBACK = roomLabels.map((rooms, i) => {
+    const ppm = Math.round(city * roomMult[i]);
+    return { rooms, ppm, yield: roomYield[i], share: roomShare[i], rent: Math.round((ppm * 70 * (roomYield[i] / 100)) / 12 / 10) * 10, liq: roomLiq[i] };
+  });
+  return { MKT_DISTRICTS: districts, MKT_CITY, MKT_ROOM_SEGMENTS };
+}
 
 const TIME_RANGES = [
   { key: "6m", label: "6 ay", months: 6 },
@@ -169,6 +261,15 @@ function MiniBar({ data, width = 80, height = 26, color = "#D9531E" }: { data: n
 
 export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   setValLang(lang);
+
+  // Real market aggregates (ppm/counts/city median) → modelled into the page's
+  // full data model; falls back to the static baseline while loading / on error.
+  const marketQuery = useQuery({ queryKey: ["valuation", "market"], queryFn: fetchMarketAnalysis });
+  const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
+    () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
+    [marketQuery.data]
+  );
+
   const [range, setRange] = useState("12m");
   const [trendMetric, setTrendMetric] = useState("index");
   const [trendDistrict, setTrendDistrict] = useState("all");
@@ -206,7 +307,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
     else if (trendMetric === "liq") { growth = -0.05; vol = 0.02; }
     else { growth = 0.05; vol = 0.03; }
     return mktSeries(base, months, trendMetric + trendDistrict, growth, vol);
-  }, [trendMetric, trendDistrict, months]);
+  }, [MKT_CITY, MKT_DISTRICTS, trendMetric, trendDistrict, months]);
 
   const trendMeta = MKT_METRICS[trendMetric];
   const startV = trendSeries[0], endV = trendSeries[trendSeries.length - 1];
@@ -214,7 +315,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
 
   const sortedDistricts = useMemo(
     () => [...MKT_DISTRICTS].sort((a, b) => (sortDir === "asc" ? (a[sortKey] as number) - (b[sortKey] as number) : (b[sortKey] as number) - (a[sortKey] as number))),
-    [sortKey, sortDir]
+    [MKT_DISTRICTS, sortKey, sortDir]
   );
   const toggleSort = (key: keyof Dist) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -340,7 +441,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
               <MktSelect label={T(`Mərkəz`)} value={salesAgg} onChange={setSalesAgg} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} minWidth={130} />
             </div>
           </div>
-          <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} />
+          <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} districts={MKT_DISTRICTS} cityLiq={MKT_CITY.liquidity} />
         </div>
 
         {/* Yield + movers */}
@@ -515,7 +616,7 @@ function MarketLineChart({ series, labels, metricKey, color = "#D9531E", height 
   );
 }
 
-function SalesDaysChart({ category, region, buffer, agg, height = 420 }: { category: string; region: string; buffer: number; agg: string; height?: number }) {
+function SalesDaysChart({ category, region, buffer, agg, districts, cityLiq, height = 420 }: { category: string; region: string; buffer: number; agg: string; districts: Dist[]; cityLiq: number; height?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1120);
   useEffect(() => {
@@ -525,7 +626,8 @@ function SalesDaysChart({ category, region, buffer, agg, height = 420 }: { categ
     return () => ro.disconnect();
   }, []);
 
-  const factor = region === "all" ? 1 : MKT_DISTRICTS.find((d) => d.name === region)!.liq / MKT_CITY.liquidity;
+  const rd = districts.find((x) => x.name === region);
+  const factor = region === "all" || !rd ? 1 : rd.liq / (cityLiq || 1);
   const data = SALES_DAYS.map((b) => ({
     bucket: b.bucket,
     old: Math.round((agg === "median" ? b.oldMed : b.old) * factor),

@@ -28,7 +28,7 @@ import { useState } from "react";
  */
 export default function LoginPage() {
   const { theme, toggle } = useTheme();
-  const [lang, setLang] = useState<Lang>("tr");
+  const [lang, setLang] = useState<Lang>("az");
   const t = useStrings(lang);
 
   // If we're already authed, bounce to the dashboard. This handles the

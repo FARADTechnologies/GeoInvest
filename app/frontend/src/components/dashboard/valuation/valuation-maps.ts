@@ -49,6 +49,36 @@ export function loadMaps(): Promise<any> {
 
 export const mapsAutocompleteEnabled = (): boolean => !!MAPS_KEY;
 
+// Forward geocode a typed address → coordinates (same Geocoder the map picker
+// uses for reverse geocoding, so the Geocoding API is already enabled). Used
+// by the form so a valuation can ALWAYS reach the predict model even when the
+// user typed the address instead of picking an autocomplete suggestion.
+// Returns null when Maps is unavailable or the address can't be located.
+export async function geocodeAddress(
+  address: string
+): Promise<{ lat: number; lng: number } | null> {
+  const text = address.trim();
+  if (!MAPS_KEY || text.length < 3) return null;
+  const maps = await loadMaps();
+  if (!maps?.Geocoder) return null;
+  try {
+    const geocoder = new maps.Geocoder();
+    const { results } = await geocoder.geocode({
+      address: text,
+      region: "AZ",
+      componentRestrictions: { country: "AZ" }
+    });
+    const loc = results?.[0]?.geometry?.location;
+    if (!loc) return null;
+    return {
+      lat: typeof loc.lat === "function" ? loc.lat() : loc.lat,
+      lng: typeof loc.lng === "function" ? loc.lng() : loc.lng
+    };
+  } catch {
+    return null;
+  }
+}
+
 export type AddrSuggestion = { id: string; text: string };
 export type PickedPlace = { address: string; lat: number; lng: number };
 

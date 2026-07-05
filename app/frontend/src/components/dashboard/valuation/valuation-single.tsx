@@ -6,8 +6,9 @@
 // local mock fallback. Existing dashboard views are untouched.
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
+import { loadSingleHistory, saveSingleHistory } from "@/components/dashboard/valuation/valuation-store";
 import type { Lang } from "@/lib/i18n";
 
 
@@ -16,13 +17,13 @@ import { Icons, DonutChart, SourceBadge, TypePill, fmtMoney } from "@/components
 import {
   PropertyEntryModal,
   statsOf,
-  toOProp,
   type OProp
 } from "@/components/dashboard/valuation/valuation-core";
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/dashboard/valuation/valuation-columns";
-import { fetchValuationMeta, newId, valuateSingle } from "@/lib/valuation-data";
-import { reportFromResult, predictByParams, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
+import { geocodeAddress } from "@/components/dashboard/valuation/valuation-maps";
+import { fetchValuationMeta, newId } from "@/lib/valuation-data";
+import { predictByParams, valuateByLink, LinkValuationError } from "@/lib/valuation-report";
 import type { DashboardView } from "@/components/dashboard/nav-sidebar";
 import type { RateReportData, ValuationInput, ValuationSource } from "@/types/valuation";
 
@@ -42,7 +43,25 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false);
   const { visible, toggle, reset } = useVisibleCols("hm-cols-single");
+
+  // Hydrate the persisted history once on mount (client only — avoids an SSR
+  // mismatch), then mirror every change back to localStorage so the history
+  // survives reloads and view switches. Only the user's delete removes a row.
+  useEffect(() => {
+    const s = loadSingleHistory();
+    if (s) {
+      setItems(s.items);
+      setReports(s.reports);
+      setSource(s.source);
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) saveSingleHistory(items, reports, source);
+  }, [hydrated, items, reports, source]);
   const shown = COLUMNS.filter((c) => visible.has(c.key));
 
   const valued = items.filter((x) => x.valued !== false);
@@ -69,28 +88,43 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
       setEditTarget(null);
       return;
     }
+    // API-only flow (team decision): always call the real predict model — no
+    // DB-median fallback. The model needs coordinates, so if the form carries
+    // none (address typed, not picked from suggestions / no map pin) we geocode
+    // the address first. If the model can't be reached, surface an error and
+    // never fabricate a value.
+    setLinkError(null);
     setBusy(true);
-    const { data, source: src } = await valuateSingle(input);
-    setSource(src);
-    const item = toOProp(data, existingId ?? newId("H"), true);
-    // Report source: prefer the real predict model when the form carries
-    // coordinates (Maps autocomplete, #1/#2); otherwise (or if the model is
-    // unreachable) fall back to the DB-median synthesis. The list row stays
-    // DB-derived as a quick summary; the report modal shows the richer model.
-    let report: RateReportData;
     try {
-      report =
-        input.latitude != null && input.longitude != null
-          ? await predictByParams(input)
-          : reportFromResult(data, input);
-    } catch {
-      report = reportFromResult(data, input);
+      let filled = input;
+      if (filled.latitude == null || filled.longitude == null) {
+        const geo = filled.address ? await geocodeAddress(filled.address) : null;
+        if (!geo) {
+          setLinkError(
+            T("Ünvan üzrə koordinat tapılmadı. Ünvanı siyahıdan seçin və ya xəritədən nöqtə göstərin.")
+          );
+          setBusy(false);
+          return;
+        }
+        filled = { ...filled, latitude: geo.lat, longitude: geo.lng };
+      }
+      const report = await predictByParams(filled);
+      setSource("db");
+      const id = existingId ?? newId("H");
+      const item = opropFromReport(id, report);
+      setItems((prev) => (existingId ? prev.map((x) => (x.id === existingId ? item : x)) : [item, ...prev]));
+      setReports((prev) => ({ ...prev, [id]: report }));
+      setEntryOpen(false);
+      setEditTarget(null);
+    } catch (err) {
+      setLinkError(
+        err instanceof LinkValuationError && err.message
+          ? err.message
+          : T("Qiymətləndirmə modeli cavab vermir, yenidən cəhd edin.")
+      );
+    } finally {
+      setBusy(false);
     }
-    setItems((prev) => (existingId ? prev.map((x) => (x.id === existingId ? item : x)) : [item, ...prev]));
-    setReports((prev) => ({ ...prev, [item.id]: report }));
-    setBusy(false);
-    setEntryOpen(false);
-    setEditTarget(null);
   };
 
   // Elan linki flow. Sends URL-only (valuateByLink), never form state. Any

@@ -102,7 +102,9 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
   setValLang(lang);
   const t = useStrings(lang);
 
-  const [analysisType, setAnalysisType] = useState<"geom" | "pure_h3">("pure_h3");
+  // Cell aggregation stays on H3 internally; the Geom/H3 switch was removed
+  // from the UI (team request — no "H3" jargon shown to users).
+  const [analysisType] = useState<"geom" | "pure_h3">("pure_h3");
   const [period, setPeriod] = useState<string | null>(null);
   const [res, setRes] = useState(7);
   const [metric, setMetric] = useState("price");
@@ -112,7 +114,11 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
   const filtersQuery = useQuery({ queryKey: ["filters"], queryFn: fetchFilters });
   const catalog = filtersQuery.data;
   const periods = catalog?.periods ?? [];
-  const activePeriod = period ?? periods[0] ?? "2026-05";
+  // The newest period is often only partially populated in the snapshot (e.g.
+  // 2026-05 collapses to ~1 cell), which makes the map look empty / "broken".
+  // Default to the previous complete month so data shows immediately; the user
+  // can still pick any period from the Dövr dropdown.
+  const activePeriod = period ?? periods[1] ?? periods[0] ?? "2026-05";
 
   const cats = useMemo(() => {
     const all = catalog?.categories ?? ["Köhnə tikili", "Yeni tikili"];
@@ -154,12 +160,11 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
       <div className="page" style={{ padding: 0, maxWidth: "none" }}>
         <div className="page-header">
           <div>
-            <div className="crumbs"><span>{T(`Analiz xəritəsi`)}</span></div>
-            <h1 className="page-title">{T(`Analiz xəritəsi`)} · Bakı</h1>
-            <p className="page-sub">{T(`H3 hexagonal əmlak istilik xəritəsi — hücrə başına göstəricilər və elan sıxlığı.`)}</p>
+            <div className="crumbs"><span>{T(`Xəritə analizi`)}</span></div>
+            <h1 className="page-title">{T(`Xəritə analizi`)} · Bakı</h1>
+            <p className="page-sub">{T(`Əmlak istilik xəritəsi — hücrə başına göstəricilər və elan sıxlığı.`)}</p>
           </div>
           <div className="page-actions">
-            <Seg value={analysisType} onChange={(v) => setAnalysisType(v as "geom" | "pure_h3")} options={[{ value: "geom", label: "Geom" }, { value: "pure_h3", label: "H3" }]} />
             <button className="btn btn-secondary" onClick={() => mapQuery.refetch()}><Icons.Refresh size={14} /> {T(`Yenilə`)}</button>
             <button className="btn btn-primary"><Icons.Download size={14} /> {T(`İxrac`)}</button>
           </div>
@@ -169,7 +174,7 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
         <div className="stat-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)", marginBottom: 16 }}>
           <KStat accent label={T(`Toplam elan`)} value={fmtNumber(kpis.totalListings)} icon={<Icons.Layers size={16} />} />
           <KStat label={`${aggLabel} ${T(`Qiymət/m²`).toLowerCase()}`} value={fmtMoney(kpis.ppm, " ₼/m²")} icon={<Icons.Coin size={16} />} />
-          <KStat label={T(`Aktiv H3 hücrə`)} value={String(kpis.cells)} icon={<Icons.MapPin size={16} />} />
+          <KStat label={T(`Aktiv hücrə`)} value={String(kpis.cells)} icon={<Icons.MapPin size={16} />} />
           <KStat label={T(`Rayon sayı`)} value={String(kpis.rayons)} icon={<Icons.Building size={16} />} />
         </div>
 
@@ -188,8 +193,8 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
             <ToolField label={T(`Mərkəz`)}>
               <MapSelect value={agg} onChange={setAgg} options={[{ value: "mean", label: T(`Orta`) }, { value: "median", label: T(`Median`) }]} minWidth={120} />
             </ToolField>
-            <ToolField label={T(`Dəqiqlik (H3)`)}>
-              <MapSelect value={String(res)} onChange={(v) => setRes(+v)} options={[{ value: "6", label: "H6 · geniş" }, { value: "7", label: "H7 · orta" }, { value: "8", label: "H8 · dəqiq" }]} minWidth={130} />
+            <ToolField label={T(`Dəqiqlik`)}>
+              <MapSelect value={String(res)} onChange={(v) => setRes(+v)} options={[{ value: "6", label: T(`Böyük`) }, { value: "7", label: T(`Orta`) }, { value: "8", label: T(`Kiçik`) }]} minWidth={130} />
             </ToolField>
             <div className="sp" />
             <div className="fl-row" style={{ gap: 8, alignItems: "center", color: "var(--text-3)", fontSize: 12, paddingBottom: 6 }}>
@@ -202,14 +207,14 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
         <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: 16 }}>
           <div className="card-head">
             <div>
-              <div className="card-title">{T(`Bakı H3 İstilik Xəritəsi`)}</div>
+              <div className="card-title">{T(`Bakı İstilik Xəritəsi`)}</div>
               <div className="card-sub">{aggLabel} {T(meta.label).toLowerCase()} · {activePeriod}</div>
             </div>
             <span className="sp" />
             <Pill tone="navy">{category === "all" ? T(`Bütün kateqoriyalar`) : category === "new" ? T(`Yeni tikili`) : T(`Köhnə tikili`)}</Pill>
           </div>
           <div style={{ height: 560 }}>
-            <MapPanel data={data} loading={mapQuery.isFetching} error={Boolean(mapQuery.error)} t={t} />
+            <MapPanel data={data} loading={mapQuery.isFetching} error={Boolean(mapQuery.error)} t={t} metric={metric === "listings" ? "listings" : "price"} />
           </div>
         </div>
 

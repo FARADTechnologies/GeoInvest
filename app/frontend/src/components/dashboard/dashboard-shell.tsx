@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
-import { FiltersPanel } from "@/components/dashboard/filters-panel";
 import { HistogramChart } from "@/components/dashboard/histogram-chart";
 import { KpiGrid } from "@/components/dashboard/kpi-grid";
 import { NavSidebar, type DashboardView } from "@/components/dashboard/nav-sidebar";
@@ -79,13 +78,12 @@ function createDefaultFilters(catalog: FiltersResponse): DashboardFilters | null
 }
 
 export function DashboardShell() {
-  const [lang, setLang] = useState<Lang>("tr");
+  const [lang, setLang] = useState<Lang>("az");
   const t = useStrings(lang);
 
   const [filters, setFilters] = useState<DashboardFilters | null>(null);
-  const [minAdsThreshold, setMinAdsThreshold] = useState(0);
-  const [colorBy, setColorBy] = useState<"price" | "listings">("price");
-  const [activeView, setActiveView] = useState<DashboardView>("overview");
+  const [minAdsThreshold] = useState(0);
+  const [activeView, setActiveView] = useState<DashboardView>("valuation-single");
 
   // ── Backend-served queries ────────────────────────────────────────
   const filtersQuery = useQuery({
@@ -178,48 +176,24 @@ export function DashboardShell() {
   const monthLabels = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_TR;
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[260px_1fr]">
-        {/* Left rail: nav + filters */}
-        <aside className="border-b bg-card/40 lg:border-b-0 lg:border-r">
+    <main className="min-h-screen bg-background lg:h-screen lg:overflow-hidden">
+      <div className="grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[260px_1fr]">
+        {/* Left rail: nav (its own scroll, independent of the content) */}
+        <aside className="border-b bg-card/40 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <NavSidebar t={t} activeView={activeView} onViewChange={setActiveView} />
-          {filtersQuery.data && filters ? (
-            <FiltersPanel
-              catalog={filtersQuery.data}
-              value={filters}
-              onChange={setFilters}
-              minAdsThreshold={minAdsThreshold}
-              onMinAdsThresholdChange={setMinAdsThreshold}
-              colorBy={colorBy}
-              onColorByChange={setColorBy}
-              disabled={metricsQuery.isFetching || mapQuery.isFetching}
-              t={t}
-            />
-          ) : (
-            <div className="space-y-3 p-4">
-              <Skeleton className="h-8 w-32" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          )}
         </aside>
 
-        {/* Right: top bar + content */}
-        <section className="flex min-w-0 flex-col">
+        {/* Right: pinned top bar + independently scrolling content */}
+        <section className="flex min-w-0 flex-col lg:h-screen lg:overflow-hidden">
           <TopBar
             t={t}
             lang={lang}
             onLangChange={setLang}
-            analysisType={(filters?.analysis_type === "pure_h3" ? "pure_h3" : "geom") as "geom" | "pure_h3"}
-            onAnalysisTypeChange={(v) =>
-              filters && setFilters({ ...filters, analysis_type: v })
-            }
             onRefresh={refresh}
             refreshing={metricsQuery.isFetching || mapQuery.isFetching}
           />
 
-          <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
             {filtersQuery.error ? (
               <Alert>Unable to load filter catalog from the API.</Alert>
             ) : null}

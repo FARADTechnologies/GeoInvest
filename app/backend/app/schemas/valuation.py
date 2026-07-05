@@ -84,6 +84,31 @@ class RayonPrice(BaseModel):
     ad_count: int
 
 
+class MarketRayon(BaseModel):
+    """Real per-rayon market aggregates (median AZN/m² split by build type)."""
+
+    rayon: str
+    ppm_new: float | None = None
+    ppm_old: float | None = None
+    ad_count: int = 0
+
+
+class MarketAnalysis(BaseModel):
+    """City-market aggregates for the Bazar analizi page.
+
+    `ppm_new` / `ppm_old` / `ad_count`, `city_median_kvm` and `new_share`
+    are REAL — computed straight from the analytics tables. Yield, liquidity,
+    rent, transaction volume and growth are modelled on the frontend from
+    these anchors, because the source DB holds no such data.
+    """
+
+    period: str | None = None
+    city_median_kvm: float | None = None
+    new_share: int = 0
+    total_ad_count: int = 0
+    rayons: list[MarketRayon]
+
+
 class ValuationMeta(BaseModel):
     """Real options to populate the valuation form / landing.
 

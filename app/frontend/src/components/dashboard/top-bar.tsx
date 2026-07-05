@@ -1,9 +1,7 @@
 "use client";
 
 import {
-  Building2,
   Globe,
-  Hexagon,
   LogOut,
   Moon,
   RefreshCcw,
@@ -25,8 +23,6 @@ type Props = {
   t: Record<string, string>;
   lang: Lang;
   onLangChange: (lang: Lang) => void;
-  analysisType: "geom" | "pure_h3";
-  onAnalysisTypeChange: (v: "geom" | "pure_h3") => void;
   onRefresh: () => void;
   refreshing?: boolean;
 };
@@ -35,8 +31,6 @@ export function TopBar({
   t,
   lang,
   onLangChange,
-  analysisType,
-  onAnalysisTypeChange,
   onRefresh,
   refreshing
 }: Props) {
@@ -78,10 +72,10 @@ export function TopBar({
 
   const initials = user?.initials ?? "AD";
   const displayName = user?.name ?? "admin";
-  const nextLang: Record<Lang, Lang> = { tr: "en", en: "az", az: "tr" };
+  const nextLang: Record<Lang, Lang> = { en: "az", az: "en" };
 
   return (
-    <header className="flex items-center gap-3 border-b bg-card px-5 py-3">
+    <header className="flex shrink-0 items-center gap-3 border-b bg-card px-5 py-3">
       <div className="flex flex-col">
         <h1 className="text-[15px] font-semibold tracking-tight text-foreground">
           {t.dashTitle}
@@ -103,34 +97,6 @@ export function TopBar({
           disabled
           className="flex-1 cursor-not-allowed bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/60"
         />
-      </div>
-
-      {/* Geom / H3 segmented */}
-      <div className="flex h-9 items-center gap-0.5 rounded-lg border bg-background p-0.5">
-        <button
-          onClick={() => onAnalysisTypeChange("geom")}
-          className={cn(
-            "flex h-full items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors",
-            analysisType === "geom"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Building2 className="h-3.5 w-3.5" />
-          {t.geom}
-        </button>
-        <button
-          onClick={() => onAnalysisTypeChange("pure_h3")}
-          className={cn(
-            "flex h-full items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors",
-            analysisType === "pure_h3"
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Hexagon className="h-3.5 w-3.5" />
-          {t.h3}
-        </button>
       </div>
 
       <Button
