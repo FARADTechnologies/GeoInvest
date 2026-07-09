@@ -35,6 +35,12 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
+    # Always allow the platform's own domains (any subdomain / port), so the
+    # deployed frontend (e.g. gitlab.homora.ai:31300) works even when the host's
+    # ALLOWED_ORIGINS env isn't set. Without an allowed origin the browser's
+    # CORS preflight fails and every API call — including the valuation
+    # /model/predict proxy — is blocked, making the UI show a connection error.
+    allow_origin_regex=r"https?://([a-z0-9-]+\.)*homora\.ai(:\d+)?",
     allow_credentials=True,
     # POST is needed by the valuation endpoints (single/batch/model proxy/link);
     # without it the browser's preflight blocks them and the UI silently falls
