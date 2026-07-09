@@ -6,7 +6,7 @@
 // mock fallback. Existing dashboard views are untouched.
 
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
 
@@ -22,9 +22,101 @@ import {
   type Stats
 } from "@/components/dashboard/valuation/valuation-core";
 import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/dashboard/valuation/valuation-columns";
+import { RateReport } from "@/components/dashboard/valuation/valuation-report";
+import { geocodeAddress } from "@/components/dashboard/valuation/valuation-maps";
 import { fetchValuationMeta, newId, valuateBatch } from "@/lib/valuation-data";
+import { predictByParams, LinkValuationError } from "@/lib/valuation-report";
 import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
-import type { ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
+import type { RateReportData, ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
+
+// One imported Excel row (parsed by the backend /valuation/parse-excel).
+type ParsedRow = {
+  type: string | null; extract: string | null; is_residence: boolean;
+  residence: string | null; repair: string | null; area: number | null;
+  rooms: number | null; floor: number | null; total_floors: number | null;
+  address: string | null;
+};
+
+function rowToInput(r: ParsedRow): ValuationInput {
+  return {
+    address: r.address ?? null,
+    rayon: null,
+    type: r.type ?? "",
+    area: r.area ?? 0,
+    rooms: r.rooms ?? null,
+    floor: r.floor ?? null,
+    total_floors: r.total_floors ?? null,
+    repair: r.repair ?? null,
+    extract: r.extract ?? null,
+    residence: r.is_residence ? r.residence ?? null : null
+  };
+}
+
+// Build a history row (OProp) from a predict report — mirrors the single-flow
+// projection so mass rows show the same figures as Tək qiymətləndirmə.
+function opropFromReport(id: string, data: RateReportData): OProp {
+  const sale = data.ai_data.sale_estimate.current_valuation;
+  const rentv = data.ai_data.rent_estimate.current_valuation;
+  const inv = data.ai_data.investment_metrics;
+  const f = data.features;
+  return {
+    id, valued: true,
+    address: f?.address || "Mənzil",
+    district: "—",
+    type: f?.type || "—",
+    area: f?.area ?? 0,
+    rooms: f?.rooms ?? null,
+    floor: f?.floor ?? null,
+    totalFloors: f?.total_floors ?? null,
+    fairValue: sale.point_estimate,
+    pricePerM2: inv.price_per_sqm,
+    monthlyRent: rentv.point_estimate,
+    yield: inv.rent_yield_percent,
+    payback: inv.payback_period_years,
+    liquidity: 0,
+    score: 0,
+    risk: "Orta",
+    residence: f?.residence_owner ?? null,
+    repair: f?.repair ?? null,
+    extract: f?.extract ?? null,
+    range: [sale.lower_bound, sale.upper_bound],
+    rentRange: [rentv.lower_bound, rentv.upper_bound]
+  };
+}
+
+// API-only valuation of one input: geocode the address if needed, then call the
+// real predict model. Throws on failure (no DB fallback).
+async function valuateInput(input: ValuationInput, id: string): Promise<{ item: OProp; report: RateReportData }> {
+  let filled = input;
+  if (filled.latitude == null || filled.longitude == null) {
+    const geo = filled.address ? await geocodeAddress(filled.address) : null;
+    if (!geo) throw new LinkValuationError(0, T("Ünvan üzrə koordinat tapılmadı"));
+    filled = { ...filled, latitude: geo.lat, longitude: geo.lng };
+  }
+  const report = await predictByParams(filled);
+  return { item: opropFromReport(id, report), report };
+}
+
+// Unvalued draft row from an input (shown in the list until valuated).
+function draftFromInput(input: ValuationInput, id: string): OProp {
+  return {
+    id, valued: false,
+    address: input.address || input.rayon || "",
+    district: input.rayon || "—",
+    type: input.type,
+    area: input.area,
+    rooms: input.rooms ?? null,
+    floor: input.floor ?? null,
+    totalFloors: input.total_floors ?? null,
+    fairValue: 0, pricePerM2: 0, monthlyRent: 0, yield: 0, payback: 0, liquidity: 0,
+    score: 0, risk: "Orta",
+    residence: input.residence ?? null, repair: input.repair ?? null, extract: input.extract ?? null,
+    range: [0, 0], rentRange: [0, 0]
+  };
+}
 
 const SEED_RAYONS = ["Yasamal", "Səbail", "Nərimanov", "Xətai", "Nəsimi", "Binəqədi", "Nizami", "Sabunçu"];
 function seedInputs(n: number, salt: number): ValuationInput[] {
@@ -212,7 +304,12 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("Hamısı");
-  const [revaluating, setRevaluating] = useState(false);
+  // Reports (predict contract) per item id — drives the RateReport modal.
+  const [reports, setReports] = useState<Record<string, RateReportData>>({});
+  // Sequential batch progress (Excel import → predict, 1-by-1).
+  const [progress, setProgress] = useState<{ done: number; total: number; label: string } | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const items = portfolio.items;
   const valued = items.filter((x) => x.valued !== false);
@@ -240,48 +337,79 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
 
   const toInput = (d: OProp): ValuationInput => ({ address: d.address || null, rayon: d.district === "—" ? null : d.district, type: d.type, area: d.area, rooms: d.rooms, floor: d.floor, total_floors: d.totalFloors, repair: d.repair, extract: d.extract, residence: d.residence });
 
-  const simulateUpload = async (count = 12) => {
+  const importExcel = async (file: File) => {
+    setImportErr(null);
     setBusy(true);
-    const res = await valuateBatch(seedInputs(count, Math.floor(Math.random() * 999)));
-    setSource(res.source);
-    addItems(res.data.map((r) => toOProp(r, newId("H"), true)));
-    setBusy(false);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/parse-excel`, { method: "POST", body: fd });
+      if (!res.ok) {
+        let msg = "";
+        try { const j = (await res.json()) as { detail?: string }; msg = j?.detail || ""; } catch { /* no body */ }
+        setImportErr(msg || T("Excel faylını oxumaq mümkün olmadı"));
+        return;
+      }
+      const j = (await res.json()) as { rows: ParsedRow[]; count: number };
+      if (!j.count) { setImportErr(T("Faylda mənzil tapılmadı")); return; }
+      addItems(j.rows.map((r) => draftFromInput(rowToInput(r), newId("H"))));
+    } catch {
+      setImportErr(T("Excel yüklənmədi, yenidən cəhd edin"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Valuate a set of rows sequentially against the real predict model (slow —
+  // ~20–55s each), updating the list + progress after each one. No DB fallback:
+  // rows whose address can't be geocoded / model fails are left as drafts.
+  const runBatch = async (targets: OProp[]) => {
+    if (targets.length === 0) return;
+    setImportErr(null);
+    setProgress({ done: 0, total: targets.length, label: "" });
+    let failed = 0;
+    let cur = portfolio.items;
+    const gotReports: Record<string, RateReportData> = {};
+    for (let i = 0; i < targets.length; i++) {
+      const d = targets[i];
+      setProgress({ done: i, total: targets.length, label: d.address || d.district || "" });
+      try {
+        const { item, report } = await valuateInput(toInput(d), d.id);
+        gotReports[d.id] = report;
+        cur = cur.map((x) => (x.id === d.id ? item : x));
+        update({ ...portfolio, items: cur });
+      } catch {
+        failed++;
+      }
+    }
+    setReports((prev) => ({ ...prev, ...gotReports }));
+    setProgress(null);
+    if (failed > 0) setImportErr(`${failed} mənzil qiymətləndirilə bilmədi (ünvan tapılmadı və ya model xətası).`);
   };
 
   const submit = async (input: ValuationInput, doValuate: boolean, existingId?: string) => {
     if (!doValuate) {
-      const draft: OProp = { id: existingId ?? newId("H"), valued: false, address: input.address || input.rayon || "", district: input.rayon || "—", type: input.type, area: input.area, rooms: input.rooms ?? null, floor: input.floor ?? null, totalFloors: input.total_floors ?? null, fairValue: 0, pricePerM2: 0, monthlyRent: 0, yield: 0, payback: 0, liquidity: 0, score: 0, risk: "Orta", residence: input.residence ?? null, repair: input.repair ?? null, extract: input.extract ?? null, range: [0, 0], rentRange: [0, 0] };
+      const draft = draftFromInput(input, existingId ?? newId("H"));
       if (existingId) replaceItem(draft); else addItems([draft]);
       setEntryOpen(false); setEditTarget(null); return;
     }
+    setImportErr(null);
     setBusy(true);
-    const res = await valuateBatch([input]);
-    setSource(res.source);
-    const it = toOProp(res.data[0], existingId ?? newId("H"), true);
-    if (existingId) replaceItem(it); else addItems([it]);
-    setBusy(false); setEntryOpen(false); setEditTarget(null);
+    try {
+      const id = existingId ?? newId("H");
+      const { item, report } = await valuateInput(input, id);
+      setReports((prev) => ({ ...prev, [id]: report }));
+      if (existingId) replaceItem(item); else addItems([item]);
+      setEntryOpen(false); setEditTarget(null);
+    } catch (err) {
+      setImportErr(err instanceof LinkValuationError && err.message ? err.message : T("Qiymətləndirmə modeli cavab vermir"));
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const valuateDrafts = async () => {
-    const drafts = items.filter((x) => x.valued === false);
-    if (drafts.length === 0) return;
-    setBusy(true);
-    const res = await valuateBatch(drafts.map(toInput));
-    setSource(res.source);
-    const byId = drafts.map((d, i) => toOProp(res.data[i], d.id, true));
-    update({ ...portfolio, items: portfolio.items.map((x) => byId.find((v) => v.id === x.id) ?? x) });
-    setBusy(false);
-  };
-
-  const revaluate = async () => {
-    if (items.length === 0) return;
-    setRevaluating(true);
-    const res = await valuateBatch(items.map(toInput));
-    setSource(res.source);
-    const next = items.map((d, i) => toOProp(res.data[i], d.id, true));
-    update({ ...portfolio, items: next });
-    setRevaluating(false);
-  };
+  const valuateDrafts = () => runBatch(items.filter((x) => x.valued === false));
+  const revaluate = () => runBatch(items);
 
   return (
     <>
@@ -306,13 +434,21 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
         <div className="drop-art" style={{ width: 52, height: 52 }}><Icons.FileSpreadsheet size={26} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="drop-title">{T(`Excel cədvəli ilə əlavə et`)}</div>
-          <div className="drop-sub">.xlsx / .csv — hər sətir bir mənzil. (prototip: nümunə sətirlər API ilə qiymətləndirilir)</div>
+          <div className="drop-sub">.xlsx — hər sətir bir mənzil (ünvan, sahə, otaq…). Yükləndikdən sonra "Portfeli qiymətləndir" ilə hamısı API ilə hesablanır.</div>
         </div>
         <div className="fl-row" style={{ gap: 8, flexShrink: 0 }}>
-          <button className="btn btn-ghost btn-sm"><Icons.Download size={13} /> {T(`Şablon`)}</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => simulateUpload(12)} disabled={busy}><Icons.Upload size={13} /> {busy ? "Oxunur…" : "Nümunə yüklə"}</button>
+          <input ref={fileRef} type="file" accept=".xlsx" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) importExcel(f); e.target.value = ""; }} />
+          <button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()} disabled={busy || !!progress}><Icons.Upload size={13} /> {busy ? T(`Oxunur…`) : T(`Excel yüklə`)}</button>
         </div>
       </div>
+
+      {importErr && (
+        <div className="card" style={{ padding: "10px 14px", marginBottom: 14, background: "var(--red-soft)", color: "var(--red)", display: "flex", alignItems: "center", gap: 10, fontSize: 13, fontWeight: 600 }}>
+          <Icons.Info size={15} style={{ flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>{importErr}</span>
+          <button className="icon-btn" style={{ width: 24, height: 24, color: "var(--red)" }} onClick={() => setImportErr(null)}><Icons.X size={12} /></button>
+        </div>
+      )}
 
       {stats && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 0, marginBottom: 14, background: "var(--card)", border: "1px solid var(--border)", borderRadius: "var(--r-lg)", overflow: "hidden", boxShadow: "var(--shadow-sm)" }}>
@@ -395,29 +531,35 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
         </div>
         <span className="sp" />
         {draftCount > 0 && (
-          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy}>{busy ? <><Icons.Refresh size={16} /> {T(`Qiymətləndirilir…`)}</> : <><Icons.Sparkle size={16} /> Portfolionu qiymətləndir ({draftCount})</>}</button>
+          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy || !!progress}>{progress ? <><Icons.Refresh size={16} /> {T(`Qiymətləndirilir…`)}</> : <><Icons.Sparkle size={16} /> Portfolionu qiymətləndir ({draftCount})</>}</button>
         )}
         {draftCount === 0 && stats && (
           <button className="btn btn-secondary" onClick={onAnalysis}><Icons.TrendUp size={14} /> {T(`Portfel analizi`)}</button>
         )}
-        <button className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`} onClick={revaluate} disabled={items.length === 0 || revaluating} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Sparkle size={16} /> {T(`Portfeli qiymətləndir`)}</button>
+        <button className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`} onClick={revaluate} disabled={items.length === 0 || busy || !!progress} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Sparkle size={16} /> {T(`Portfeli qiymətləndir`)}</button>
       </div>
 
-      {revaluating && (
+      {progress && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,30,61,0.42)", backdropFilter: "blur(4px)", display: "grid", placeItems: "center", zIndex: 200 }}>
-          <div style={{ background: "var(--card)", borderRadius: 18, padding: "32px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, boxShadow: "var(--shadow-lg)", minWidth: 320 }}>
+          <div style={{ background: "var(--card)", borderRadius: 18, padding: "32px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, boxShadow: "var(--shadow-lg)", minWidth: 380, maxWidth: 460 }}>
             <div className="empty-art"><Icons.Sparkle size={28} /></div>
-            <div style={{ textAlign: "center" }}>
+            <div style={{ textAlign: "center", width: "100%" }}>
               <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text-1)" }}>{T(`Portfel qiymətləndirilir…`)}</div>
-              <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 4 }}>{items.length} mənzil yenidən hesablanır</div>
+              <div style={{ fontSize: 13, color: "var(--text-2)", marginTop: 4 }}>{progress.done} / {progress.total} mənzil · model yavaş ola bilər (sətir başına ~20-40 san)</div>
+              {progress.label ? <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 380 }}>{progress.label}</div> : null}
+              <div style={{ height: 8, background: "var(--bg-subtle)", borderRadius: 99, overflow: "hidden", marginTop: 14 }}>
+                <div style={{ width: `${(progress.done / Math.max(progress.total, 1)) * 100}%`, height: "100%", background: "var(--orange)", transition: "width .3s" }} />
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {openItem && openItem.valued !== false && stats && (
+      {openItem && openItem.valued !== false && reports[openItem.id] ? (
+        <RateReport data={reports[openItem.id]} onClose={() => setOpenId(null)} />
+      ) : openItem && openItem.valued !== false && stats ? (
         <PropertyReport property={openItem} portfolioName={portfolio.name} itemsCount={valued.length} stats={stats} rank={[...valued].sort((a, b) => b.score - a.score).findIndex((x) => x.id === openItem.id) + 1} onClose={() => setOpenId(null)} onPrev={() => openIdx > 0 && setOpenId(items[openIdx - 1].id)} onNext={() => openIdx >= 0 && openIdx < items.length - 1 && setOpenId(items[openIdx + 1].id)} />
-      )}
+      ) : null}
       <PropertyEntryModal open={entryOpen} portfolioName={portfolio.name} meta={meta} busy={busy} onClose={() => setEntryOpen(false)} onSubmit={(input, v) => submit(input, v)} />
       <PropertyEntryModal open={!!editTarget} portfolioName={portfolio.name} meta={meta} initial={editTarget} busy={busy} onClose={() => setEditTarget(null)} onSubmit={(input, v) => submit(input, v, editTarget?.id)} />
     </>

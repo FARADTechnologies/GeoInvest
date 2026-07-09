@@ -120,3 +120,26 @@ class ValuationMeta(BaseModel):
     categories: list[str]
     rayons: list[RayonPrice]
     market_median_kvm: float | None = None
+
+
+class ParsedListing(BaseModel):
+    """One listing row parsed from the mass-valuation Excel template.
+
+    No coordinates — the frontend geocodes `address` before calling predict.
+    """
+
+    type: str | None = None
+    extract: str | None = None
+    is_residence: bool = False
+    residence: str | None = None
+    repair: str | None = None
+    area: float | None = None
+    rooms: int | None = None
+    floor: int | None = None
+    total_floors: int | None = None
+    address: str | None = None
+
+
+class ExcelParseResponse(BaseModel):
+    rows: list[ParsedListing]
+    count: int
