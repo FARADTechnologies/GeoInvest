@@ -164,7 +164,11 @@ export function buildPredictPayload(input: ValuationInput): PredictPayload {
     mertebe_yer: input.floor ?? 0,
     mertebe_say: input.total_floors ?? 0,
     date2: input.valuation_date || todayISO(),
-    kateqoriya: (input.type || "").toLowerCase(),
+    // Send the category EXACTLY as the UI shows it ("Yeni tikili" / "Köhnə
+    // tikili"). The predict model is case-sensitive: lowercasing it (old bug)
+    // made "yeni tikili" unrecognised → a lower valuation that didn't match
+    // homora.ai/rate-my-apartment. The official site sends it unchanged.
+    kateqoriya: input.type || "",
     temir: (input.repair || "").trim() === "Təmirli" ? "var" : "yox",
     cixaris: (input.extract || "").trim() === "Var" ? "var" : "yox",
     residential_complex: input.residence ? 1 : 0,
