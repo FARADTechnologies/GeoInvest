@@ -22,7 +22,7 @@ import {
   genTrend,
   monthsLabels
 } from "@/components/dashboard/valuation/valuation-ui";
-import type { RayonPrice, ValuationInput, ValuationMeta, ValuationResult } from "@/types/valuation";
+import type { RateReportData, RayonPrice, ValuationInput, ValuationMeta, ValuationResult } from "@/types/valuation";
 
 // Prototype property shape (camelCase) the UI components expect.
 export type OProp = {
@@ -78,6 +78,112 @@ export function toOProp(r: ValuationResult, id: string, valued = true): OProp {
     rentRange: (r.rent_range as number[]) ?? [r.monthly_rent, r.monthly_rent],
     priceBasis: r.price_basis,
     marketMedian: r.market_median_kvm ?? null
+  };
+}
+
+// Deterministic value in [-spread, +spread] from a text seed — mirrors the
+// backend `_stable_jitter` (services/valuation.py) so re-valuations stay
+// reproducible while charts still get a natural spread, not identical numbers.
+function stableJitter(seed: string, spread: number): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const unit = ((h >>> 0) % 1_000_000) / 1_000_000; // 0..1
+  return (unit - 0.5) * 2 * spread;
+}
+const clampNum = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
+
+// Model the investment score / liquidity / risk from the predict figures.
+// The predict server returns fair value, rent, yield and payback but no score
+// or time-on-market, so we derive them here (the DB flow gets these from
+// services/valuation.py). We follow the same shape as the backend but recentre
+// the constants: the real predict yields run noticeably LOWER than the backend's
+// modelled 5.5% / 7.2% (Baku new builds land ~3.5-5%), so reusing the backend
+// centre (yield−6) would clamp almost every property to the 38 floor and
+// collapse the analysis charts. Yield is the dominant driver; payback is
+// dropped because it is ≈100/yield (redundant) and double-counting it is exactly
+// what crushed the score. Deterministic jitter keeps re-valuations reproducible.
+export function modelInvestment(args: {
+  type: string | null;
+  yieldPct: number;
+  floor: number | null;
+  totalFloors: number | null;
+  seed: string;
+}): { score: number; liquidity: number; risk: string } {
+  const isNew = (args.type || "").toLowerCase().includes("yeni");
+  let liquidity = isNew ? 70 : 95; // base time-on-market (days) by build type
+  // Ground / top floors sell a touch slower (mirrors the backend adjustment).
+  if (args.floor && args.totalFloors) {
+    if (args.floor === 1) liquidity += 6;
+    else if (args.floor >= args.totalFloors) liquidity += 4;
+  }
+  liquidity += stableJitter(args.seed + "l", 18);
+  const liquidityDays = clampNum(20, 260, Math.round(liquidity));
+
+  // Centre ~62 for a typical listing; ±8 per point of yield around a 4.5%
+  // pivot, minus a mild time-on-market penalty. Gives a real spread (≈40-88)
+  // across the predict server's actual output range instead of a flat floor.
+  const score =
+    62 +
+    (args.yieldPct - 4.5) * 8 -
+    (liquidityDays - 85) * 0.12 +
+    stableJitter(args.seed + "s", 6);
+  const scoreInt = clampNum(38, 96, Math.round(score));
+  const risk = scoreInt >= 78 ? "Aşağı" : scoreInt >= 60 ? "Orta" : "Yüksək";
+  return { score: scoreInt, liquidity: liquidityDays, risk };
+}
+
+// Build a history row (OProp) from a predict report. The predict model returns
+// value / rent / yield / payback; score, liquidity and risk are modelled above
+// so the portfolio-analysis charts show real figures instead of zeros. Shared
+// by Tək and Kütləvi so both flows project identically. Handles the link flow's
+// missing form features by labelling the row from the source URL host.
+export function opropFromReport(id: string, data: RateReportData): OProp {
+  const sale = data.ai_data.sale_estimate.current_valuation;
+  const rentv = data.ai_data.rent_estimate.current_valuation;
+  const inv = data.ai_data.investment_metrics;
+  const f = data.features;
+  let label = f?.address ?? "";
+  if (!label && data.source.kind === "link") {
+    try {
+      label = new URL(data.source.url).hostname.replace(/^www\./, "");
+    } catch {
+      label = data.source.url;
+    }
+  }
+  const seed = `${f?.address || ""}|${f?.area ?? ""}|${f?.rooms ?? ""}|${f?.floor ?? ""}|${f?.type || ""}|${id}`;
+  const model = modelInvestment({
+    type: f?.type ?? null,
+    yieldPct: inv.rent_yield_percent,
+    floor: f?.floor ?? null,
+    totalFloors: f?.total_floors ?? null,
+    seed
+  });
+  return {
+    id,
+    valued: true,
+    address: label || "Mənzil",
+    district: "—",
+    type: f?.type || "—",
+    area: f?.area ?? 0,
+    rooms: f?.rooms ?? null,
+    floor: f?.floor ?? null,
+    totalFloors: f?.total_floors ?? null,
+    fairValue: sale.point_estimate,
+    pricePerM2: inv.price_per_sqm,
+    monthlyRent: rentv.point_estimate,
+    yield: inv.rent_yield_percent,
+    payback: inv.payback_period_years,
+    liquidity: model.liquidity,
+    score: model.score,
+    risk: model.risk,
+    residence: f?.residence_owner ?? null,
+    repair: f?.repair ?? null,
+    extract: f?.extract ?? null,
+    range: [sale.lower_bound, sale.upper_bound],
+    rentRange: [rentv.lower_bound, rentv.upper_bound]
   };
 }
 

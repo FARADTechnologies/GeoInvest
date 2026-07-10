@@ -14,6 +14,7 @@ import type { Lang } from "@/lib/i18n";
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons, DonutChart, HBars, Pill, RiskPill, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
 import {
+  opropFromReport,
   PropertyEntryModal,
   PropertyReport,
   statsOf,
@@ -52,38 +53,6 @@ function rowToInput(r: ParsedRow): ValuationInput {
     repair: r.repair ?? null,
     extract: r.extract ?? null,
     residence: r.is_residence ? r.residence ?? null : null
-  };
-}
-
-// Build a history row (OProp) from a predict report — mirrors the single-flow
-// projection so mass rows show the same figures as Tək qiymətləndirmə.
-function opropFromReport(id: string, data: RateReportData): OProp {
-  const sale = data.ai_data.sale_estimate.current_valuation;
-  const rentv = data.ai_data.rent_estimate.current_valuation;
-  const inv = data.ai_data.investment_metrics;
-  const f = data.features;
-  return {
-    id, valued: true,
-    address: f?.address || "Mənzil",
-    district: "—",
-    type: f?.type || "—",
-    area: f?.area ?? 0,
-    rooms: f?.rooms ?? null,
-    floor: f?.floor ?? null,
-    totalFloors: f?.total_floors ?? null,
-    fairValue: sale.point_estimate,
-    pricePerM2: inv.price_per_sqm,
-    monthlyRent: rentv.point_estimate,
-    yield: inv.rent_yield_percent,
-    payback: inv.payback_period_years,
-    liquidity: 0,
-    score: 0,
-    risk: "Orta",
-    residence: f?.residence_owner ?? null,
-    repair: f?.repair ?? null,
-    extract: f?.extract ?? null,
-    range: [sale.lower_bound, sale.upper_bound],
-    rentRange: [rentv.lower_bound, rentv.upper_bound]
   };
 }
 

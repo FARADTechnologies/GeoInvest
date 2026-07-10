@@ -15,6 +15,7 @@ import type { Lang } from "@/lib/i18n";
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Icons, DonutChart, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
 import {
+  opropFromReport,
   PropertyEntryModal,
   statsOf,
   type OProp
@@ -310,47 +311,6 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
       <PropertyEntryModal open={!!editTarget} portfolioName="Tək qiymətləndirmə" meta={meta} initial={editTarget} busy={busy} onClose={() => setEditTarget(null)} onSubmit={(input, v) => submit(input, v, editTarget?.id)} />
     </div>
   );
-}
-
-// Minimal history-row projection of a link report (the link flow has no form
-// features). Drives the table row; the full report lives in `reports[id]`.
-function opropFromReport(id: string, data: RateReportData): OProp {
-  const sale = data.ai_data.sale_estimate.current_valuation;
-  const rentv = data.ai_data.rent_estimate.current_valuation;
-  const inv = data.ai_data.investment_metrics;
-  const f = data.features;
-  let label = f?.address ?? "";
-  if (!label && data.source.kind === "link") {
-    try {
-      label = new URL(data.source.url).hostname.replace(/^www\./, "");
-    } catch {
-      label = data.source.url;
-    }
-  }
-  return {
-    id,
-    valued: true,
-    address: label || "Elan linki",
-    district: "—",
-    type: f?.type || "—",
-    area: f?.area ?? 0,
-    rooms: f?.rooms ?? null,
-    floor: f?.floor ?? null,
-    totalFloors: f?.total_floors ?? null,
-    fairValue: sale.point_estimate,
-    pricePerM2: inv.price_per_sqm,
-    monthlyRent: rentv.point_estimate,
-    yield: inv.rent_yield_percent,
-    payback: inv.payback_period_years,
-    liquidity: 0,
-    score: 0,
-    risk: "Orta",
-    residence: f?.residence_owner ?? null,
-    repair: f?.repair ?? null,
-    extract: f?.extract ?? null,
-    range: [sale.lower_bound, sale.upper_bound],
-    rentRange: [rentv.lower_bound, rentv.upper_bound]
-  };
 }
 
 // BA §17 — map predict-link HTTP failures to user-facing copy.
