@@ -30,6 +30,7 @@ import {
   fetchB2C,
   fetchHistogram,
   fetchListings,
+  fetchListingsDB,
   fetchRayons,
   fetchRayonStats,
   fetchSparklines,
@@ -138,7 +139,9 @@ export function DashboardShell() {
   const periodKey = filters?.period ?? "";
   const catsKey = filters ? [...filters.categories].sort().join(",") : "";
 
-  const listingsQuery = useQuery({ queryKey: ["v3", "listings"], queryFn: () => fetchListings() });
+  // Elanlar view is fed from the real source DB (team #10); mock stays the
+  // fallback inside fetchListingsDB. Rayons / B2C keep the mock set below.
+  const listingsQuery = useQuery({ queryKey: ["v3", "listings", "db"], queryFn: fetchListingsDB });
   const filteredListingsQuery = useQuery({
     queryKey: ["v3", "listings", periodKey, catsKey],
     queryFn: () => fetchListings(filters?.period, filters?.categories),

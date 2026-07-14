@@ -197,3 +197,102 @@ async def nearby_objects(lat: float, lon: float) -> dict:
     # Categories ordered by their nearest object so the most relevant lead.
     cats.sort(key=lambda c: c["items"][0]["distance"] if c["items"] else 10**9)
     return {"categories": cats}
+
+
+# ── §10 Elanlar — real listings from the source DB ───────────────────────────
+#
+# The Elanlar view is fed from item_app_items (real scraped + predicted
+# listings) instead of mock data. Each row carries its source_url so clicking
+# it opens the stored prediction through the existing link flow. Read-only.
+
+# item_app_itemcategory: 3 = Yeni tikili, 4 = Köhnə tikili (apartment listings).
+_LISTING_CATEGORY = {3: "Yeni tikili", 4: "Köhnə tikili"}
+
+# item_app_items has no rayon column — derive a label from the free-text
+# address by matching known Baku rayon names (best effort; "—" when unknown).
+_BAKU_RAYONS = [
+    "Yasamal", "Səbail", "Nərimanov", "Xətai", "Nəsimi", "Binəqədi", "Nizami",
+    "Sabunçu", "Suraxanı", "Qaradağ", "Xəzər", "Abşeron", "Pirallahı", "Xırdalan",
+]
+
+
+def _derive_rayon(address: str | None) -> str:
+    if not address:
+        return "—"
+    low = address.lower()
+    for r in _BAKU_RAYONS:
+        if r.lower() in low:
+            return r
+    return "—"
+
+
+def _source_host(url: str | None) -> str:
+    if not url:
+        return "—"
+    m = re.search(r"https?://(?:www\.)?([^/]+)", url)
+    return m.group(1) if m else "—"
+
+
+def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
+    """Runs synchronously in a thread (psycopg). Newest-predicted apartments."""
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=20000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, title, address, size, rooms_qty, floor_level, "
+                "owner_price, predicted_sale_price, category_id, source_url, "
+                "created_date, latitude, longitude "
+                "FROM item_app_items "
+                "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
+                "AND category_id IN (3, 4) AND size > 0 "
+                "ORDER BY prediction_updated_at DESC NULLS LAST "
+                "LIMIT %s OFFSET %s",
+                (limit, offset),
+            )
+            return cur.fetchall()
+
+
+async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
+    """Real apartment listings (Yeni/Köhnə tikili with a stored prediction).
+
+    Feeds the Elanlar view; each row's source_url drives the click-to-report
+    link flow. Read-only.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Elan bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        rows = await asyncio.to_thread(_query_listings, conn_str, limit, offset)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Elan siyahısı alınmadı.") from exc
+
+    out: list[dict] = []
+    for (
+        rid, title, address, size, rooms, floor, owner_price, pred_price,
+        cat_id, source_url, created, lat, lon,
+    ) in rows:
+        area = float(size or 0)
+        price = float(owner_price or pred_price or 0)
+        out.append(
+            {
+                "id": str(rid),
+                "title": title or address or "Mənzil",
+                "address": address,
+                "rayon": _derive_rayon(address),
+                "rooms": int(rooms or 0),
+                "area": round(area, 1),
+                "price": round(price),
+                "ppm": round(price / area) if area else 0,
+                "floor": int(floor or 0),
+                "cat": _LISTING_CATEGORY.get(cat_id, "Yeni tikili"),
+                "source": _source_host(source_url),
+                "source_url": source_url,
+                "date": created.date().isoformat() if created else "",
+                "latitude": lat,
+                "longitude": lon,
+            }
+        )
+    return out

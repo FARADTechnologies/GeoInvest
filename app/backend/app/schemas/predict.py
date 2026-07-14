@@ -40,3 +40,32 @@ class NearbyRequest(BaseModel):
 
     latitude: float
     longitude: float
+
+
+class ListingRow(BaseModel):
+    """One real listing from the source DB for the Elanlar view.
+
+    `source_url` lets the frontend open the stored prediction via the existing
+    link flow when a row is clicked (team #10).
+    """
+
+    id: str
+    title: str
+    address: str | None = None
+    rayon: str
+    rooms: int
+    area: float
+    price: float
+    ppm: float
+    floor: int
+    cat: str
+    source: str
+    source_url: str | None = None
+    date: str
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class ListingsResponse(BaseModel):
+    items: list[ListingRow]
+    total: int

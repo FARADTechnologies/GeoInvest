@@ -1,9 +1,16 @@
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.predict import LinkRequest, NearbyRequest, PredictRequest
+from app.schemas.predict import (
+    LinkRequest,
+    ListingRow,
+    ListingsResponse,
+    NearbyRequest,
+    PredictRequest,
+)
 from app.services.predict import (
     PredictError,
     call_predict,
+    list_listings,
     nearby_objects,
     predict_by_link,
 )
@@ -49,3 +56,19 @@ async def model_nearby(payload: NearbyRequest) -> dict:
         return await nearby_objects(payload.latitude, payload.longitude)
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.get("/model/listings", response_model=ListingsResponse)
+async def model_listings(limit: int = 500, offset: int = 0) -> ListingsResponse:
+    """Real apartment listings (source DB) for the Elanlar view (team #10).
+
+    Only Yeni/Köhnə tikili rows that already carry a prediction. Each row's
+    source_url lets the frontend open the stored prediction via the link flow.
+    """
+    limit = max(1, min(limit, 1000))
+    offset = max(0, offset)
+    try:
+        rows = await list_listings(limit, offset)
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+    return ListingsResponse(items=[ListingRow(**r) for r in rows], total=len(rows))

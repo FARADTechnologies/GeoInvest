@@ -111,6 +111,9 @@ export type Listing = {
   status: "active" | "paused" | "sold";
   date: string;        // YYYY-MM-DD
   floor: number;
+  // Real source_url (DB-fed Elanlar); clicking the row opens the stored
+  // prediction via the link flow. Absent for mock rows.
+  sourceUrl?: string;
 };
 
 export type RayonStat = {

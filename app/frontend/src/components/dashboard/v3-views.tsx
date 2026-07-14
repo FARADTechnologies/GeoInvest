@@ -10,7 +10,11 @@ import { ArrowRight, Heart, MapPin, Search, Sparkles, TrendingUp, X } from "luci
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import type { B2CSummary, Listing, RayonStat } from "@/types/api";
+import type { RateReportData } from "@/types/valuation";
+import { RateReport } from "@/components/dashboard/valuation/valuation-report";
+import { valuateByLink, LinkValuationError } from "@/lib/valuation-report";
 import "@/components/dashboard/v3-views.css";
+import "@/components/dashboard/valuation/valuation-orange.css";
 
 // ── helpers ─────────────────────────────────────────────────────────────
 const nf = (n: number) => Math.round(n).toLocaleString("az-AZ").replace(/,/g, " ");
@@ -333,8 +337,7 @@ type SortKey = "title" | "rayon" | "rooms" | "area" | "price" | "ppm" | "date";
 
 export function ListingsViewV3({
   t,
-  listings,
-  rayons
+  listings
 }: {
   t: Record<string, string>;
   listings: Listing[];
@@ -349,9 +352,34 @@ export function ListingsViewV3({
   const [page, setPage] = useState(0);
   const per = 12;
 
-  const rayonOpts = [{ id: "all", name: t.allRayons ?? "Tüm bölgeler" }].concat(
-    rayons.map((r) => ({ id: r.id, name: r.short }))
-  );
+  // Clicking a real (DB-fed) listing opens its stored prediction via the link
+  // flow (team #10). Mock rows have no sourceUrl and stay non-clickable.
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
+  const [report, setReport] = useState<RateReportData | null>(null);
+  const [reportErr, setReportErr] = useState<string | null>(null);
+  const openReport = async (l: Listing) => {
+    if (!l.sourceUrl) return;
+    setReportUrl(l.sourceUrl);
+    setReport(null);
+    setReportErr(null);
+    try {
+      const { data } = await valuateByLink(l.sourceUrl);
+      setReport(data);
+    } catch (e) {
+      setReportErr(e instanceof LinkValuationError && e.message ? e.message : (t.listingReportFailed ?? "Saxlanmış nəticə açılmadı"));
+    }
+  };
+  const closeReport = () => { setReportUrl(null); setReport(null); setReportErr(null); };
+
+  // Rayon filter options derive from the listings themselves so the dropdown
+  // reflects whatever data source feeds the view (real DB or mock).
+  const rayonOpts = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const l of listings) {
+      if (l.rayonId && l.rayon && l.rayon !== "—") seen.set(l.rayonId, l.rayon.replace(" rayonu", ""));
+    }
+    return [{ id: "all", name: t.allRayons ?? "Tüm bölgeler" }, ...[...seen].map(([id, name]) => ({ id, name }))];
+  }, [listings, t.allRayons]);
 
   const filtered = listings.filter(
     (l) =>
@@ -435,7 +463,7 @@ export function ListingsViewV3({
             </thead>
             <tbody>
               {pageRows.map((l) => (
-                <tr key={l.id}>
+                <tr key={l.id} onClick={() => openReport(l)} style={l.sourceUrl ? { cursor: "pointer" } : undefined} title={l.sourceUrl ? (t.listingOpenReport ?? "Saxlanmış nəticəni aç") : undefined}>
                   <td>
                     <b>{l.title}</b>
                     <div className="hm-cell-sub">{l.id} · {l.floor}. {t.lvFloor ?? "mərtəbə"}</div>
@@ -463,6 +491,28 @@ export function ListingsViewV3({
           </div>
         </div>
       </Card>
+      {reportUrl && (
+        <div className="hm-val">
+          {report ? (
+            <RateReport data={report} onClose={closeReport} />
+          ) : (
+            <div className="modal-backdrop" onClick={closeReport}>
+              <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-body" style={{ padding: "28px 24px", textAlign: "center" }}>
+                  {reportErr ? (
+                    <>
+                      <div style={{ color: "var(--red)", fontWeight: 600, marginBottom: 14 }}>{reportErr}</div>
+                      <button className="btn btn-secondary" onClick={closeReport}>{t.close ?? "Bağla"}</button>
+                    </>
+                  ) : (
+                    <div style={{ fontWeight: 600, color: "var(--text-1)" }}>{t.listingReportLoading ?? "Saxlanmış nəticə yüklənir…"}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

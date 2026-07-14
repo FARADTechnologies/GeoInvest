@@ -106,6 +106,45 @@ export function fetchListings(period?: string, categories?: string[]): Promise<L
   return Promise.resolve(filterListings(period, categories));
 }
 
+// Elanlar view — real apartment listings from the source DB (team #10).
+// Falls back to the mock set when the backend / source DB is unreachable,
+// matching the resilience pattern the rest of the dashboard uses.
+type ListingApiRow = {
+  id: string; title: string; address: string | null; rayon: string; rooms: number; area: number;
+  price: number; ppm: number; floor: number; cat: string; source: string;
+  source_url: string | null; date: string;
+};
+export async function fetchListingsDB(): Promise<Listing[]> {
+  try {
+    const res = await apiGet<{ items: ListingApiRow[]; total: number }>(
+      "/model/listings",
+      undefined,
+      { limit: "500" }
+    );
+    return res.items.map((r) => ({
+      id: r.id,
+      // The source DB has no rayon column and addresses are street-only, so a
+      // rayon is only sometimes derivable. Fall back to the street so the
+      // "Bölge" column is never empty; only real rayons feed the filter.
+      rayonId: r.rayon !== "—" ? r.rayon : "",
+      rayon: r.rayon !== "—" ? r.rayon : (r.address ?? "—"),
+      title: r.title,
+      rooms: r.rooms,
+      area: r.area,
+      ppm: r.ppm,
+      price: r.price,
+      cat: r.cat === "Köhnə tikili" ? "Köhnə tikili" : "Yeni tikili",
+      source: r.source,
+      status: "active" as const,
+      date: r.date,
+      floor: r.floor,
+      sourceUrl: r.source_url ?? undefined
+    }));
+  } catch {
+    return filterListings();
+  }
+}
+
 export function fetchRayonStats(period?: string, categories?: string[]): Promise<RayonStat[]> {
   return Promise.resolve(buildRayonStats(filterListings(period, categories)));
 }
