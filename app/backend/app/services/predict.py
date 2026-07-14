@@ -208,6 +208,11 @@ async def nearby_objects(lat: float, lon: float) -> dict:
 # item_app_itemcategory: 3 = Yeni tikili, 4 = Köhnə tikili (apartment listings).
 _LISTING_CATEGORY = {3: "Yeni tikili", 4: "Köhnə tikili"}
 
+# Noise floor (AZN, total): listings below this are garbage/mislabeled and are
+# dropped from Elanlar — same fixed threshold the analytics pipeline applies
+# before H3 aggregation (services/nightly_job.py `_MIN_LISTING_PRICE`).
+_MIN_LISTING_PRICE = 5000
+
 # item_app_items has no rayon column — derive a label from the free-text
 # address by matching known Baku rayon names (best effort; "—" when unknown).
 _BAKU_RAYONS = [
@@ -246,9 +251,10 @@ def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
                 "FROM item_app_items "
                 "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
                 "AND category_id IN (3, 4) AND size > 0 "
+                "AND COALESCE(owner_price, predicted_sale_price, 0) >= %s "
                 "ORDER BY prediction_updated_at DESC NULLS LAST "
                 "LIMIT %s OFFSET %s",
-                (limit, offset),
+                (_MIN_LISTING_PRICE, limit, offset),
             )
             return cur.fetchall()
 

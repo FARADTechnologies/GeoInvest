@@ -244,7 +244,7 @@ class AnalyticsService:
             .order_by(func.sum(H3AnalyticsRecord.ad_count).desc())
         )
         if min_ads_per_cell > 0:
-            stmt = stmt.having(func.sum(H3AnalyticsRecord.ad_count) > min_ads_per_cell)
+            stmt = stmt.having(func.sum(H3AnalyticsRecord.ad_count) >= min_ads_per_cell)
 
         rows = (await self.session.execute(stmt)).mappings().all()
         return [
@@ -274,7 +274,7 @@ class AnalyticsService:
                 select(H3AnalyticsRecord.h3_index)
                 .where(*self._filter_clauses(period, categories, resolution, analysis_type))
                 .group_by(H3AnalyticsRecord.h3_index)
-                .having(func.sum(H3AnalyticsRecord.ad_count) > min_ads_per_cell)
+                .having(func.sum(H3AnalyticsRecord.ad_count) >= min_ads_per_cell)
                 .scalar_subquery()
             )
             filters.append(H3AnalyticsRecord.h3_index.in_(qualified_subq))

@@ -15,6 +15,10 @@ import { fetchFilters, fetchMapData } from "@/lib/api";
 import { useStrings, type Lang } from "@/lib/i18n";
 import type { DashboardFilters } from "@/types/api";
 
+// Fixed noise floor: H3 cells with fewer than this many listings are dropped
+// from the map (team ask — a constant filter, not a slider).
+const MIN_ADS_PER_CELL = 5;
+
 const METRICS: Record<string, { label: string; short: string; fmt: (v: number) => string }> = {
   price: { label: "Qiymət (₼/m²)", short: "Qiymət/m²", fmt: (v) => fmtMoney(v, " ₼/m²") },
   listings: { label: "Elan sayı", short: "Elan", fmt: (v) => fmtNumber(v) }
@@ -130,7 +134,8 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
   const filters: DashboardFilters = { period: activePeriod, categories: cats, resolution: res, analysis_type: analysisType };
   const mapQuery = useQuery({
     queryKey: ["val-map", activePeriod, category, res, analysisType],
-    queryFn: () => fetchMapData(filters, 0),
+    // Fixed noise filter: drop H3 cells with fewer than 5 listings (team ask).
+    queryFn: () => fetchMapData(filters, MIN_ADS_PER_CELL),
     enabled: !!catalog,
     placeholderData: keepPreviousData
   });

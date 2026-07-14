@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 _RESOLUTIONS = [6, 7, 8]
 _TARGET_CATEGORIES = (3, 4)  # Yeni Tikili, Köhne Tikili
 
+# Noise floor: listings priced below this (AZN, total) are garbage/mislabeled
+# (a real Baku flat is never < 5000 ₼) and are dropped BEFORE H3 aggregation,
+# so they never distort a cell's median ₼/m² or ad_count. Fixed, not a slider.
+_MIN_LISTING_PRICE = 5000
+
 _GEOM_SQL = """\
 SELECT
     'geom'                                                               AS analysis_type,
@@ -44,6 +49,7 @@ JOIN index_app_object o
 WHERE i.latitude IS NOT NULL
   AND i.longitude IS NOT NULL
   AND i.owner_price IS NOT NULL
+  AND i.owner_price >= {min_price}
   AND o.type_id = 22
   AND i.category_id IN ({cats})
 GROUP BY 1, 2, 3, 4, 8, 9
@@ -68,6 +74,7 @@ LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
 WHERE i.latitude IS NOT NULL
   AND i.longitude IS NOT NULL
   AND i.owner_price IS NOT NULL
+  AND i.owner_price >= {min_price}
   AND i.category_id IN ({cats})
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, ad_count DESC;
@@ -90,10 +97,10 @@ def _fetch_from_source_db(conn_str: str) -> list[tuple]:
         with conn.cursor() as cur:
             for res in _RESOLUTIONS:
                 logger.info("Fetching geom path (res=%d)…", res)
-                cur.execute(_GEOM_SQL.format(res=res, cats=cats))
+                cur.execute(_GEOM_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE))
                 rows.extend(cur.fetchall())
                 logger.info("Fetching pure_h3 path (res=%d)…", res)
-                cur.execute(_PURE_H3_SQL.format(res=res, cats=cats))
+                cur.execute(_PURE_H3_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE))
                 rows.extend(cur.fetchall())
     return rows
 
