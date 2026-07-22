@@ -165,7 +165,8 @@ export function opropFromReport(id: string, data: RateReportData): OProp {
     id,
     valued: true,
     address: label || "Mənzil",
-    district: "—",
+    // Rayon resolved server-side from the coordinates (team #2).
+    district: data.rayon || "—",
     type: f?.type || "—",
     area: f?.area ?? 0,
     rooms: f?.rooms ?? null,

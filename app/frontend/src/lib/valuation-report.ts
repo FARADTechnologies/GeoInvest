@@ -183,6 +183,7 @@ type PredictResponse = {
   investment_metrics: RateReportData["ai_data"]["investment_metrics"];
   as_of_date?: string | null;
   accessibility_data?: RateReportData["accessibility_data"];
+  rayon?: string | null;
 };
 
 export function reportFromPredict(resp: PredictResponse, input: ValuationInput): RateReportData {
@@ -197,6 +198,7 @@ export function reportFromPredict(resp: PredictResponse, input: ValuationInput):
     latitude: input.latitude ?? null,
     longitude: input.longitude ?? null,
     listing_price: null, // form flow → mortgage uses predicted sale price
+    rayon: resp.rayon ?? input.rayon ?? null,
     features: featuresFromInput(input),
     source: { kind: "form" }
   };
@@ -310,6 +312,7 @@ export async function valuateByLink(url: string): Promise<LinkResult> {
     longitude?: number | null;
     listing_price?: number | null;
     actual_price?: number | null;
+    rayon?: string | null;
   };
   return {
     data: {
@@ -318,6 +321,7 @@ export async function valuateByLink(url: string): Promise<LinkResult> {
       latitude: resp.latitude ?? null,
       longitude: resp.longitude ?? null,
       listing_price: resp.listing_price ?? resp.actual_price ?? null,
+      rayon: resp.rayon ?? null,
       features: null,
       source: { kind: "link", url }
     },

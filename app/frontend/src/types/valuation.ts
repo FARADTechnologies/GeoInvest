@@ -168,6 +168,9 @@ export type RateReportData = {
   // null the calculator uses the predicted sale price with a "Homora
   // qiymətləndirməsinə əsasən" label.
   listing_price?: number | null;
+  // Rayon resolved from the coordinates server-side (team #2) so the report /
+  // history row can show it — the predict server itself returns no rayon.
+  rayon?: string | null;
   features: ReportFeatures | null;
   source: ReportSource;
 };

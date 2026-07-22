@@ -85,6 +85,16 @@ async function fetchMarketSegments(): Promise<SegData> {
   return res.json();
 }
 
+// Real monthly sale (₼/m²) + rent (₼) curves per build type (team #3b/d/e).
+type TrendPoint = { date: string; value: number };
+type TrendCat = { all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[] };
+type MarketTrends = { sale: TrendCat; rent: TrendCat };
+async function fetchMarketTrends(): Promise<MarketTrends> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/trends`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("market trends unavailable");
+  return res.json();
+}
+
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
 function unitOf(text: string): number {
   let h = 2166136261;
@@ -277,13 +287,16 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const marketQuery = useQuery({ queryKey: ["valuation", "market"], queryFn: fetchMarketAnalysis });
   // Real room-count segments (team #3h) — independent of the modelled fallback.
   const segQuery = useQuery({ queryKey: ["valuation", "market", "segments"], queryFn: fetchMarketSegments });
+  // Real monthly sale/rent curves (team #3b/d/e) — used for the ppm & rent metrics.
+  const trendsQuery = useQuery({ queryKey: ["valuation", "market", "trends"], queryFn: fetchMarketTrends });
   const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
     () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
     [marketQuery.data]
   );
 
   const [range, setRange] = useState("12m");
-  const [trendMetric, setTrendMetric] = useState("index");
+  const [trendMetric, setTrendMetric] = useState("ppm");
+  const [trendCat, setTrendCat] = useState("all");
   const [trendDistrict, setTrendDistrict] = useState("all");
   const [sortKey, setSortKey] = useState<keyof Dist>("growth");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -322,9 +335,24 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
     return mktSeries(base, months, trendMetric + trendDistrict, growth, vol);
   }, [MKT_CITY, MKT_DISTRICTS, trendMetric, trendDistrict, months]);
 
+  // Real monthly curve for ppm / rent from the DB (team #3b/d/e); the other
+  // metrics stay modelled for now (index needs the PM's data; yield/liq/txn are
+  // pending). The Kateqoriya dropdown selects all / new / old.
+  const realTrend = useMemo<TrendPoint[] | null>(() => {
+    const td = trendsQuery.data;
+    if (!td) return null;
+    if (trendMetric === "ppm") return td.sale[trendCat as keyof TrendCat] ?? null;
+    if (trendMetric === "rent") return td.rent[trendCat as keyof TrendCat] ?? null;
+    return null;
+  }, [trendsQuery.data, trendMetric, trendCat]);
+  const useReal = !!realTrend && realTrend.length > 0;
+  const realSlice = useReal ? realTrend!.slice(-months) : [];
+  const chartSeries = useReal ? realSlice.map((p) => p.value) : trendSeries;
+  const chartLabels = useReal ? realSlice.map((p) => ({ short: p.date.slice(0, 7) })) : labels;
+
   const trendMeta = MKT_METRICS[trendMetric];
-  const startV = trendSeries[0], endV = trendSeries[trendSeries.length - 1];
-  const changePct = ((endV - startV) / startV) * 100;
+  const startV = chartSeries[0], endV = chartSeries[chartSeries.length - 1];
+  const changePct = startV ? ((endV - startV) / startV) * 100 : 0;
 
   const sortedDistricts = useMemo(
     () => [...MKT_DISTRICTS].sort((a, b) => (sortDir === "asc" ? (a[sortKey] as number) - (b[sortKey] as number) : (b[sortKey] as number) - (a[sortKey] as number))),
@@ -383,6 +411,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
               <div className="card-sub" style={{ marginTop: 4 }}>{trendDistrict === "all" ? "Bütün Bakı" : trendDistrict} üzrə son {months} ayın trendi.</div>
             </div>
             <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+              <MktSelect label={T(`Kateqoriya`)} value={trendCat} onChange={setTrendCat} options={[{ value: "all", label: T(`Mənzillər`) }, { value: "new", label: T(`Yeni tikili`) }, { value: "old", label: T(`Köhnə tikili`) }]} minWidth={130} />
               <MktSelect label={T(`Metrika`)} value={trendMetric} onChange={setTrendMetric} options={MKT_METRIC_KEYS.map((k) => ({ value: k, label: T(MKT_METRICS[k].label) }))} />
               <MktSelect label={T(`Rayon`)} value={trendDistrict} onChange={setTrendDistrict} options={distOptions} />
             </div>
@@ -392,7 +421,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
             <TrendKpi k={`${months} ay əvvəl`} v={trendMeta.fmt(startV)} />
             <TrendKpi k={T(`Dəyişiklik`)} v={`${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`} tone={changePct > 0 ? "green" : changePct < 0 ? "red" : "gray"} />
           </div>
-          <MarketLineChart series={trendSeries} labels={labels} metricKey={trendMetric} color={trendMetric === "liq" || trendMetric === "yield" ? "#2A6FDB" : "#D9531E"} />
+          <MarketLineChart series={chartSeries} labels={chartLabels} metricKey={trendMetric} color={trendMetric === "liq" || trendMetric === "yield" ? "#2A6FDB" : "#D9531E"} />
         </div>
 
         {/* District table */}

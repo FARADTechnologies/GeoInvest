@@ -12,8 +12,10 @@ from app.services.predict import (
     call_predict,
     list_listings,
     market_room_segments,
+    market_trends,
     nearby_objects,
     predict_by_link,
+    resolve_rayon,
 )
 
 router = APIRouter()
@@ -30,9 +32,12 @@ async def model_predict(payload: PredictRequest) -> dict:
     batches must call this sequentially (one property at a time).
     """
     try:
-        return await call_predict(payload.model_dump())
+        result = await call_predict(payload.model_dump())
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+    # Resolve the rayon from the coordinates so the report can show it (team #2).
+    result["rayon"] = await resolve_rayon(payload.latitude, payload.longitude)
+    return result
 
 
 @router.post("/model/predict/link")
@@ -44,9 +49,11 @@ async def model_predict_link(payload: LinkRequest) -> dict:
     shows no form feature grid (features stays null on the frontend, BA §6).
     """
     try:
-        return await predict_by_link(payload.flat_link)
+        result = await predict_by_link(payload.flat_link)
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+    result["rayon"] = await resolve_rayon(result.get("latitude"), result.get("longitude"))
+    return result
 
 
 @router.post("/model/nearby")
@@ -81,5 +88,15 @@ async def model_market_segments() -> dict:
     type for the Bazar analizi 'Otaq sayına görə seqment' block (team #3h)."""
     try:
         return await market_room_segments()
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.get("/model/market/trends")
+async def model_market_trends() -> dict:
+    """Real monthly sale ₼/m² and rent ₼ curves per build type for the Bazar
+    analizi trend chart (team #3b/d/e)."""
+    try:
+        return await market_trends()
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc

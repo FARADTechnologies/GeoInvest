@@ -238,6 +238,39 @@ def _source_host(url: str | None) -> str:
     return m.group(1) if m else "—"
 
 
+# ── Rayon from coordinates (team #2) ─────────────────────────────────────────
+#
+# The source DB / predict server carry no rayon for a valuation, so we resolve
+# it spatially: which of the 12 Baku rayon polygons (index_app_object type_id=22)
+# contains the point. Same join the analytics pipeline uses. Read-only. This
+# fixes the "rayon doesn't appear after valuation" problem in one place.
+
+def _query_rayon(conn_str: str, lat: float, lon: float) -> str | None:
+    with psycopg.connect(conn_str, connect_timeout=15) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT o.name FROM index_app_object o "
+                "WHERE o.type_id = 22 AND ST_Contains("
+                "  o.geom, ST_SetSRID(ST_MakePoint(%s, %s), 4326)) LIMIT 1",
+                (lon, lat),
+            )
+            row = cur.fetchone()
+            return row[0] if row else None
+
+
+async def resolve_rayon(lat: float | None, lon: float | None) -> str | None:
+    """Baku rayon name for a coordinate, or None. Never raises (best-effort)."""
+    if not settings.source_database_url or lat is None or lon is None:
+        return None
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        return await asyncio.to_thread(_query_rayon, conn_str, float(lat), float(lon))
+    except (psycopg.Error, ValueError, TypeError):
+        return None
+
+
 def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
     """Runs synchronously in a thread (psycopg). Newest-predicted apartments."""
     with psycopg.connect(
@@ -245,14 +278,17 @@ def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, title, address, size, rooms_qty, floor_level, "
-                "owner_price, predicted_sale_price, category_id, source_url, "
-                "created_date, latitude, longitude "
-                "FROM item_app_items "
-                "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
-                "AND category_id IN (3, 4) AND size > 0 "
-                "AND COALESCE(owner_price, predicted_sale_price, 0) >= %s "
-                "ORDER BY prediction_updated_at DESC NULLS LAST "
+                "SELECT i.id, i.title, i.address, i.size, i.rooms_qty, "
+                "i.floor_level, i.owner_price, i.predicted_sale_price, "
+                "i.category_id, i.source_url, i.created_date, i.latitude, "
+                "i.longitude, o.name AS rayon "
+                "FROM item_app_items i "
+                "LEFT JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
+                "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
+                "WHERE i.deleted IS NOT TRUE AND i.prediction_info IS NOT NULL "
+                "AND i.category_id IN (3, 4) AND i.size > 0 "
+                "AND COALESCE(i.owner_price, i.predicted_sale_price, 0) >= %s "
+                "ORDER BY i.prediction_updated_at DESC NULLS LAST "
                 "LIMIT %s OFFSET %s",
                 (_MIN_LISTING_PRICE, limit, offset),
             )
@@ -278,7 +314,7 @@ async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
     out: list[dict] = []
     for (
         rid, title, address, size, rooms, floor, owner_price, pred_price,
-        cat_id, source_url, created, lat, lon,
+        cat_id, source_url, created, lat, lon, rayon,
     ) in rows:
         area = float(size or 0)
         price = float(owner_price or pred_price or 0)
@@ -287,7 +323,8 @@ async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
                 "id": str(rid),
                 "title": title or address or "Mənzil",
                 "address": address,
-                "rayon": _derive_rayon(address),
+                # Real rayon from the spatial join; street address as last resort.
+                "rayon": rayon or _derive_rayon(address),
                 "rooms": int(rooms or 0),
                 "area": round(area, 1),
                 "price": round(price),
@@ -388,3 +425,80 @@ async def market_room_segments() -> dict:
         return segs
 
     return {"all": build((3, 4)), "new": build((3,)), "old": build((4,))}
+
+
+# ── Bazar analizi — real monthly price / rent trends (team #3b/d/e) ───────────
+#
+# Each valuated listing carries a 12-month sale + rent price_trend inside its
+# prediction (ai_data). Averaging the point estimates per month gives a real
+# market curve: avg ₼/m² for sale, avg ₼/month for rent — split by build type
+# so the Kateqoriya dropdown can switch (all / new / old). Read-only.
+
+def _query_trend(conn_str: str, kind: str) -> list[tuple]:
+    """(category_id, date, value, count) monthly averages for one metric.
+
+    kind='sale' → avg ₼/m² (point_estimate / size); kind='rent' → avg ₼/month.
+    """
+    node = "sale_estimate" if kind == "sale" else "rent_estimate"
+    value_expr = (
+        "(pt->>'point_estimate')::numeric / NULLIF(i.size, 0)"
+        if kind == "sale"
+        else "(pt->>'point_estimate')::numeric"
+    )
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=60000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT i.category_id, pt->>'date' AS d, "
+                f"  round(avg({value_expr})) AS v, count(*) AS n "
+                "FROM item_app_items i, jsonb_array_elements(COALESCE("
+                f"  i.prediction_info->'{node}', "
+                f"  i.prediction_info->'ai_data'->'{node}')->'price_trend') pt "
+                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
+                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                "  AND i.predicted_sale_price >= %s "
+                "GROUP BY 1, 2 ORDER BY 2",
+                (_MIN_LISTING_PRICE,),
+            )
+            return cur.fetchall()
+
+
+async def market_trends() -> dict:
+    """Monthly sale ₼/m² and rent ₼ curves per build type (all / new / old).
+
+    Returns { "sale": {all:[{date,value}], new:[...], old:[...]},
+              "rent": {...} }.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Bazar bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        sale_rows = await asyncio.to_thread(_query_trend, conn_str, "sale")
+        rent_rows = await asyncio.to_thread(_query_trend, conn_str, "rent")
+    except psycopg.Error as exc:
+        raise PredictError(502, "Bazar trend məlumatı alınmadı.") from exc
+
+    def fold(rows: list[tuple]) -> dict:
+        # date -> {cat_id: (value, count)}
+        by_date: dict[str, dict[int, tuple[float, int]]] = {}
+        for cat_id, d, v, n in rows:
+            by_date.setdefault(d, {})[int(cat_id)] = (float(v or 0), int(n or 0))
+        dates = sorted(by_date)
+
+        def series(cats: tuple[int, ...]) -> list[dict]:
+            out = []
+            for d in dates:
+                parts = [by_date[d][c] for c in cats if c in by_date[d]]
+                cnt = sum(p[1] for p in parts)
+                if cnt == 0:
+                    continue
+                val = round(sum(p[0] * p[1] for p in parts) / cnt)
+                out.append({"date": d, "value": val})
+            return out
+
+        return {"all": series((3, 4)), "new": series((3,)), "old": series((4,))}
+
+    return {"sale": fold(sale_rows), "rent": fold(rent_rows)}

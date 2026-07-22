@@ -95,6 +95,7 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
                 <div style={{ fontSize: 15, fontWeight: 700, marginTop: 2 }}>{dash(features.address)}</div>
               </div>
               <div className="info-grid">
+                <InfoCell k={T("Rayon")}>{data.rayon ?? "—"}</InfoCell>
                 <InfoCell k={T("Mənzil növü")}>{dash(features.type)}</InfoCell>
                 <InfoCell k={T("Təmir vəziyyəti")}>{dash(features.repair)}</InfoCell>
                 <InfoCell k={T("Çıxarış")}>{dash(features.extract)}</InfoCell>
