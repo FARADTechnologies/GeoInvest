@@ -75,6 +75,16 @@ async function fetchMarketAnalysis(): Promise<ApiMarket> {
   return res.json();
 }
 
+// Real room-count segments (₼/m², rent, yield, share) from the source DB,
+// split by build type so the Kateqoriya dropdown (#3a) can switch (team #3h).
+type SegRow = { rooms: string; ppm: number; rent: number; yield_pct: number; count: number; share: number };
+type SegData = { all: SegRow[]; new: SegRow[]; old: SegRow[] };
+async function fetchMarketSegments(): Promise<SegData> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/segments`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("market segments unavailable");
+  return res.json();
+}
+
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
 function unitOf(text: string): number {
   let h = 2166136261;
@@ -265,6 +275,8 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   // Real market aggregates (ppm/counts/city median) → modelled into the page's
   // full data model; falls back to the static baseline while loading / on error.
   const marketQuery = useQuery({ queryKey: ["valuation", "market"], queryFn: fetchMarketAnalysis });
+  // Real room-count segments (team #3h) — independent of the modelled fallback.
+  const segQuery = useQuery({ queryKey: ["valuation", "market", "segments"], queryFn: fetchMarketSegments });
   const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
     () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
     [marketQuery.data]
@@ -276,6 +288,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const [sortKey, setSortKey] = useState<keyof Dist>("growth");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [segMetric, setSegMetric] = useState("ppm");
+  const [segCat, setSegCat] = useState("all");
   const [salesCat, setSalesCat] = useState("all");
   const [salesRegion, setSalesRegion] = useState("all");
   const salesBuffer = 30;
@@ -327,12 +340,18 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const falling = movers.slice(-4).reverse();
   const yieldBars = [...MKT_DISTRICTS].sort((a, b) => b.yield - a.yield).map((d) => ({ label: d.name, value: d.yield }));
 
-  const segValues = MKT_ROOM_SEGMENTS.map((s) => ({
-    label: s.rooms,
-    value: segMetric === "ppm" ? s.ppm : segMetric === "yield" ? s.yield : segMetric === "rent" ? s.rent : s.liq,
+  // Real segments (source DB) filtered by the Kateqoriya dropdown; fall back to
+  // the modelled baseline while loading / on error. Liquidity ("liq") is not
+  // shown here yet — the team is providing that basis separately (#3h note).
+  const segSource = segQuery.data
+    ? (segQuery.data[segCat as keyof SegData] ?? segQuery.data.all).map((s) => ({ label: s.rooms, ppm: s.ppm, yieldV: s.yield_pct, rent: s.rent, share: s.share }))
+    : MKT_ROOM_SEGMENTS.map((s) => ({ label: s.rooms, ppm: s.ppm, yieldV: s.yield, rent: s.rent, share: s.share }));
+  const segValues = segSource.map((s) => ({
+    label: s.label,
+    value: segMetric === "ppm" ? s.ppm : segMetric === "yield" ? s.yieldV : s.rent,
     share: s.share
   }));
-  const segMax = Math.max(...segValues.map((s) => s.value));
+  const segMax = Math.max(...segValues.map((s) => s.value), 1);
 
   const distOptions = [{ value: "all", label: "Bütün Bakı" }, ...MKT_DISTRICTS.map((d) => ({ value: d.name, label: d.name }))];
 
@@ -473,7 +492,10 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                 <div className="card-title">{T(`Otaq sayına görə seqment`)}</div>
                 <div className="card-sub" style={{ marginTop: 4 }}>{T(`Bazarın otaq sayı üzrə bölgüsü və göstəriciləri.`)}</div>
               </div>
-              <MktSelect value={segMetric} onChange={setSegMetric} options={[{ value: "ppm", label: "Qiymət ₼/m²" }, { value: "yield", label: "Gəlirlilik" }, { value: "rent", label: "Kirayə ₼" }, { value: "liq", label: "Likvidlik" }]} minWidth={140} />
+              <div className="fl-row" style={{ gap: 8, flexWrap: "wrap" }}>
+                <MktSelect value={segCat} onChange={setSegCat} options={[{ value: "all", label: T(`Mənzillər`) }, { value: "new", label: T(`Yeni tikili`) }, { value: "old", label: T(`Köhnə tikili`) }]} minWidth={130} />
+                <MktSelect value={segMetric} onChange={setSegMetric} options={[{ value: "ppm", label: "Qiymət ₼/m²" }, { value: "yield", label: "Gəlirlilik" }, { value: "rent", label: "Kirayə ₼" }]} minWidth={140} />
+              </div>
             </div>
             <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
               {segValues.map((s, i) => (

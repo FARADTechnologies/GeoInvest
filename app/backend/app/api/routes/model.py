@@ -11,6 +11,7 @@ from app.services.predict import (
     PredictError,
     call_predict,
     list_listings,
+    market_room_segments,
     nearby_objects,
     predict_by_link,
 )
@@ -72,3 +73,13 @@ async def model_listings(limit: int = 500, offset: int = 0) -> ListingsResponse:
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
     return ListingsResponse(items=[ListingRow(**r) for r in rows], total=len(rows))
+
+
+@router.get("/model/market/segments")
+async def model_market_segments() -> dict:
+    """Real room-count market segments (₼/m², rent, yield, share) split by build
+    type for the Bazar analizi 'Otaq sayına görə seqment' block (team #3h)."""
+    try:
+        return await market_room_segments()
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc

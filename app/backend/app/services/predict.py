@@ -302,3 +302,89 @@ async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
             }
         )
     return out
+
+
+# ── Bazar analizi — real room-count segments from the source DB (team #3h) ────
+#
+# Per room count (1..5+) and build type (all / new / old): average ₼/m², monthly
+# rent, gross yield and share — computed straight from the valuated listings
+# (item_app_items), so the Otaq sayına görə seqment block shows real numbers
+# instead of modelled ones. Read-only. Liquidity is intentionally omitted (the
+# team is providing that basis separately).
+
+def _query_room_segments(conn_str: str) -> list[tuple]:
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=30000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT category_id, LEAST(rooms_qty, 5) AS rooms, "
+                "  round(avg(predicted_sale_price / NULLIF(size, 0))) AS ppm, "
+                "  round(avg(predicted_rent_price)) AS rent, "
+                "  round(avg(predicted_rent_price * 12 / "
+                "    NULLIF(predicted_sale_price, 0) * 100)::numeric, 1) AS yield_pct, "
+                "  count(*) AS n "
+                "FROM item_app_items "
+                "WHERE category_id IN (3, 4) AND prediction_info IS NOT NULL "
+                "  AND deleted IS NOT TRUE AND size > 0 AND rooms_qty BETWEEN 1 AND 8 "
+                "  AND predicted_sale_price >= %s AND predicted_rent_price IS NOT NULL "
+                "GROUP BY 1, 2 ORDER BY 2",
+                (_MIN_LISTING_PRICE,),
+            )
+            return cur.fetchall()
+
+
+async def market_room_segments() -> dict:
+    """Room-count segments (₼/m², rent, yield, share) split by build type.
+
+    Returns { "all": [...], "new": [...], "old": [...] } so the frontend's
+    Kateqoriya dropdown (#3a) can switch between them. Each list item is
+    { rooms, ppm, rent, yield_pct, count, share }.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Bazar bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        rows = await asyncio.to_thread(_query_room_segments, conn_str)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Bazar seqment məlumatı alınmadı.") from exc
+
+    labels = {1: "1 otaq", 2: "2 otaq", 3: "3 otaq", 4: "4 otaq", 5: "5+ otaq"}
+    # rooms -> {"new": agg, "old": agg}; then fold into all/new/old lists.
+    by_room: dict[int, dict[int, dict]] = {}
+    for cat_id, rooms, ppm, rent, yield_pct, n in rows:
+        by_room.setdefault(int(rooms), {})[int(cat_id)] = {
+            "ppm": float(ppm or 0),
+            "rent": float(rent or 0),
+            "yield_pct": float(yield_pct or 0),
+            "count": int(n or 0),
+        }
+
+    def build(pick_cats: tuple[int, ...]) -> list[dict]:
+        segs = []
+        for rooms in sorted(by_room):
+            parts = [by_room[rooms][c] for c in pick_cats if c in by_room[rooms]]
+            cnt = sum(p["count"] for p in parts)
+            if cnt == 0:
+                continue
+            # count-weighted averages so mixing new+old is representative.
+            wavg = lambda k: round(sum(p[k] * p["count"] for p in parts) / cnt)
+            segs.append(
+                {
+                    "rooms": labels.get(rooms, f"{rooms} otaq"),
+                    "ppm": wavg("ppm"),
+                    "rent": wavg("rent"),
+                    "yield_pct": round(
+                        sum(p["yield_pct"] * p["count"] for p in parts) / cnt, 1
+                    ),
+                    "count": cnt,
+                }
+            )
+        total = sum(s["count"] for s in segs) or 1
+        for s in segs:
+            s["share"] = round(s["count"] / total * 100)
+        return segs
+
+    return {"all": build((3, 4)), "new": build((3,)), "old": build((4,))}
