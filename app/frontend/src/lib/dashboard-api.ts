@@ -114,13 +114,29 @@ type ListingApiRow = {
   price: number; ppm: number; floor: number; cat: string; source: string;
   source_url: string | null; date: string;
 };
+// The listings payload is large (~170 KB, ~1.5-3 s). The shared apiGet timeout
+// is 1.5 s, so it aborted this call, silently fell back to mock AND tripped the
+// 15 s backend-down cooldown that pushed other views to mock too. Use a
+// dedicated fetch with a generous timeout instead.
+const LISTINGS_TIMEOUT_MS = 20_000;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
+
 export async function fetchListingsDB(): Promise<Listing[]> {
   try {
-    const res = await apiGet<{ items: ListingApiRow[]; total: number }>(
-      "/model/listings",
-      undefined,
-      { limit: "500" }
-    );
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LISTINGS_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${API_PREFIX}/model/listings?limit=500`, {
+        headers: { Accept: "application/json" },
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!response.ok) throw new Error(`listings ${response.status}`);
+    const res = (await response.json()) as { items: ListingApiRow[]; total: number };
     return res.items.map((r) => ({
       id: r.id,
       // The source DB has no rayon column and addresses are street-only, so a
