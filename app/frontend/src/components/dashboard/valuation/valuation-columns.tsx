@@ -16,7 +16,7 @@ import type { OProp } from "@/components/dashboard/valuation/valuation-core";
 export type ColKey =
   | "type" | "address" | "area" | "rooms" | "district" | "totalFloors"
   | "fairValue" | "pricePerM2" | "monthlyRent" | "yield" | "payback"
-  | "liquidity" | "score" | "risk";
+  | "liquidity" | "score" | "risk" | "growth";
 
 export type ColAlign = "num" | "center" | "left";
 
@@ -54,7 +54,10 @@ export const COLUMNS: ColDef[] = [
   { key: "payback", label: "Geri ödəmə", group: "valuation", align: "num", width: 110, defaultOn: true, render: (p, dr) => (dr ? dash : `${p.payback} il`) },
   { key: "liquidity", label: "Likvidlik", group: "valuation", align: "num", width: 95, defaultOn: false, render: (p, dr) => (dr ? dash : `${p.liquidity} gün`) },
   { key: "score", label: "Skor", group: "valuation", align: "center", width: 70, defaultOn: false, render: (p, dr) => (dr ? dash : p.score) },
-  { key: "risk", label: "Risk", group: "valuation", align: "center", width: 90, defaultOn: false, render: (p, dr) => (dr ? dash : p.risk) }
+  { key: "risk", label: "Risk", group: "valuation", align: "center", width: 90, defaultOn: false, render: (p, dr) => (dr ? dash : p.risk) },
+  // Price appreciation over the model's stored trend window (team #1).
+  { key: "growth", label: "Qiymət artımı", group: "valuation", align: "num", width: 115, defaultOn: false, render: (p, dr) =>
+      dr || p.growth == null ? dash : <span style={{ color: p.growth >= 0 ? "var(--green)" : "var(--red)", fontWeight: 600 }}>{p.growth >= 0 ? "+" : ""}{p.growth.toFixed(1)}%</span> }
 ];
 
 const DEFAULT_ON: ColKey[] = COLUMNS.filter((c) => c.defaultOn).map((c) => c.key);

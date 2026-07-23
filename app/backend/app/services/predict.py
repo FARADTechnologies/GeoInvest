@@ -502,3 +502,107 @@ async def market_trends() -> dict:
         return {"all": series((3, 4)), "new": series((3,)), "old": series((4,))}
 
     return {"sale": fold(sale_rows), "rent": fold(rent_rows)}
+
+
+# ── Bazar analizi — per-rayon yield + growth (team #3g / #3j) ─────────────────
+#
+# #3g: average gross rental yield per rayon over listings valuated in the last
+#      month.  #3j: average price growth per rayon across the stored trend
+#      window, used for the fastest / slowest growing rayon lists.
+# Rayon comes from the spatial join (no rayon column in the source DB).
+
+# Rayons with fewer valuated listings than this are excluded from the growth
+# ranking so a 3-listing rayon can't top the "fastest growing" list.
+_MIN_RAYON_SAMPLE = 20
+
+
+def _query_rayon_yield(conn_str: str) -> list[tuple]:
+    """(rayon, avg yield %, avg rent, n) for the last 30 days of valuations."""
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=60000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT o.name, "
+                "  round(avg(i.predicted_rent_price * 12 / "
+                "    NULLIF(i.predicted_sale_price, 0) * 100)::numeric, 2), "
+                "  round(avg(i.predicted_rent_price)), count(*) "
+                "FROM item_app_items i "
+                "JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
+                "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
+                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
+                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                "  AND i.predicted_sale_price >= %s "
+                "  AND i.predicted_rent_price IS NOT NULL "
+                "  AND i.prediction_updated_at >= ("
+                "    SELECT max(prediction_updated_at) - interval '30 days' "
+                "    FROM item_app_items) "
+                "GROUP BY 1",
+                (_MIN_LISTING_PRICE,),
+            )
+            return cur.fetchall()
+
+
+def _query_rayon_growth(conn_str: str) -> list[tuple]:
+    """(rayon, avg growth % across the stored trend window, n)."""
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=120000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT o.name, "
+                "  round(avg((tr.last_v / NULLIF(tr.first_v, 0) - 1) * 100)::numeric, 2), "
+                "  count(*) "
+                "FROM item_app_items i "
+                "JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
+                "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
+                "CROSS JOIN LATERAL ("
+                "  SELECT (array_agg((pt->>'point_estimate')::numeric "
+                "            ORDER BY pt->>'date'))[1] AS first_v, "
+                "         (array_agg((pt->>'point_estimate')::numeric "
+                "            ORDER BY pt->>'date' DESC))[1] AS last_v "
+                "  FROM jsonb_array_elements(COALESCE("
+                "    i.prediction_info->'sale_estimate', "
+                "    i.prediction_info->'ai_data'->'sale_estimate')->'price_trend') pt "
+                ") tr "
+                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
+                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                "  AND i.predicted_sale_price >= %s AND tr.first_v > 0 "
+                "GROUP BY 1",
+                (_MIN_LISTING_PRICE,),
+            )
+            return cur.fetchall()
+
+
+async def market_rayons() -> dict:
+    """Per-rayon rental yield (last month) and price growth for Bazar analizi.
+
+    Returns { "rayons": [{rayon, yield_pct, rent, recent_count, growth_pct,
+    growth_count}], "min_sample": N } — the frontend ranks the fastest /
+    slowest growing rayons from the entries that meet min_sample.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Bazar bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        yield_rows = await asyncio.to_thread(_query_rayon_yield, conn_str)
+        growth_rows = await asyncio.to_thread(_query_rayon_growth, conn_str)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Rayon məlumatı alınmadı.") from exc
+
+    merged: dict[str, dict] = {}
+    for name, yield_pct, rent, n in yield_rows:
+        merged.setdefault(name, {"rayon": name}).update(
+            {
+                "yield_pct": float(yield_pct or 0),
+                "rent": float(rent or 0),
+                "recent_count": int(n or 0),
+            }
+        )
+    for name, growth_pct, n in growth_rows:
+        merged.setdefault(name, {"rayon": name}).update(
+            {"growth_pct": float(growth_pct or 0), "growth_count": int(n or 0)}
+        )
+    return {"rayons": list(merged.values()), "min_sample": _MIN_RAYON_SAMPLE}

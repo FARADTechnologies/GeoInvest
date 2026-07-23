@@ -50,6 +50,8 @@ export type OProp = {
   rentRange: number[];
   priceBasis?: string;
   marketMedian?: number | null;
+  // Price appreciation (%) across the model's stored trend window (team #1).
+  growth?: number;
 };
 
 export function toOProp(r: ValuationResult, id: string, valued = true): OProp {
@@ -184,8 +186,20 @@ export function opropFromReport(id: string, data: RateReportData): OProp {
     repair: f?.repair ?? null,
     extract: f?.extract ?? null,
     range: [sale.lower_bound, sale.upper_bound],
-    rentRange: [rentv.lower_bound, rentv.upper_bound]
+    rentRange: [rentv.lower_bound, rentv.upper_bound],
+    growth: priceGrowthPct(data)
   };
+}
+
+// Price appreciation (%) across the model's stored sale trend (team #1):
+// first → last point estimate. Undefined when the trend is missing/degenerate.
+function priceGrowthPct(data: RateReportData): number | undefined {
+  const trend = data.ai_data?.sale_estimate?.price_trend;
+  if (!trend || trend.length < 2) return undefined;
+  const first = trend[0]?.point_estimate;
+  const last = trend[trend.length - 1]?.point_estimate;
+  if (!first || !last) return undefined;
+  return +(((last - first) / first) * 100).toFixed(1);
 }
 
 export type Stats = {

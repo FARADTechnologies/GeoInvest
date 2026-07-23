@@ -11,6 +11,7 @@ from app.services.predict import (
     PredictError,
     call_predict,
     list_listings,
+    market_rayons,
     market_room_segments,
     market_trends,
     nearby_objects,
@@ -98,5 +99,15 @@ async def model_market_trends() -> dict:
     analizi trend chart (team #3b/d/e)."""
     try:
         return await market_trends()
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.get("/model/market/rayons")
+async def model_market_rayons() -> dict:
+    """Per-rayon rental yield (last month) and price growth for the Bazar
+    analizi yield bars and fastest/slowest growing lists (team #3g / #3j)."""
+    try:
+        return await market_rayons()
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc

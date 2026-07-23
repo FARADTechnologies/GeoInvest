@@ -95,6 +95,15 @@ async function fetchMarketTrends(): Promise<MarketTrends> {
   return res.json();
 }
 
+// Per-rayon rental yield (last month, #3g) and price growth (#3j) — real.
+type RayonRow = { rayon: string; yield_pct?: number; rent?: number; recent_count?: number; growth_pct?: number; growth_count?: number };
+type RayonData = { rayons: RayonRow[]; min_sample: number };
+async function fetchMarketRayons(): Promise<RayonData> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/rayons`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("market rayons unavailable");
+  return res.json();
+}
+
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
 function unitOf(text: string): number {
   let h = 2166136261;
@@ -289,6 +298,8 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const segQuery = useQuery({ queryKey: ["valuation", "market", "segments"], queryFn: fetchMarketSegments });
   // Real monthly sale/rent curves (team #3b/d/e) — used for the ppm & rent metrics.
   const trendsQuery = useQuery({ queryKey: ["valuation", "market", "trends"], queryFn: fetchMarketTrends });
+  // Real per-rayon yield (#3g) + growth ranking (#3j).
+  const rayonsQuery = useQuery({ queryKey: ["valuation", "market", "rayons"], queryFn: fetchMarketRayons });
   const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
     () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
     [marketQuery.data]
@@ -363,10 +374,29 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
     else { setSortKey(key); setSortDir("desc"); }
   };
 
-  const movers = [...MKT_DISTRICTS].sort((a, b) => b.growth - a.growth);
-  const rising = movers.slice(0, 4);
-  const falling = movers.slice(-4).reverse();
-  const yieldBars = [...MKT_DISTRICTS].sort((a, b) => b.yield - a.yield).map((d) => ({ label: d.name, value: d.yield }));
+  // #3g — rental yield per rayon from listings valuated in the last month.
+  const shortRayon = (n: string) => n.replace(" rayonu", "");
+  const yieldBars = useMemo(() => {
+    const real = rayonsQuery.data?.rayons.filter((r) => r.yield_pct != null) ?? [];
+    if (real.length > 0) {
+      return [...real].sort((a, b) => (b.yield_pct ?? 0) - (a.yield_pct ?? 0))
+        .map((r) => ({ label: shortRayon(r.rayon), value: r.yield_pct ?? 0 }));
+    }
+    return [...MKT_DISTRICTS].sort((a, b) => b.yield - a.yield).map((d) => ({ label: d.name, value: d.yield }));
+  }, [rayonsQuery.data, MKT_DISTRICTS]);
+
+  // #3j — fastest / slowest growing rayons, ranked on real growth. Rayons with
+  // too few valuated listings are excluded so a 3-listing rayon can't top it.
+  const { rising, falling } = useMemo(() => {
+    const min = rayonsQuery.data?.min_sample ?? 20;
+    const real = (rayonsQuery.data?.rayons ?? [])
+      .filter((r) => r.growth_pct != null && (r.growth_count ?? 0) >= min)
+      .sort((a, b) => (b.growth_pct ?? 0) - (a.growth_pct ?? 0))
+      .map((r) => ({ name: shortRayon(r.rayon), growth: r.growth_pct ?? 0 }));
+    if (real.length > 0) return { rising: real.slice(0, 5), falling: real.slice(-5).reverse() };
+    const m = [...MKT_DISTRICTS].sort((a, b) => b.growth - a.growth);
+    return { rising: m.slice(0, 5), falling: m.slice(-5).reverse() };
+  }, [rayonsQuery.data, MKT_DISTRICTS]);
 
   // Real segments (source DB) filtered by the Kateqoriya dropdown; fall back to
   // the modelled baseline while loading / on error. Liquidity ("liq") is not
