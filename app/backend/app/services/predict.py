@@ -295,11 +295,25 @@ def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
             return cur.fetchall()
 
 
-async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
+def _count_listings(conn_str: str) -> int:
+    """Total matching listings (same noise filters as the list) for the header."""
+    with psycopg.connect(conn_str, connect_timeout=15) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT count(*) FROM item_app_items "
+                "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
+                "AND category_id IN (3, 4) AND size > 0 "
+                "AND COALESCE(owner_price, predicted_sale_price, 0) >= %s",
+                (_MIN_LISTING_PRICE,),
+            )
+            return int(cur.fetchone()[0] or 0)
+
+
+async def list_listings(limit: int = 500, offset: int = 0) -> tuple[list[dict], int]:
     """Real apartment listings (Yeni/Köhnə tikili with a stored prediction).
 
-    Feeds the Elanlar view; each row's source_url drives the click-to-report
-    link flow. Read-only.
+    Returns (page_rows, total_count). Feeds the Elanlar view; each row's
+    source_url drives the click-to-report link flow. Read-only.
     """
     if not settings.source_database_url:
         raise PredictError(503, "Elan bazası konfiqurasiya olunmayıb.")
@@ -308,6 +322,7 @@ async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
     )
     try:
         rows = await asyncio.to_thread(_query_listings, conn_str, limit, offset)
+        total = await asyncio.to_thread(_count_listings, conn_str)
     except psycopg.Error as exc:
         raise PredictError(502, "Elan siyahısı alınmadı.") from exc
 
@@ -338,7 +353,7 @@ async def list_listings(limit: int = 500, offset: int = 0) -> list[dict]:
                 "longitude": lon,
             }
         )
-    return out
+    return out, total
 
 
 # ── Bazar analizi — real room-count segments from the source DB (team #3h) ────

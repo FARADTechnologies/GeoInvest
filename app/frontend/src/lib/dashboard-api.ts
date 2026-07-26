@@ -122,13 +122,20 @@ const LISTINGS_TIMEOUT_MS = 20_000;
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
-export async function fetchListingsDB(): Promise<Listing[]> {
+// Number of real listings loaded into the Elanlar view for client-side
+// filter/sort/paginate. The DB has ~13-19k; loading all is too heavy, so we
+// load the newest LISTINGS_PAGE and surface the true total (COUNT) in the
+// header — fixing the "13k shows as 500" the user hit.
+export const LISTINGS_PAGE = 1000;
+export type ListingsResult = { listings: Listing[]; total: number };
+
+export async function fetchListingsDB(): Promise<ListingsResult> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), LISTINGS_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}${API_PREFIX}/model/listings?limit=500`, {
+      response = await fetch(`${API_BASE_URL}${API_PREFIX}/model/listings?limit=${LISTINGS_PAGE}`, {
         headers: { Accept: "application/json" },
         signal: controller.signal
       });
@@ -137,7 +144,7 @@ export async function fetchListingsDB(): Promise<Listing[]> {
     }
     if (!response.ok) throw new Error(`listings ${response.status}`);
     const res = (await response.json()) as { items: ListingApiRow[]; total: number };
-    return res.items.map((r) => ({
+    const listings = res.items.map((r) => ({
       id: r.id,
       // The source DB has no rayon column and addresses are street-only, so a
       // rayon is only sometimes derivable. Fall back to the street so the
@@ -149,15 +156,17 @@ export async function fetchListingsDB(): Promise<Listing[]> {
       area: r.area,
       ppm: r.ppm,
       price: r.price,
-      cat: r.cat === "Köhnə tikili" ? "Köhnə tikili" : "Yeni tikili",
+      cat: (r.cat === "Köhnə tikili" ? "Köhnə tikili" : "Yeni tikili") as Listing["cat"],
       source: r.source,
       status: "active" as const,
       date: r.date,
       floor: r.floor,
       sourceUrl: r.source_url ?? undefined
     }));
+    return { listings, total: res.total || listings.length };
   } catch {
-    return filterListings();
+    const mock = filterListings();
+    return { listings: mock, total: mock.length };
   }
 }
 

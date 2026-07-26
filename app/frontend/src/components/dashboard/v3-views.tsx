@@ -337,10 +337,12 @@ type SortKey = "title" | "rayon" | "rooms" | "area" | "price" | "ppm" | "date";
 
 export function ListingsViewV3({
   t,
-  listings
+  listings,
+  serverTotal = 0
 }: {
   t: Record<string, string>;
   listings: Listing[];
+  serverTotal?: number;
   rayons: RayonStat[];
 }) {
   const [q, setQ] = useState("");
@@ -397,6 +399,12 @@ export function ListingsViewV3({
   const pages = Math.max(1, Math.ceil(total / per));
   const pageRows = rows.slice(page * per, page * per + per);
 
+  // Header count: with no filter show the true DB total (COUNT); with a filter
+  // show the filtered result count. `capped` = the DB has more than we loaded.
+  const filtersActive = q !== "" || rayon !== "all" || cat !== "all" || status !== "all";
+  const headerCount = filtersActive ? total : Math.max(serverTotal, listings.length);
+  const capped = !filtersActive && serverTotal > listings.length;
+
   useEffect(() => {
     setPage(0);
   }, [q, rayon, cat, status]);
@@ -419,7 +427,7 @@ export function ListingsViewV3({
     <div className="hm-v3">
       <Card
         title={t.listingsPageTitle ?? "İlanlar"}
-        sub={`${nf(total)} ilan · ${t.listingsPageSub ?? "Filtrelenebilir ilan çalışma alanı"}`}
+        sub={`${nf(headerCount)} ilan${capped ? ` · ən son ${nf(listings.length)} yüklənib` : ""} · ${t.listingsPageSub ?? "Filtrelenebilir ilan çalışma alanı"}`}
         action={
           <div className="hm-toolbar">
             <div className="hm-search-sm">

@@ -321,12 +321,25 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const months = TIME_RANGES.find((r) => r.key === range)!.months;
   const labels = mktMonthLabels(months);
 
+  // Real KPI values from the DB where available (latest month of the trend +
+  // count-weighted segment yield); index / liquidity / txn stay modelled until
+  // the PM index and the team's liquidity/txn data arrive.
+  const trendPct = (arr?: { value: number }[]) =>
+    arr && arr.length >= 2 ? +(((arr[arr.length - 1].value - arr[0].value) / arr[0].value) * 100).toFixed(1) : undefined;
+  const realPpm = trendsQuery.data?.sale.all?.at(-1)?.value;
+  const realRent = trendsQuery.data?.rent.all?.at(-1)?.value;
+  const realYield = (() => {
+    const segs = segQuery.data?.all ?? [];
+    const n = segs.reduce((s, x) => s + x.count, 0);
+    return n ? +(segs.reduce((s, x) => s + x.yield_pct * x.count, 0) / n).toFixed(1) : undefined;
+  })();
+
   const kpis = [
-    { label: "Orta qiymət/m²", value: fmtMoney(MKT_CITY.ppm, " ₼"), delta: MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
+    { label: "Orta qiymət/m²", value: fmtMoney(realPpm ?? MKT_CITY.ppm, " ₼"), delta: trendPct(trendsQuery.data?.sale.all) ?? MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
     { label: "Qiymət indeksi", value: MKT_CITY.ppmIndex.toFixed(1), delta: MKT_CITY.ppmIndexYoY, sub: "baza 100 = Yan 2022", icon: <Icons.TrendUp size={16} />, accent: true },
-    { label: "Orta gəlirlilik", value: MKT_CITY.yield.toFixed(1) + "%", delta: MKT_CITY.yieldYoY, icon: <Icons.Sparkle size={16} /> },
+    { label: "Orta gəlirlilik", value: (realYield ?? MKT_CITY.yield).toFixed(1) + "%", delta: MKT_CITY.yieldYoY, icon: <Icons.Sparkle size={16} /> },
     { label: "Orta likvidlik", value: MKT_CITY.liquidity + " gün", delta: -MKT_CITY.liquidityYoY, icon: <Icons.Refresh size={16} /> },
-    { label: "Orta kirayə", value: fmtMoney(MKT_CITY.rent), delta: MKT_CITY.rentYoY, icon: <Icons.Building size={16} /> },
+    { label: "Orta kirayə", value: fmtMoney(realRent ?? MKT_CITY.rent), delta: trendPct(trendsQuery.data?.rent.all) ?? MKT_CITY.rentYoY, icon: <Icons.Building size={16} /> },
     { label: "Aylıq əqd həcmi", value: fmtNumber(MKT_CITY.txnVolume), delta: MKT_CITY.txnYoY, icon: <Icons.Layers size={16} /> }
   ];
 

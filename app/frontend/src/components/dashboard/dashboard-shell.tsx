@@ -262,7 +262,8 @@ export function DashboardShell() {
             {activeView === "listings" ? (
               <ListingsViewV3
                 t={t}
-                listings={listingsQuery.data ?? []}
+                listings={listingsQuery.data?.listings ?? []}
+                serverTotal={listingsQuery.data?.total ?? 0}
                 rayons={rayonStatsQuery.data ?? []}
               />
             ) : null}

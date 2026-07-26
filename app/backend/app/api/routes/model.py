@@ -74,13 +74,13 @@ async def model_listings(limit: int = 500, offset: int = 0) -> ListingsResponse:
     Only Yeni/Köhnə tikili rows that already carry a prediction. Each row's
     source_url lets the frontend open the stored prediction via the link flow.
     """
-    limit = max(1, min(limit, 1000))
+    limit = max(1, min(limit, 2000))
     offset = max(0, offset)
     try:
-        rows = await list_listings(limit, offset)
+        rows, total = await list_listings(limit, offset)
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
-    return ListingsResponse(items=[ListingRow(**r) for r in rows], total=len(rows))
+    return ListingsResponse(items=[ListingRow(**r) for r in rows], total=total)
 
 
 @router.get("/model/market/segments")
