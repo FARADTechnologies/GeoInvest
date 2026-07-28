@@ -376,11 +376,14 @@ export function HMBrandHeader({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <HMBrandMarkInline size={28} />
-        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: "-0.02em" }}>
-          {t.brand}
-          <span style={{ fontWeight: 500, opacity: 0.6 }}>.ai</span>
-        </div>
+        {/* Official Homora.ai wordmark (team #4). On the coloured/dark panel the
+            dark logo text is inverted to white so it stays legible. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/homora-logo.svg"
+          alt="Homora.ai"
+          style={{ height: 28, width: "auto", filter: onLight ? "brightness(0) invert(1)" : "none" }}
+        />
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
@@ -428,39 +431,6 @@ export function HMBrandHeader({
         </button>
       </div>
     </div>
-  );
-}
-
-function HMBrandMarkInline({ size = 28 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <defs>
-        <linearGradient
-          id="hm-brand-g"
-          x1="0"
-          y1="0"
-          x2="32"
-          y2="32"
-          gradientUnits="userSpaceOnUse"
-        >
-          <stop offset="0" stopColor="currentColor" stopOpacity="1" />
-          <stop offset="1" stopColor="currentColor" stopOpacity="0.7" />
-        </linearGradient>
-      </defs>
-      <path
-        d="M16 2.5 27.5 9v14L16 29.5 4.5 23V9L16 2.5Z"
-        fill="url(#hm-brand-g)"
-      />
-      <path
-        d="M16 9.5 22.5 13v6L16 22.5 9.5 19v-6L16 9.5Z"
-        fill="#fff"
-        fillOpacity="0.18"
-        stroke="#fff"
-        strokeOpacity="0.55"
-        strokeWidth="1.2"
-      />
-      <circle cx="16" cy="16" r="1.6" fill="#fff" />
-    </svg>
   );
 }
 

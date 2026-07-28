@@ -16,31 +16,31 @@
   --card-foreground: 222 25% 10%;
   --muted: 220 16% 95%;
   --muted-foreground: 220 10% 42%;
-  --primary: 262 83% 58%;          /* Homora violet */
+  --primary: 24 86% 53%;           /* Homora brand orange #EE701E */
   --primary-foreground: 0 0% 100%;
   --secondary: 220 16% 95%;
   --secondary-foreground: 222 25% 10%;
-  --accent: 32 95% 56%;
-  --accent-foreground: 28 30% 12%;
+  --accent: 24 86% 53%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 78% 58%;
   --destructive-foreground: 0 0% 100%;
   --border: 220 14% 90%;
   --input: 220 14% 90%;
-  --ring: 262 83% 58%;
+  --ring: 24 86% 53%;
   --radius: 0.625rem;
 
-  /* Homora extended palette (matches src/tokens.css from the HTML preview) */
-  --brand-50:  #f3e8ff;
-  --brand-100: #e9d5ff;
-  --brand-200: #d8b4fe;
-  --brand-300: #c084fc;
-  --brand-400: #a855f7;
-  --brand-500: #9333ea;
-  --brand-600: #7c3aed;
-  --brand-700: #6d28d9;
-  --brand-800: #5b21b6;
-  --brand-900: #4c1d95;
-  --brand-950: #3b0764;
+  /* Homora brand palette — orange scale around #EE701E (logo colour). */
+  --brand-50:  #fef3ea;
+  --brand-100: #fbdfc7;
+  --brand-200: #f8c39b;
+  --brand-300: #f4a066;
+  --brand-400: #f18640;
+  --brand-500: #ee701e;
+  --brand-600: #d65f14;
+  --brand-700: #b24e12;
+  --brand-800: #8f4013;
+  --brand-900: #822b11;
+  --brand-950: #4a1808;
 
   --surface:        #ffffff;
   --surface-alt:    #fafafa;
@@ -75,17 +75,17 @@
   --card-foreground: 220 14% 96%;
   --muted: 222 18% 16%;
   --muted-foreground: 220 10% 64%;
-  --primary: 262 92% 72%;
+  --primary: 24 88% 62%;           /* Homora orange, lightened for dark */
   --primary-foreground: 222 28% 7%;
   --secondary: 222 18% 16%;
   --secondary-foreground: 220 14% 96%;
-  --accent: 32 95% 60%;
+  --accent: 24 88% 62%;
   --accent-foreground: 28 30% 8%;
   --destructive: 0 78% 64%;
   --destructive-foreground: 0 0% 100%;
   --border: 222 18% 20%;
   --input: 222 18% 20%;
-  --ring: 262 92% 72%;
+  --ring: 24 88% 62%;
 
   --surface:        #15171f;
   --surface-alt:    #1a1d27;
@@ -145,3 +145,6 @@ body {
   border: 2px solid hsl(var(--background));
 }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.4); }
+
+/* Official Homora.ai wordmark (team #4): dark text → white in dark mode. */
+[data-theme="dark"] .app-logo { filter: brightness(0) invert(1); }

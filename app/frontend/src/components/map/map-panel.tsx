@@ -83,7 +83,7 @@ export function MapPanel({ data, loading, error, t, metric }: Props) {
           className="h-2 w-32 rounded-full"
           style={{
             background:
-              "linear-gradient(to right, #fef3c7, #fcd34d, #f59e0b, #ea580c, #7c3aed, #5b21b6)"
+              "linear-gradient(to right, #fef3c7, #fcd34d, #f59e0b, #ea580c, #d65f14, #822b11)"
           }}
         />
         <span className="text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground">

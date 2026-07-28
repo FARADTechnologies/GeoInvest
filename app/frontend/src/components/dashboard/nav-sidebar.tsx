@@ -72,23 +72,10 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
         className="sticky top-0 z-10 -mx-3 -mt-4 mb-1 flex items-center gap-2 border-b bg-card px-5 py-3 transition-colors hover:bg-muted/40"
         aria-label="Homora.ai dashboard"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--brand-600)] text-white">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 2.5 L21 7 V17 L12 21.5 L3 17 V7 Z"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              fill="currentColor"
-              fillOpacity="0.25"
-            />
-          </svg>
-        </div>
+        {/* Official Homora.ai wordmark (team #4); inverted to white in dark mode. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/homora-logo.svg" alt="Homora.ai" className="app-logo h-[22px] w-auto" />
         <div className="flex min-w-0 flex-col">
-          <span className="text-[14px] font-bold tracking-tight">
-            Homora
-            <span className="font-medium text-muted-foreground">.ai</span>
-          </span>
           <span className="truncate text-[10.5px] text-muted-foreground">
             {t.workspace} · Caspian Realty
           </span>

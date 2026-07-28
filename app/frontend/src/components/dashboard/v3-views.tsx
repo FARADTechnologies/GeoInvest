@@ -19,7 +19,7 @@ import "@/components/dashboard/valuation/valuation-orange.css";
 // ── helpers ─────────────────────────────────────────────────────────────
 const nf = (n: number) => Math.round(n).toLocaleString("az-AZ").replace(/,/g, " ");
 
-const SCALE = ["#fde68a", "#fcd34d", "#fb923c", "#f97316", "#e0529c", "#a855f7", "#7c3aed", "#5b21b6"];
+const SCALE = ["#fde68a", "#fcd34d", "#fb923c", "#f97316", "#ee701e", "#d65f14", "#b24e12", "#822b11"];
 function colorFor(t: number) {
   const x = Math.max(0, Math.min(0.999, t)) * (SCALE.length - 1);
   const i = Math.floor(x);

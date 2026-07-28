@@ -12,6 +12,12 @@ import { signIn } from "@/lib/auth";
 // verify. Pure UI; auth side-effects happen via lib/auth.ts.
 // ──────────────────────────────────────────────────────────────────────
 
+// Demo mode is on everywhere EXCEPT production (team #2 — "prod olduqda demo
+// data görsənməsin"). The prod deployment sets NEXT_PUBLIC_APP_ENV=production;
+// dev/staging leave it unset so the demo banner + prefilled credentials stay.
+const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV ?? "";
+const DEMO_MODE = APP_ENV !== "production" && APP_ENV !== "prod";
+
 type Mode = "signin" | "signup" | "forgot" | "otp" | "verify";
 
 type Props = {
@@ -24,8 +30,8 @@ export function HMAuthFlow({ t }: Props) {
   const nextParam = search?.get("next") ?? "/";
 
   const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState("admin@homora.ai");
-  const [password, setPassword] = useState("12345");
+  const [email, setEmail] = useState(DEMO_MODE ? "admin@homora.ai" : "");
+  const [password, setPassword] = useState(DEMO_MODE ? "12345" : "");
   const [name, setName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
@@ -151,7 +157,8 @@ export function HMAuthFlow({ t }: Props) {
           <h1 style={hmStyles.h1}>{t.signInTitle}</h1>
           <p style={hmStyles.sub}>{t.signInSub}</p>
 
-          {/* Demo credentials banner */}
+          {/* Demo credentials banner — hidden in production (team #2). */}
+          {DEMO_MODE && (
           <div
             style={{
               marginTop: 16,
@@ -172,6 +179,7 @@ export function HMAuthFlow({ t }: Props) {
               (örn. <code>admin / 12345</code>).
             </span>
           </div>
+          )}
 
           <form
             onSubmit={(e) => {
