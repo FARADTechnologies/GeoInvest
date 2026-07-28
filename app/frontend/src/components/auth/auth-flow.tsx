@@ -43,7 +43,13 @@ export function HMAuthFlow({ t }: Props) {
   const [otp, setOtp] = useState("");
   const [otpOrigin, setOtpOrigin] = useState<Mode>("signin");
   const [error, setError] = useState("");
+  const [fieldErr, setFieldErr] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  // Keep digits only (VOEN / phone / employee count). Phone also allows a
+  // leading + and spaces so a formatted number can be typed.
+  const digits = (v: string) => v.replace(/\D/g, "");
+  const phoneChars = (v: string) => v.replace(/[^\d+\s]/g, "");
 
   const goto = (m: Mode) => {
     setOtp("");
@@ -73,17 +79,22 @@ export function HMAuthFlow({ t }: Props) {
 
   const handleSignUp = async () => {
     setError("");
-    if (
-      !name.trim() ||
-      !lastName.trim() ||
-      !email.trim() ||
-      !phone.trim() ||
-      !company.trim() ||
-      !taxId.trim() ||
-      !title.trim() ||
-      !password.trim()
-    ) {
-      setError(t.errEmpty || "Email ve şifre gerekli.");
+    // Per-field validation (team #7). Failing fields turn red.
+    const req = t.errRequired ?? "Bu xana tələb olunur";
+    const fe: Record<string, string> = {};
+    if (!name.trim()) fe.name = req;
+    if (!lastName.trim()) fe.lastName = req;
+    if (company.trim().length < 3) fe.company = t.errMin3 ?? "Minimum 3 simvol";
+    if (title.trim().length < 3) fe.title = t.errMin3 ?? "Minimum 3 simvol";
+    if (!taxId.trim()) fe.taxId = req;
+    else if (taxId.length > 15) fe.taxId = t.errMax15 ?? "Maksimum 15 rəqəm";
+    if (!phone.trim()) fe.phone = req;
+    else if (digits(phone).length < 7 || digits(phone).length > 15) fe.phone = t.errPhone ?? "Telefon formatı düzgün deyil";
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fe.email = t.errEmail ?? "E-poçt düzgün deyil";
+    if (!password.trim()) fe.password = req;
+    setFieldErr(fe);
+    if (Object.keys(fe).length > 0) {
+      setError(t.errFix ?? "Zəhmət olmasa qırmızı xanaları düzəldin.");
       return;
     }
     setSubmitting(true);
@@ -285,14 +296,18 @@ export function HMAuthFlow({ t }: Props) {
                 label={t.firstName ?? t.fullName}
                 value={name}
                 onChange={setName}
-                placeholder={t.fullNamePlaceholder}
+                placeholder="Aysel"
+                error={!!fieldErr.name}
+                errorText={fieldErr.name}
               />
               <HMField
                 icon="user"
                 label={t.lastName ?? "Soyad"}
                 value={lastName}
                 onChange={setLastName}
-                placeholder="Mammadova"
+                placeholder="Məmmədova"
+                error={!!fieldErr.lastName}
+                errorText={fieldErr.lastName}
               />
             </div>
             <div
@@ -308,13 +323,19 @@ export function HMAuthFlow({ t }: Props) {
                 value={company}
                 onChange={setCompany}
                 placeholder={t.companyPlaceholder}
+                error={!!fieldErr.company}
+                errorText={fieldErr.company}
               />
               <HMField
                 icon="building"
                 label={t.taxId ?? "VOEN"}
                 value={taxId}
-                onChange={setTaxId}
+                onChange={(v) => setTaxId(digits(v))}
                 placeholder="1702458891"
+                inputMode="numeric"
+                maxLength={15}
+                error={!!fieldErr.taxId}
+                errorText={fieldErr.taxId}
               />
             </div>
             <HMField
@@ -324,6 +345,8 @@ export function HMAuthFlow({ t }: Props) {
               value={email}
               onChange={setEmail}
               placeholder={t.emailPlaceholder}
+              error={!!fieldErr.email}
+              errorText={fieldErr.email}
             />
             <div
               style={{
@@ -336,8 +359,11 @@ export function HMAuthFlow({ t }: Props) {
                 icon="mail"
                 label={t.phone ?? "Telefon"}
                 value={phone}
-                onChange={setPhone}
+                onChange={(v) => setPhone(phoneChars(v))}
                 placeholder="+994 50 000 00 00"
+                inputMode="tel"
+                error={!!fieldErr.phone}
+                errorText={fieldErr.phone}
               />
               <HMField
                 icon="user"
@@ -345,14 +371,17 @@ export function HMAuthFlow({ t }: Props) {
                 value={title}
                 onChange={setTitle}
                 placeholder="Director"
+                error={!!fieldErr.title}
+                errorText={fieldErr.title}
               />
             </div>
             <HMField
               icon="building"
               label={t.employeeCount ?? "Calisan sayisi"}
               value={employeeCount}
-              onChange={setEmployeeCount}
+              onChange={(v) => setEmployeeCount(digits(v))}
               placeholder="Opsiyonel"
+              inputMode="numeric"
             />
             <HMField
               icon="lock"
@@ -361,6 +390,8 @@ export function HMAuthFlow({ t }: Props) {
               value={password}
               onChange={setPassword}
               placeholder={t.passwordPlaceholder}
+              error={!!fieldErr.password}
+              errorText={fieldErr.password}
             />
 
             {error && <HMErrorBanner text={error} />}
@@ -543,7 +574,11 @@ function HMField({
   value,
   onChange,
   placeholder,
-  autoFocus
+  autoFocus,
+  error = false,
+  errorText,
+  maxLength,
+  inputMode
 }: {
   icon?: IconName;
   label?: string;
@@ -554,6 +589,10 @@ function HMField({
   onChange: (v: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  error?: boolean;
+  errorText?: string;
+  maxLength?: number;
+  inputMode?: "text" | "numeric" | "tel";
 }) {
   const [shown, setShown] = useState(false);
   const inputType = type === "password" && shown ? "text" : type;
@@ -573,7 +612,7 @@ function HMField({
           )}
         </label>
       )}
-      <div className="hm-input-wrap">
+      <div className="hm-input-wrap" style={error ? { borderColor: "var(--err-500)", boxShadow: "0 0 0 3px var(--err-50)" } : undefined}>
         {icon && (
           <span className="hm-input-icon">
             <HMIcon name={icon} size={17} />
@@ -586,6 +625,8 @@ function HMField({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           autoFocus={autoFocus}
+          maxLength={maxLength}
+          inputMode={inputMode}
           autoComplete={type === "password" ? "current-password" : "email"}
         />
         {type === "password" && (
@@ -599,6 +640,9 @@ function HMField({
           </button>
         )}
       </div>
+      {error && errorText && (
+        <span style={{ marginTop: 4, fontSize: 11.5, color: "var(--err-500)", fontWeight: 600 }}>{errorText}</span>
+      )}
     </div>
   );
 }
