@@ -7,16 +7,41 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import dispose_engine, engine
-from app.models import H3AnalyticsRecord, MarketStats  # noqa: F401 — ensure models are registered
+from app.models import H3AnalyticsRecord, MarketStats, User  # noqa: F401 — ensure models are registered
 from app.models.precomputed import H3MapPrecomputed, H3MetricsPrecomputed  # noqa: F401
 from app.scheduler import start_scheduler, stop_scheduler
 from app.services.cache import close_cache
+
+
+async def _seed_admin() -> None:
+    """Seed a first admin so the OTP login has a user to check against (team #8)."""
+    from sqlalchemy import select
+
+    from app.db.session import async_session_factory
+    from app.services.security import hash_password
+
+    email = settings.seed_admin_email.strip().lower()
+    async with async_session_factory() as session:
+        exists = (
+            await session.execute(select(User).where(User.email == email))
+        ).scalar_one_or_none()
+        if exists is None:
+            session.add(
+                User(
+                    email=email,
+                    password_hash=hash_password(settings.seed_admin_password),
+                    name="Admin",
+                    role="super_admin",
+                )
+            )
+            await session.commit()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _seed_admin()
     start_scheduler()
     yield
     stop_scheduler()

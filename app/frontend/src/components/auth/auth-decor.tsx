@@ -458,13 +458,13 @@ export function HMFooter({
     >
       <span>{t.copyright}</span>
       <div style={{ display: "flex", gap: 16 }}>
-        <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
+        <a href="mailto:office@homora.ai" style={{ color: "inherit", textDecoration: "none" }}>
           {t.help}
         </a>
-        <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
+        <a href="/privacy" style={{ color: "inherit", textDecoration: "none" }}>
           {t.privacy}
         </a>
-        <a href="#" style={{ color: "inherit", textDecoration: "none" }}>
+        <a href="/terms" style={{ color: "inherit", textDecoration: "none" }}>
           {t.terms}
         </a>
       </div>

@@ -6,6 +6,70 @@
 const STORAGE_KEY = "homora-auth-token";
 const USER_KEY = "homora-auth-user";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
+
+export class AuthError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
+
+async function detail(res: Response): Promise<string> {
+  try {
+    return ((await res.json()) as { detail?: string }).detail ?? "";
+  } catch {
+    return "";
+  }
+}
+
+// Step 1 (team #8): verify email+password on the backend; on success it emails
+// a 6-digit OTP and returns without logging in. Throws AuthError on bad creds.
+export async function loginRequest(email: string, password: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Giriş alınmadı");
+}
+
+// Step 2: verify the OTP; on success stores the token + user and returns it.
+export async function verifyOtp(email: string, code: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ email, code })
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "OTP yanlışdır");
+  const data = (await res.json()) as { token: string; user: { email: string; name: string; role: string } };
+  const user: AuthUser = {
+    email: data.user.email,
+    name: data.user.name || data.user.email.split("@")[0],
+    initials: deriveInitials(data.user.email, data.user.name),
+    role: (data.user.role as AuthUser["role"]) ?? "company_admin",
+    companyId: "company-caspian",
+    permissions: ["dashboard:read", "reports:export", "users:manage", "companies:manage"]
+  };
+  try {
+    window.localStorage.setItem(STORAGE_KEY, data.token);
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore quota errors */
+  }
+  return user;
+}
+
+// Fire the account request to the team (team #7, item 7). Best-effort.
+export async function registerRequest(data: Record<string, unknown>): Promise<void> {
+  await fetch(`${API_BASE_URL}${API_PREFIX}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+}
+
 export type AuthUser = {
   email: string;
   name: string;

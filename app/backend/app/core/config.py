@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     predict_client_secret: str = ""
     predict_timeout_seconds: float = 120.0
 
+    # Email (Resend) + OTP auth. Secrets live in the gitignored .env only.
+    resend_api_key: str = ""
+    default_from_email: str = "hello@updates.homora.ai"
+    account_request_email: str = "m.aydayev@gmail.com"  # #7 — submissions go here
+    # Seed a first admin so the OTP login has a user to check against.
+    seed_admin_email: str = "admin@homora.ai"
+    seed_admin_password: str = "12345"
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]

@@ -5,7 +5,7 @@ import { useRef, useState, type CSSProperties } from "react";
 
 import { HMIcon, type IconName } from "@/components/auth/auth-icons";
 import { submitAccountRequest } from "@/lib/admin-data";
-import { signIn } from "@/lib/auth";
+import { AuthError, loginRequest, registerRequest, signIn, verifyOtp } from "@/lib/auth";
 
 // ──────────────────────────────────────────────────────────────────────
 // HMAuthFlow — single state machine for signin / signup / forgot / otp /
@@ -69,11 +69,27 @@ export function HMAuthFlow({ t }: Props) {
     }
     setSubmitting(true);
     try {
-      await signIn(email, password, { name });
-      enterDashboard();
-    } catch (e) {
-      setError(t.errEmpty || "Giriş başarısız.");
+      // Step 1: verify credentials → backend emails an OTP (team #8).
+      await loginRequest(email, password);
       setSubmitting(false);
+      setOtpOrigin("signin");
+      goto("otp");
+    } catch (e) {
+      setSubmitting(false);
+      if (e instanceof AuthError) {
+        // Wrong email/password (401) or "OTP could not be sent" (502).
+        setError(e.message || (t.errWrongCreds ?? "E-poçt və ya şifrə səhvdir"));
+      } else if (DEMO_MODE) {
+        // Backend unreachable in local dev → fall back to the demo login.
+        try {
+          await signIn(email, password, { name });
+          enterDashboard();
+        } catch {
+          setError(t.errWrongCreds ?? "Giriş alınmadı");
+        }
+      } else {
+        setError(t.errWrongCreds ?? "Giriş alınmadı");
+      }
     }
   };
 
@@ -109,6 +125,18 @@ export function HMAuthFlow({ t }: Props) {
       password,
       employeeCount: employeeCount || undefined
     });
+    // Email the request to the team (team #7, item 7). Best-effort — a network
+    // failure must not block the user's confirmation screen.
+    registerRequest({
+      firstName: name,
+      lastName,
+      email,
+      phone,
+      companyName: company,
+      taxId,
+      title,
+      employeeCount: employeeCount || undefined
+    }).catch(() => {});
     goto("verify");
     setSubmitting(false);
   };
@@ -116,11 +144,26 @@ export function HMAuthFlow({ t }: Props) {
   const onOtpComplete = async (code: string) => {
     if (code.length !== 6) return;
     setSubmitting(true);
+    setError("");
     try {
-      await signIn(email, password || code, { name });
+      // Step 2: verify the OTP against the backend → logs in (team #8).
+      await verifyOtp(email, code);
       enterDashboard();
-    } catch {
+    } catch (e) {
       setSubmitting(false);
+      if (e instanceof AuthError) {
+        setError(e.message || (t.errOtp ?? "OTP kodu yanlışdır və ya vaxtı bitib"));
+      } else if (DEMO_MODE) {
+        // Backend unreachable in local dev → demo login.
+        try {
+          await signIn(email, password || code, { name });
+          enterDashboard();
+        } catch {
+          setError(t.errOtp ?? "OTP təsdiqlənmədi");
+        }
+      } else {
+        setError(t.errOtp ?? "OTP təsdiqlənmədi");
+      }
     }
   };
 
@@ -407,11 +450,11 @@ export function HMAuthFlow({ t }: Props) {
 
             <p style={{ ...hmStyles.fine, marginTop: 4 }}>
               {t.agreeStart}{" "}
-              <a href="#" style={hmStyles.link}>
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={hmStyles.link}>
                 {t.agreeTerms}
               </a>{" "}
               {t.agreeAnd}{" "}
-              <a href="#" style={hmStyles.link}>
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" style={hmStyles.link}>
                 {t.agreePrivacy}
               </a>
               {t.agreeEnd}
