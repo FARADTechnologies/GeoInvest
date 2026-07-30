@@ -11,6 +11,7 @@ from app.services.predict import (
     PredictError,
     call_predict,
     list_listings,
+    market_index,
     market_rayons,
     market_room_segments,
     market_trends,
@@ -109,5 +110,15 @@ async def model_market_rayons() -> dict:
     analizi yield bars and fastest/slowest growing lists (team #3g / #3j)."""
     try:
         return await market_rayons()
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.get("/model/market/index")
+async def model_market_index() -> dict:
+    """City price index (base 100 = Aug 2023) per build type for the Bazar
+    analizi Qiymət indeksi KPI + trend (team #3c)."""
+    try:
+        return await market_index()
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc

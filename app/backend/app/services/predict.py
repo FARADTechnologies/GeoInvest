@@ -621,3 +621,82 @@ async def market_rayons() -> dict:
             {"growth_pct": float(growth_pct or 0), "growth_count": int(n or 0)}
         )
     return {"rayons": list(merged.values()), "min_sample": _MIN_RAYON_SAMPLE}
+
+
+# ── Bazar analizi — price index, base 100 = Aug 2023 (team #3c) ───────────────
+#
+# index_app_valueindex holds monthly year-over-year % (new_yoy / old_yoy) per
+# rayon. The city index is the rayon average; the series is anchored at
+# 2023-08 = 100 and compounded monthly (each month's yoy spread as its monthly
+# rate). Months before the data starts are bootstrapped with the first yoy.
+
+_INDEX_BASE = "2023-08"  # baza 100
+
+
+def _month_range(start: str, end: str) -> list[str]:
+    y, m = int(start[:4]), int(start[5:7])
+    out: list[str] = []
+    while f"{y:04d}-{m:02d}" <= end:
+        out.append(f"{y:04d}-{m:02d}")
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
+def _query_index_yoy(conn_str: str) -> list[tuple]:
+    with psycopg.connect(conn_str, connect_timeout=15) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT to_char(period, 'YYYY-MM'), avg(new_yoy), avg(old_yoy) "
+                "FROM index_app_valueindex WHERE region_id <> 1 "
+                "GROUP BY 1 ORDER BY 1"
+            )
+            return cur.fetchall()
+
+
+async def market_index() -> dict:
+    """City price index (base 100 = Aug 2023) per build type — team #3c.
+
+    Returns { base, all:[{date,value}], new:[...], old:[...],
+    latest_yoy:{all,new,old} }.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Bazar bazası konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        rows = await asyncio.to_thread(_query_index_yoy, conn_str)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Qiymət indeksi alınmadı.") from exc
+
+    data = {d: (float(ny or 0), float(oy or 0)) for d, ny, oy in rows}
+    dates = sorted(data)
+    if not dates:
+        return {"base": _INDEX_BASE, "all": [], "new": [], "old": [], "latest_yoy": {}}
+    first = data[dates[0]]
+    months = _month_range(_INDEX_BASE, dates[-1])
+
+    def build(pick: str) -> list[dict]:
+        idx = 100.0
+        series = [{"date": _INDEX_BASE, "value": 100.0}]
+        for d in months[1:]:
+            ny, oy = data.get(d, first)
+            yoy = ny if pick == "new" else oy if pick == "old" else (ny + oy) / 2
+            idx *= (1 + yoy / 100) ** (1 / 12)
+            series.append({"date": d, "value": round(idx, 1)})
+        return series
+
+    latest = data[dates[-1]]
+    return {
+        "base": _INDEX_BASE,
+        "all": build("all"),
+        "new": build("new"),
+        "old": build("old"),
+        "latest_yoy": {
+            "all": round((latest[0] + latest[1]) / 2, 1),
+            "new": round(latest[0], 1),
+            "old": round(latest[1], 1),
+        },
+    }

@@ -104,6 +104,14 @@ async function fetchMarketRayons(): Promise<RayonData> {
   return res.json();
 }
 
+// Real price index (base 100 = Aug 2023) per build type (team #3c).
+type IndexData = { base: string; all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[]; latest_yoy: { all?: number; new?: number; old?: number } };
+async function fetchMarketIndex(): Promise<IndexData> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/index`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("market index unavailable");
+  return res.json();
+}
+
 const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
 function unitOf(text: string): number {
   let h = 2166136261;
@@ -300,6 +308,8 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const trendsQuery = useQuery({ queryKey: ["valuation", "market", "trends"], queryFn: fetchMarketTrends });
   // Real per-rayon yield (#3g) + growth ranking (#3j).
   const rayonsQuery = useQuery({ queryKey: ["valuation", "market", "rayons"], queryFn: fetchMarketRayons });
+  // Real price index, base 100 = Aug 2023 (#3c).
+  const indexQuery = useQuery({ queryKey: ["valuation", "market", "index"], queryFn: fetchMarketIndex });
   const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
     () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
     [marketQuery.data]
@@ -333,10 +343,13 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
     const n = segs.reduce((s, x) => s + x.count, 0);
     return n ? +(segs.reduce((s, x) => s + x.yield_pct * x.count, 0) / n).toFixed(1) : undefined;
   })();
+  const realIndex = indexQuery.data?.all?.at(-1)?.value;
+  const realIndexYoY = indexQuery.data?.latest_yoy?.all;
+  const indexBase = indexQuery.data?.base;
 
   const kpis = [
     { label: "Orta qiymət/m²", value: fmtMoney(realPpm ?? MKT_CITY.ppm, " ₼"), delta: trendPct(trendsQuery.data?.sale.all) ?? MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
-    { label: "Qiymət indeksi", value: MKT_CITY.ppmIndex.toFixed(1), delta: MKT_CITY.ppmIndexYoY, sub: "baza 100 = Yan 2022", icon: <Icons.TrendUp size={16} />, accent: true },
+    { label: "Qiymət indeksi", value: (realIndex ?? MKT_CITY.ppmIndex).toFixed(1), delta: realIndexYoY ?? MKT_CITY.ppmIndexYoY, sub: `baza 100 = ${indexBase === "2023-08" ? "avqust 2023" : indexBase ?? "avqust 2023"}`, icon: <Icons.TrendUp size={16} />, accent: true },
     { label: "Orta gəlirlilik", value: (realYield ?? MKT_CITY.yield).toFixed(1) + "%", delta: MKT_CITY.yieldYoY, icon: <Icons.Sparkle size={16} /> },
     { label: "Orta likvidlik", value: MKT_CITY.liquidity + " gün", delta: -MKT_CITY.liquidityYoY, icon: <Icons.Refresh size={16} /> },
     { label: "Orta kirayə", value: fmtMoney(realRent ?? MKT_CITY.rent), delta: trendPct(trendsQuery.data?.rent.all) ?? MKT_CITY.rentYoY, icon: <Icons.Building size={16} /> },
@@ -364,11 +377,12 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   // pending). The Kateqoriya dropdown selects all / new / old.
   const realTrend = useMemo<TrendPoint[] | null>(() => {
     const td = trendsQuery.data;
+    if (trendMetric === "index") return indexQuery.data?.[trendCat as keyof TrendCat] ?? null;
     if (!td) return null;
     if (trendMetric === "ppm") return td.sale[trendCat as keyof TrendCat] ?? null;
     if (trendMetric === "rent") return td.rent[trendCat as keyof TrendCat] ?? null;
     return null;
-  }, [trendsQuery.data, trendMetric, trendCat]);
+  }, [trendsQuery.data, indexQuery.data, trendMetric, trendCat]);
   const useReal = !!realTrend && realTrend.length > 0;
   const realSlice = useReal ? realTrend!.slice(-months) : [];
   const chartSeries = useReal ? realSlice.map((p) => p.value) : trendSeries;
