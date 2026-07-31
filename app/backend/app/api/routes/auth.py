@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_session
+from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, VerifyOtpRequest
 from app.services import email as email_svc
@@ -22,6 +23,13 @@ from app.services import otp
 from app.services.security import verify_password
 
 router = APIRouter()
+
+
+def _issue_token(user: User) -> dict:
+    return {
+        "token": secrets.token_urlsafe(32),
+        "user": {"email": user.email, "name": user.name, "role": user.role},
+    }
 
 
 @router.post("/auth/login")
@@ -35,6 +43,11 @@ async def login(
     ).scalar_one_or_none()
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-poçt və ya şifrə səhvdir")
+    # Dev-only access: the seed admin signs in without the OTP step so the team
+    # can reach the app while email/OTP delivery is still being provisioned.
+    # Only this account, only when DEV_LOGIN_BYPASS is on (off in production).
+    if settings.dev_login_bypass and email == settings.seed_admin_email.strip().lower():
+        return {"otp_required": False, **_issue_token(user)}
     code = await otp.generate(email)
     try:
         await email_svc.send_otp(email, code)
@@ -57,10 +70,7 @@ async def verify_otp(
     ).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="İstifadəçi tapılmadı")
-    return {
-        "token": secrets.token_urlsafe(32),
-        "user": {"email": user.email, "name": user.name, "role": user.role},
-    }
+    return _issue_token(user)
 
 
 @router.post("/auth/register")

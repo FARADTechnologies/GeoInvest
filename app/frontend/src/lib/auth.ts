@@ -24,15 +24,56 @@ async function detail(res: Response): Promise<string> {
   }
 }
 
-// Step 1 (team #8): verify email+password on the backend; on success it emails
-// a 6-digit OTP and returns without logging in. Throws AuthError on bad creds.
-export async function loginRequest(email: string, password: string): Promise<void> {
+export type LoginResult =
+  | { otpRequired: true; email: string }
+  | { otpRequired: false; user: AuthUser };
+
+// Persist the token + user returned by the backend and shape it into AuthUser.
+// Shared by the direct login (seed admin) and the OTP verification step.
+function storeSession(
+  token: string,
+  u: { email: string; name: string; role: string }
+): AuthUser {
+  const user: AuthUser = {
+    email: u.email,
+    name: u.name || u.email.split("@")[0],
+    initials: deriveInitials(u.email, u.name),
+    role: (u.role as AuthUser["role"]) ?? "company_admin",
+    companyId: "company-caspian",
+    permissions: ["dashboard:read", "reports:export", "users:manage", "companies:manage"]
+  };
+  try {
+    window.localStorage.setItem(STORAGE_KEY, token);
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    /* ignore quota errors */
+  }
+  return user;
+}
+
+// Step 1 (team #8): verify email+password on the backend. Normally it emails a
+// 6-digit OTP and returns { otp_required: true } without logging in. The seed
+// admin (dev access) instead gets a token immediately ({ otp_required: false });
+// we persist the session and report otpRequired:false so the caller can enter
+// the dashboard directly. Throws AuthError on bad creds.
+export async function loginRequest(email: string, password: string): Promise<LoginResult> {
   const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email, password })
   });
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Giriş alınmadı");
+  const data = (await res.json()) as {
+    otp_required?: boolean;
+    token?: string;
+    email?: string;
+    user?: { email: string; name: string; role: string };
+  };
+  if (data.otp_required === false && data.token && data.user) {
+    const user = storeSession(data.token, data.user);
+    return { otpRequired: false, user };
+  }
+  return { otpRequired: true, email: data.email ?? email };
 }
 
 // Step 2: verify the OTP; on success stores the token + user and returns it.
@@ -44,21 +85,7 @@ export async function verifyOtp(email: string, code: string): Promise<AuthUser> 
   });
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "OTP yanlışdır");
   const data = (await res.json()) as { token: string; user: { email: string; name: string; role: string } };
-  const user: AuthUser = {
-    email: data.user.email,
-    name: data.user.name || data.user.email.split("@")[0],
-    initials: deriveInitials(data.user.email, data.user.name),
-    role: (data.user.role as AuthUser["role"]) ?? "company_admin",
-    companyId: "company-caspian",
-    permissions: ["dashboard:read", "reports:export", "users:manage", "companies:manage"]
-  };
-  try {
-    window.localStorage.setItem(STORAGE_KEY, data.token);
-    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-  } catch {
-    /* ignore quota errors */
-  }
-  return user;
+  return storeSession(data.token, data.user);
 }
 
 // Fire the account request to the team (team #7, item 7). Best-effort.
@@ -141,7 +168,7 @@ export async function signIn(
     companyId: "company-caspian",
     permissions: ["dashboard:read", "reports:export", "users:manage", "companies:manage"]
   };
-  const fakeToken = "demo." + btoa(`${email}:${Date.now()}`);
+  const fakeToken = "local." + btoa(`${email}:${Date.now()}`);
 
   try {
     window.localStorage.setItem(STORAGE_KEY, fakeToken);

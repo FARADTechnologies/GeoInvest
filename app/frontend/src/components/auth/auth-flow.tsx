@@ -12,11 +12,12 @@ import { AuthError, loginRequest, registerRequest, signIn, verifyOtp } from "@/l
 // verify. Pure UI; auth side-effects happen via lib/auth.ts.
 // ──────────────────────────────────────────────────────────────────────
 
-// Demo mode is on everywhere EXCEPT production (team #2 — "prod olduqda demo
-// data görsənməsin"). The prod deployment sets NEXT_PUBLIC_APP_ENV=production;
-// dev/staging leave it unset so the demo banner + prefilled credentials stay.
+// Dev convenience is on everywhere EXCEPT production (team #2 — "prod olduqda
+// göstəriş datası görsənməsin"). The prod deployment sets
+// NEXT_PUBLIC_APP_ENV=production; dev/staging leave it unset so the seed-admin
+// credentials stay prefilled for quick access.
 const APP_ENV = process.env.NEXT_PUBLIC_APP_ENV ?? "";
-const DEMO_MODE = APP_ENV !== "production" && APP_ENV !== "prod";
+const DEV_MODE = APP_ENV !== "production" && APP_ENV !== "prod";
 
 type Mode = "signin" | "signup" | "forgot" | "otp" | "verify";
 
@@ -30,8 +31,8 @@ export function HMAuthFlow({ t }: Props) {
   const nextParam = search?.get("next") ?? "/";
 
   const [mode, setMode] = useState<Mode>("signin");
-  const [email, setEmail] = useState(DEMO_MODE ? "admin@homora.ai" : "");
-  const [password, setPassword] = useState(DEMO_MODE ? "12345" : "");
+  const [email, setEmail] = useState(DEV_MODE ? "admin@homora.ai" : "");
+  const [password, setPassword] = useState(DEV_MODE ? "12345" : "");
   const [name, setName] = useState("");
   const [lastName, setLastName] = useState("");
   const [company, setCompany] = useState("");
@@ -69,9 +70,15 @@ export function HMAuthFlow({ t }: Props) {
     }
     setSubmitting(true);
     try {
-      // Step 1: verify credentials → backend emails an OTP (team #8).
-      await loginRequest(email, password);
+      // Step 1: verify credentials. Normally the backend emails an OTP and we
+      // move to the OTP screen. The seed admin (dev access) is logged in
+      // straight away — the backend returns a token with otp_required:false.
+      const res = await loginRequest(email, password);
       setSubmitting(false);
+      if (!res.otpRequired) {
+        enterDashboard();
+        return;
+      }
       setOtpOrigin("signin");
       goto("otp");
     } catch (e) {
@@ -79,8 +86,8 @@ export function HMAuthFlow({ t }: Props) {
       if (e instanceof AuthError) {
         // Wrong email/password (401) or "OTP could not be sent" (502).
         setError(e.message || (t.errWrongCreds ?? "E-poçt və ya şifrə səhvdir"));
-      } else if (DEMO_MODE) {
-        // Backend unreachable in local dev → fall back to the demo login.
+      } else if (DEV_MODE) {
+        // Backend unreachable in local dev → fall back to the local sign-in.
         try {
           await signIn(email, password, { name });
           enterDashboard();
@@ -153,8 +160,8 @@ export function HMAuthFlow({ t }: Props) {
       setSubmitting(false);
       if (e instanceof AuthError) {
         setError(e.message || (t.errOtp ?? "OTP kodu yanlışdır və ya vaxtı bitib"));
-      } else if (DEMO_MODE) {
-        // Backend unreachable in local dev → demo login.
+      } else if (DEV_MODE) {
+        // Backend unreachable in local dev → local sign-in.
         try {
           await signIn(email, password || code, { name });
           enterDashboard();
@@ -210,30 +217,6 @@ export function HMAuthFlow({ t }: Props) {
         <div className="hm-fade" key="signin">
           <h1 style={hmStyles.h1}>{t.signInTitle}</h1>
           <p style={hmStyles.sub}>{t.signInSub}</p>
-
-          {/* Demo credentials banner — hidden in production (team #2). */}
-          {DEMO_MODE && (
-          <div
-            style={{
-              marginTop: 16,
-              padding: "10px 12px",
-              background: "var(--brand-50)",
-              border: "1px solid var(--brand-200)",
-              borderRadius: 10,
-              fontSize: 12.5,
-              color: "var(--brand-800)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8
-            }}
-          >
-            <HMIcon name="spark" size={14} />
-            <span>
-              <strong>Demo:</strong> herhangi bir e-posta + şifre çalışır
-              (örn. <code>admin / 12345</code>).
-            </span>
-          </div>
-          )}
 
           <form
             onSubmit={(e) => {

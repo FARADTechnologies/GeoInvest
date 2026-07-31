@@ -205,7 +205,7 @@ const TR: Strings = {
   viewAll: "Tümünü Gör",
   listings: "İlan",
 
-  connectTitle: "DEMO Modu",
+  connectTitle: "Çevrimdışı",
   connectSub: "Canlı veri için backend'i başlatın.",
   connectStep1: "1. Backend'i başlat",
   connectStep2: "2. Bekle, otomatik LIVE olacak",
@@ -478,7 +478,7 @@ const EN: Strings = {
   viewAll: "View all",
   listings: "Listings",
 
-  connectTitle: "DEMO Mode",
+  connectTitle: "Offline",
   connectSub: "Start the backend to see live data.",
   connectStep1: "1. Start the backend",
   connectStep2: "2. Wait — it'll go LIVE automatically",
@@ -706,7 +706,7 @@ const AZ: Strings = {
   hot: "İsti",
   viewAll: "Hamisi",
   listings: "Elan",
-  connectTitle: "DEMO rejimi",
+  connectTitle: "Oflayn",
   connectSub: "Canlı veri üçün backend-i başladın.",
   connectingLive: "Canlı veri axını var",
   connectionLost: "Bağlantı kəsildi",

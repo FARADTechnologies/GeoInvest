@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+import { HomoraLogo } from "@/components/brand/homora-logo";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -72,9 +73,9 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
         className="sticky top-0 z-10 -mx-3 -mt-4 mb-1 flex items-center gap-2 border-b bg-card px-5 py-3 transition-colors hover:bg-muted/40"
         aria-label="Homora.ai dashboard"
       >
-        {/* Official Homora.ai wordmark (team #4); inverted to white in dark mode. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/homora-logo.svg" alt="Homora.ai" className="app-logo h-[22px] w-auto" />
+        {/* Official Homora.ai wordmark (team #4), inlined so it can't 404 on
+            deploy; `.app-logo` inverts it to white in dark mode. */}
+        <HomoraLogo height={22} className="app-logo" />
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-[10.5px] text-muted-foreground">
             {t.workspace} · Caspian Realty

@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Seed a first admin so the OTP login has a user to check against.
     seed_admin_email: str = "admin@homora.ai"
     seed_admin_password: str = "12345"
+    # Dev-only: let the seed admin sign in without the OTP step so the team can
+    # reach the app while email/OTP delivery is still being provisioned. MUST be
+    # turned off in production by setting DEV_LOGIN_BYPASS=false.
+    dev_login_bypass: bool = True
 
     @property
     def allowed_origins_list(self) -> list[str]:

@@ -4,6 +4,7 @@
 import type { CSSProperties, ReactElement } from "react";
 
 import { HMIcon } from "@/components/auth/auth-icons";
+import { HomoraLogo } from "@/components/brand/homora-logo";
 import type { Lang } from "@/lib/i18n";
 
 // ──────────────────────────────────────────────────────────────────────
@@ -376,14 +377,9 @@ export function HMBrandHeader({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {/* Official Homora.ai wordmark (team #4). On the coloured/dark panel the
-            dark logo text is inverted to white so it stays legible. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/homora-logo.svg"
-          alt="Homora.ai"
-          style={{ height: 28, width: "auto", filter: onLight ? "brightness(0) invert(1)" : "none" }}
-        />
+        {/* Official Homora.ai wordmark (team #4), inlined so it can't 404 on
+            deploy. On the coloured/dark panel it's flattened to white. */}
+        <HomoraLogo height={28} mono={onLight} />
       </div>
       <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
         <button
