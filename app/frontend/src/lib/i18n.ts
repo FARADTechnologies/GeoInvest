@@ -84,6 +84,7 @@ const EN: Strings = {
   errPhone: "Invalid phone format",
   errEmail: "Invalid email address",
   errFix: "Please correct the fields marked in red.",
+  errRegisterFailed: "Registration failed. Please try again.",
 
   productHeadline: "Every square meter of Baku, priced.",
   productSub: "Analyzing 12,847 listings on the H3 hex grid.",
@@ -350,6 +351,7 @@ const AZ: Strings = {
   errPhone: "Telefon formatı düzgün deyil",
   errEmail: "E-poçt düzgün deyil",
   errFix: "Zəhmət olmasa qırmızı xanaları düzəldin.",
+  errRegisterFailed: "Qeydiyyat alınmadı. Yenidən cəhd edin.",
   productHeadline: "Bakının hər kvadrat metrində qiymət siqnalı.",
   productSub: "H3 hexagon şəbəkəsində 12.847 elanı analiz edir.",
   statHexagons: "Aktiv hexagon",

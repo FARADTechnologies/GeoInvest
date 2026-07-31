@@ -20,6 +20,14 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     name: Mapped[str] = mapped_column(String(255), default="")
     role: Mapped[str] = mapped_column(String(50), default="company_admin")
+    # "pending"  — self-registered, waiting for a super admin (cannot log in)
+    # "active"   — approved, may log in
+    # "rejected" — turned down by a super admin
+    # Existing rows predate this column, so the startup migration backfills
+    # them with 'active' (see _migrate_users in main.py).
+    status: Mapped[str] = mapped_column(
+        String(16), default="pending", server_default="active"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

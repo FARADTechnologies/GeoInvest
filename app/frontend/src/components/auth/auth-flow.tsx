@@ -132,19 +132,25 @@ export function HMAuthFlow({ t }: Props) {
       password,
       employeeCount: employeeCount || undefined
     });
-    // Email the request to the team (team #7, item 7). Best-effort — a network
-    // failure must not block the user's confirmation screen.
-    registerRequest({
-      firstName: name,
-      lastName,
-      email,
-      phone,
-      companyName: company,
-      taxId,
-      title,
-      employeeCount: employeeCount || undefined
-    }).catch(() => {});
-    goto("verify");
+    // Create the pending account on the backend. The password travels with it
+    // so the person can sign in from any device once a super admin approves.
+    try {
+      await registerRequest({
+        firstName: name,
+        lastName,
+        email,
+        password,
+        phone,
+        companyName: company,
+        taxId,
+        title,
+        employeeCount: employeeCount || undefined
+      });
+      goto("verify");
+    } catch (e) {
+      // 409 = email already registered; anything else is a generic failure.
+      setError(e instanceof AuthError ? e.message : (t.errRegisterFailed ?? ""));
+    }
     setSubmitting(false);
   };
 

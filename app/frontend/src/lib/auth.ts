@@ -88,13 +88,15 @@ export async function verifyOtp(email: string, code: string): Promise<AuthUser> 
   return storeSession(data.token, data.user);
 }
 
-// Fire the account request to the team (team #7, item 7). Best-effort.
+// Create the pending account (team #7). Throws AuthError so the form can show
+// why it failed — most usefully 409 "this email is already registered".
 export async function registerRequest(data: Record<string, unknown>): Promise<void> {
-  await fetch(`${API_BASE_URL}${API_PREFIX}/auth/register`, {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(data)
   });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Müraciət göndərilmədi");
 }
 
 export type AuthUser = {

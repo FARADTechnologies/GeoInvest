@@ -13,6 +13,25 @@ from app.scheduler import start_scheduler, stop_scheduler
 from app.services.cache import close_cache
 
 
+async def _migrate_users() -> None:
+    """Add app_users.status to databases created before the column existed.
+
+    `create_all` only creates missing tables, never missing columns, so a
+    deployment that already has app_users would otherwise keep failing every
+    query that selects `status`. Existing rows default to 'active' — they were
+    created before self-registration, so they're already approved.
+    """
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "ALTER TABLE app_users "
+                "ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'"
+            )
+        )
+
+
 async def _seed_admin() -> None:
     """Seed a first admin so the OTP login has a user to check against (team #8)."""
     from sqlalchemy import select
@@ -32,6 +51,9 @@ async def _seed_admin() -> None:
                     password_hash=hash_password(settings.seed_admin_password),
                     name="Admin",
                     role="super_admin",
+                    # Explicit: the model defaults new rows to "pending", which
+                    # would lock the seeded admin out of its own instance.
+                    status="active",
                 )
             )
             await session.commit()
@@ -41,6 +63,7 @@ async def _seed_admin() -> None:
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _migrate_users()
     await _seed_admin()
     start_scheduler()
     yield
