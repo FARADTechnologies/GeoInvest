@@ -10,6 +10,7 @@ import {
   fetchFallbackMetrics
 } from "@/lib/mock-data";
 import { dashKey, loadSnapshot } from "@/lib/snapshot";
+import { mockAllowed } from "@/lib/mock-gate";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
@@ -86,7 +87,9 @@ export async function apiGet<T>(
 export async function fetchFilters() {
   try {
     return await apiGet<FiltersResponse>("/filters");
-  } catch {
+  } catch (err) {
+    // In production only a super admin may see fallback data (mock-gate.ts).
+    if (!mockAllowed()) throw err;
     const snap = await loadSnapshot();
     if (snap?.filters) return snap.filters;
     return fetchFallbackFilters();
@@ -102,7 +105,8 @@ export async function fetchMetrics(filters: DashboardFilters, minAdsPerCell: num
       metrics = await apiGet<MetricsResponse>("/metrics", filters, { min_ads_per_cell: "0" });
     }
     return { ...metrics, _source: "db" as const };
-  } catch {
+  } catch (err) {
+    if (!mockAllowed()) throw err;
     const snap = await loadSnapshot();
     const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
     if (hit?.metrics) return { ...hit.metrics, _source: "mock" as const };
@@ -120,7 +124,8 @@ export async function fetchMapData(filters: DashboardFilters, minAdsPerCell: num
       return apiGet<MapDataPoint[]>("/map-data", filters, { min_ads_per_cell: "0" });
     }
     return rows;
-  } catch {
+  } catch (err) {
+    if (!mockAllowed()) throw err;
     const snap = await loadSnapshot();
     const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
     if (hit?.mapData) return hit.mapData;

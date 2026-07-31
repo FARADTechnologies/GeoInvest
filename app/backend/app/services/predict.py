@@ -558,31 +558,54 @@ def _query_rayon_yield(conn_str: str) -> list[tuple]:
             return cur.fetchall()
 
 
+# The trend array lives under different keys depending on when the row was
+# written (newer rows drop the ai_data wrapper), so both are tried.
+_TREND_JSON = (
+    "jsonb_array_elements(COALESCE("
+    "  i.prediction_info->'sale_estimate', "
+    "  i.prediction_info->'ai_data'->'sale_estimate')->'price_trend')"
+)
+
+
 def _query_rayon_growth(conn_str: str) -> list[tuple]:
-    """(rayon, avg growth % across the stored trend window, n)."""
+    """(rayon, avg year-over-year price growth %, n).
+
+    Growth uses the team's formula (PM, #3j): compare the latest month in the
+    stored trend with the SAME month one year earlier —
+        (latest / same_month_last_year - 1) * 100
+    e.g. (2026-07 / 2025-07 - 1) * 100. Listings whose trend doesn't reach 12
+    months back are skipped (base_v IS NULL) rather than distorting the average.
+
+    Dates are compared on their 'YYYY-MM' prefix so the query works whether the
+    stored date is 'YYYY-MM' or a full 'YYYY-MM-DD'.
+    """
     with psycopg.connect(
         conn_str, connect_timeout=15, options="-c statement_timeout=120000"
     ) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT o.name, "
-                "  round(avg((tr.last_v / NULLIF(tr.first_v, 0) - 1) * 100)::numeric, 2), "
+                "  round(avg((tr.last_v / NULLIF(tr.base_v, 0) - 1) * 100)::numeric, 2), "
                 "  count(*) "
                 "FROM item_app_items i "
                 "JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
                 "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
                 "CROSS JOIN LATERAL ("
-                "  SELECT (array_agg((pt->>'point_estimate')::numeric "
-                "            ORDER BY pt->>'date'))[1] AS first_v, "
-                "         (array_agg((pt->>'point_estimate')::numeric "
-                "            ORDER BY pt->>'date' DESC))[1] AS last_v "
-                "  FROM jsonb_array_elements(COALESCE("
-                "    i.prediction_info->'sale_estimate', "
-                "    i.prediction_info->'ai_data'->'sale_estimate')->'price_trend') pt "
+                f"  SELECT max(left(pt->>'date', 7)) AS last_ym FROM {_TREND_JSON} pt"
+                ") d "
+                "CROSS JOIN LATERAL ("
+                "  SELECT max((pt->>'point_estimate')::numeric) "
+                "           FILTER (WHERE left(pt->>'date', 7) = d.last_ym) AS last_v, "
+                "         max((pt->>'point_estimate')::numeric) "
+                "           FILTER (WHERE left(pt->>'date', 7) = to_char("
+                "             to_date(d.last_ym, 'YYYY-MM') - interval '12 months', "
+                "             'YYYY-MM')) AS base_v "
+                f"  FROM {_TREND_JSON} pt"
                 ") tr "
                 "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
                 "  AND i.deleted IS NOT TRUE AND i.size > 0 "
-                "  AND i.predicted_sale_price >= %s AND tr.first_v > 0 "
+                "  AND i.predicted_sale_price >= %s "
+                "  AND tr.base_v > 0 AND tr.last_v IS NOT NULL "
                 "GROUP BY 1",
                 (_MIN_LISTING_PRICE,),
             )

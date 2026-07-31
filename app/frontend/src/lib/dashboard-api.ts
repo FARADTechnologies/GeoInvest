@@ -29,6 +29,7 @@ import {
 } from "@/lib/mock-data";
 import { buildB2C, buildRayonStats, filterListings } from "@/lib/listings-data";
 import { dashKey, loadSnapshot, trendKey } from "@/lib/snapshot";
+import { mockAllowed } from "@/lib/mock-gate";
 
 export function fetchRayons(): Promise<Rayon[]> {
   return mockRayons();
@@ -44,7 +45,8 @@ export async function fetchSparklines(
     return await apiGet<Sparklines>("/sparklines", filters, {
       min_ads_per_cell: String(minAdsPerCell)
     });
-  } catch {
+  } catch (err) {
+    if (!mockAllowed()) throw err;
     const snap = await loadSnapshot();
     const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
     if (hit?.sparklines) return hit.sparklines;
@@ -87,6 +89,9 @@ export async function fetchTrendSeries(filters?: DashboardFilters): Promise<Tren
     if (hit && hit.length > 0) return hit;
   }
   // Mock path — derive from the period/category-filtered rayon stats.
+  // Gated: in production a customer gets an empty chart rather than invented
+  // series (the backend's /trend-series currently returns [] — see below).
+  if (!mockAllowed()) return [];
   const stats = buildRayonStats(filterListings(filters?.period, filters?.categories));
   const ranked = stats.filter((s) => s.listings > 0).sort((a, b) => b.listings - a.listings);
   const top = (ranked.length ? ranked : stats.slice().sort((a, b) => b.listings - a.listings)).slice(0, 5);
@@ -164,7 +169,9 @@ export async function fetchListingsDB(): Promise<ListingsResult> {
       sourceUrl: r.source_url ?? undefined
     }));
     return { listings, total: res.total || listings.length };
-  } catch {
+  } catch (err) {
+    // Production customers must not silently get invented listings.
+    if (!mockAllowed()) throw err;
     const mock = filterListings();
     return { listings: mock, total: mock.length };
   }

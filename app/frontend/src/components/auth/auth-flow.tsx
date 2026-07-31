@@ -85,17 +85,17 @@ export function HMAuthFlow({ t }: Props) {
       setSubmitting(false);
       if (e instanceof AuthError) {
         // Wrong email/password (401) or "OTP could not be sent" (502).
-        setError(e.message || (t.errWrongCreds ?? "E-poçt və ya şifrə səhvdir"));
+        setError(e.message || (t.errWrongCreds));
       } else if (DEV_MODE) {
         // Backend unreachable in local dev → fall back to the local sign-in.
         try {
           await signIn(email, password, { name });
           enterDashboard();
         } catch {
-          setError(t.errWrongCreds ?? "Giriş alınmadı");
+          setError(t.errWrongCreds);
         }
       } else {
-        setError(t.errWrongCreds ?? "Giriş alınmadı");
+        setError(t.errWrongCreds);
       }
     }
   };
@@ -103,21 +103,21 @@ export function HMAuthFlow({ t }: Props) {
   const handleSignUp = async () => {
     setError("");
     // Per-field validation (team #7). Failing fields turn red.
-    const req = t.errRequired ?? "Bu xana tələb olunur";
+    const req = t.errRequired;
     const fe: Record<string, string> = {};
     if (!name.trim()) fe.name = req;
     if (!lastName.trim()) fe.lastName = req;
-    if (company.trim().length < 3) fe.company = t.errMin3 ?? "Minimum 3 simvol";
-    if (title.trim().length < 3) fe.title = t.errMin3 ?? "Minimum 3 simvol";
+    if (company.trim().length < 3) fe.company = t.errMin3;
+    if (title.trim().length < 3) fe.title = t.errMin3;
     if (!taxId.trim()) fe.taxId = req;
-    else if (taxId.length > 15) fe.taxId = t.errMax15 ?? "Maksimum 15 rəqəm";
+    else if (taxId.length > 15) fe.taxId = t.errMax15;
     if (!phone.trim()) fe.phone = req;
-    else if (digits(phone).length < 7 || digits(phone).length > 15) fe.phone = t.errPhone ?? "Telefon formatı düzgün deyil";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fe.email = t.errEmail ?? "E-poçt düzgün deyil";
+    else if (digits(phone).length < 7 || digits(phone).length > 15) fe.phone = t.errPhone;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fe.email = t.errEmail;
     if (!password.trim()) fe.password = req;
     setFieldErr(fe);
     if (Object.keys(fe).length > 0) {
-      setError(t.errFix ?? "Zəhmət olmasa qırmızı xanaları düzəldin.");
+      setError(t.errFix);
       return;
     }
     setSubmitting(true);
@@ -159,17 +159,17 @@ export function HMAuthFlow({ t }: Props) {
     } catch (e) {
       setSubmitting(false);
       if (e instanceof AuthError) {
-        setError(e.message || (t.errOtp ?? "OTP kodu yanlışdır və ya vaxtı bitib"));
+        setError(e.message || (t.errOtp));
       } else if (DEV_MODE) {
         // Backend unreachable in local dev → local sign-in.
         try {
           await signIn(email, password || code, { name });
           enterDashboard();
         } catch {
-          setError(t.errOtp ?? "OTP təsdiqlənmədi");
+          setError(t.errOtp);
         }
       } else {
-        setError(t.errOtp ?? "OTP təsdiqlənmədi");
+        setError(t.errOtp);
       }
     }
   };
@@ -319,7 +319,7 @@ export function HMAuthFlow({ t }: Props) {
             >
               <HMField
                 icon="user"
-                label={t.firstName ?? t.fullName}
+                label={t.firstName}
                 value={name}
                 onChange={setName}
                 placeholder="Aysel"
@@ -328,7 +328,7 @@ export function HMAuthFlow({ t }: Props) {
               />
               <HMField
                 icon="user"
-                label={t.lastName ?? "Soyad"}
+                label={t.lastName}
                 value={lastName}
                 onChange={setLastName}
                 placeholder="Məmmədova"
@@ -354,7 +354,7 @@ export function HMAuthFlow({ t }: Props) {
               />
               <HMField
                 icon="building"
-                label={t.taxId ?? "VOEN"}
+                label={t.taxId}
                 value={taxId}
                 onChange={(v) => setTaxId(digits(v))}
                 placeholder="1702458891"
@@ -383,7 +383,7 @@ export function HMAuthFlow({ t }: Props) {
             >
               <HMField
                 icon="mail"
-                label={t.phone ?? "Telefon"}
+                label={t.phone}
                 value={phone}
                 onChange={(v) => setPhone(phoneChars(v))}
                 placeholder="+994 50 000 00 00"
@@ -393,7 +393,7 @@ export function HMAuthFlow({ t }: Props) {
               />
               <HMField
                 icon="user"
-                label={t.title ?? "Unvan / pozisyon"}
+                label={t.title}
                 value={title}
                 onChange={setTitle}
                 placeholder="Director"
@@ -403,10 +403,10 @@ export function HMAuthFlow({ t }: Props) {
             </div>
             <HMField
               icon="building"
-              label={t.employeeCount ?? "Calisan sayisi"}
+              label={t.employeeCount}
               value={employeeCount}
               onChange={(v) => setEmployeeCount(digits(v))}
-              placeholder="Opsiyonel"
+              placeholder={t.optional}
               inputMode="numeric"
             />
             <HMField
@@ -483,19 +483,6 @@ export function HMAuthFlow({ t }: Props) {
             <button type="submit" className="hm-btn hm-btn-primary">
               {t.sendResetLink} <HMIcon name="send" size={15} />
             </button>
-            <p style={hmStyles.fine}>
-              {t.rememberItNow}{" "}
-              <a
-                href="#"
-                style={hmStyles.link}
-                onClick={(e) => {
-                  e.preventDefault();
-                  goto("signin");
-                }}
-              >
-                {t.signIn}
-              </a>
-            </p>
           </form>
         </div>
       )}
@@ -565,22 +552,19 @@ export function HMAuthFlow({ t }: Props) {
           <div style={hmStyles.iconBubble}>
             <HMIcon name="check-circle" size={28} stroke={1.6} />
           </div>
-          <h1 style={hmStyles.h1}>{t.requestReceivedTitle ?? t.verifyTitle}</h1>
-          <p style={hmStyles.sub}>
-            {t.requestReceivedBody ??
-              "Talebiniz alindi, super admin onayindan sonra erisim acilacak."}
-          </p>
+          <h1 style={hmStyles.h1}>{t.requestReceivedTitle}</h1>
+          <p style={hmStyles.sub}>{t.requestReceivedBody}</p>
+          {/* The account doesn't exist until a super admin approves it, so the
+              only sensible action here is going back to sign-in. (The old
+              screen offered "continue" into the dashboard plus a dead "resend"
+              button — neither applied to an approval-gated request.) */}
           <div style={{ display: "flex", gap: 10, marginTop: 24, flexWrap: "wrap" }}>
             <button
               type="button"
               className="hm-btn hm-btn-primary"
-              onClick={enterDashboard}
+              onClick={() => goto("signin")}
             >
-              <HMIcon name="arrow-right" size={15} />{" "}
-              {t.continue ?? "Devam et"}
-            </button>
-            <button type="button" className="hm-btn hm-btn-ghost">
-              <HMIcon name="refresh" size={14} /> {t.resendVerify}
+              <HMIcon name="arrow-left" size={15} /> {t.backToSignIn}
             </button>
           </div>
         </div>
