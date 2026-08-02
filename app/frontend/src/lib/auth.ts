@@ -99,6 +99,36 @@ export async function registerRequest(data: Record<string, unknown>): Promise<vo
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Müraciət göndərilmədi");
 }
 
+// ── Super-admin account approval (team: pending-account flow) ─────────
+export type PendingAccount = { email: string; name: string; created_at: string };
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** Accounts waiting for super-admin approval. */
+export async function fetchPendingAccounts(): Promise<PendingAccount[]> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/pending`, {
+    headers: { Accept: "application/json", ...authHeaders() }
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");
+  return ((await res.json()) as { items: PendingAccount[] }).items ?? [];
+}
+
+/** Approve ("active") or turn down ("rejected") a pending account. */
+export async function setAccountStatus(
+  email: string,
+  status: "active" | "rejected"
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify({ email, status })
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
+}
+
 export type AuthUser = {
   email: string;
   name: string;

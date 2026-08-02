@@ -8,11 +8,13 @@ import {
   Mail,
   PieChart,
   Settings,
+  Shield,
   User
 } from "lucide-react";
 import Link from "next/link";
 
 import { HomoraLogo } from "@/components/brand/homora-logo";
+import { getUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -49,16 +51,22 @@ type NavItem = {
 
 export function NavSidebar({ t, activeView, onViewChange }: Props) {
   // Single navigation group. Legacy "Homora V1" views (overview / map /
-  // rayons / trends / b2c / reports / alerts / admin / secondary system) are
-  // hidden from the menu per team request — their code stays in the shell.
+  // rayons / trends / b2c / reports / secondary system) stay hidden from the
+  // menu per team request — their code stays in the shell.
   // Elanlar (listings) was moved up from V1 into this group.
+  // "Admin / Şirkətlər" came back out of V1 because account approval lives
+  // there; it's only rendered for a super admin.
+  const isSuperAdmin = getUser()?.role === "super_admin";
   const items: NavItem[] = [
     { id: "valuation-single", icon: Calculator, label: t.navValSingle ?? "Tək qiymətləndirmə" },
     { id: "valuation-mass", icon: Boxes, label: t.navValMass ?? "Kütləvi qiymətləndirmə" },
     { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
     { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
     { id: "valuation-hexmap", icon: Globe, label: t.navValHexMap ?? "Xəritə analizi" },
-    { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" }
+    { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
+    ...(isSuperAdmin
+      ? [{ id: "admin" as const, icon: Shield, label: t.navAdmin ?? "Admin / Şirkətlər" }]
+      : [])
   ];
   const settings: NavItem[] = [
     { id: "settings", icon: Settings, label: t.navSettings },

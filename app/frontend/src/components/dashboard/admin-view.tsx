@@ -18,7 +18,13 @@ import {
   Users,
   X
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+
+import {
+  fetchPendingAccounts,
+  setAccountStatus,
+  type PendingAccount
+} from "@/lib/auth";
 
 import {
   brandColor,
@@ -95,6 +101,41 @@ type AddForm = {
 };
 
 export function AdminView({ t }: { t: Record<string, string> }) {
+  // Real accounts awaiting super-admin approval (backend /auth/pending).
+  const [accounts, setAccounts] = useState<PendingAccount[]>([]);
+  const [acctLoading, setAcctLoading] = useState(true);
+  const [acctErr, setAcctErr] = useState("");
+  const [acctBusy, setAcctBusy] = useState<string | null>(null);
+
+  const loadAccounts = useCallback(async () => {
+    setAcctLoading(true);
+    setAcctErr("");
+    try {
+      setAccounts(await fetchPendingAccounts());
+    } catch (e) {
+      setAcctErr(e instanceof Error ? e.message : "…");
+    }
+    setAcctLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadAccounts();
+  }, [loadAccounts]);
+
+  const decide = async (email: string, status: "active" | "rejected") => {
+    setAcctBusy(email);
+    try {
+      await setAccountStatus(email, status);
+      setAccounts((prev) => prev.filter((a) => a.email !== email));
+      setToast(
+        `${email} · ${status === "active" ? (t.admApproved ?? "") : (t.admRejected ?? "")}`
+      );
+    } catch (e) {
+      setAcctErr(e instanceof Error ? e.message : "…");
+    }
+    setAcctBusy(null);
+  };
+
   const [reqs, setReqs] = useState<SuperRequest[]>(() => SUPER_REQUESTS.map((r) => ({ ...r })));
   const [companies, setCompanies] = useState<SuperCompany[]>(() => SUPER_COMPANIES.map((c) => ({ ...c })));
   const [openCo, setOpenCo] = useState<string | null>(null);
@@ -390,44 +431,51 @@ export function AdminView({ t }: { t: Record<string, string> }) {
       )}
 
       {tab === "requests" && (
-        <Card title={t.admReqTitle ?? "Hesap Açılma Talepleri"} sub={t.admReqSub ?? "B2B kayıt kuyruğu · onayladığında müşteri şirket olarak eklenir"}>
-          {reqs.length === 0 ? (
+        <Card title={t.admReqTitle} sub={t.admReqSub}>
+          {/* Real pending accounts from the backend. This used to render the
+              SUPER_REQUESTS demo array; a super admin acting on fake rows
+              would have been meaningless, so it now drives /auth/pending. */}
+          {acctErr ? (
+            <div className="hm-empty">
+              <X size={22} />
+              <span>{acctErr}</span>
+            </div>
+          ) : acctLoading ? (
+            <div className="hm-empty">
+              <span>{t.loading}…</span>
+            </div>
+          ) : accounts.length === 0 ? (
             <div className="hm-empty">
               <Check size={22} />
-              <span>{t.admNoRequests ?? "Bekleyen talep yok"}</span>
+              <span>{t.admNoRequests}</span>
             </div>
           ) : (
             <div className="hm-req-list">
-              {reqs.map((r) => (
-                <div className={"hm-req " + (r.status !== "pending" ? "done" : "")} key={r.id}>
-                  <Logo name={r.company} size={42} />
+              {accounts.map((a) => (
+                <div className="hm-req" key={a.email}>
+                  <Logo name={a.name || a.email} size={42} />
                   <div className="hm-req-main">
-                    <div className="hm-req-name">
-                      {r.company} <span className="hm-req-title">· {r.title}</span>
-                    </div>
-                    <div className="hm-req-co">
-                      {r.firstName} {r.lastName} · VÖEN {r.voen} · {r.employees} {t.admEmployeesSuffix ?? "çalışan"}
-                    </div>
-                    <div className="hm-req-contact">{r.email} · {r.phone}</div>
+                    <div className="hm-req-name">{a.name || a.email}</div>
+                    <div className="hm-req-contact">{a.email}</div>
                   </div>
                   <div className="hm-req-meta">
-                    <span className="muted">{r.submittedAt}</span>
+                    <span className="muted">{a.created_at.slice(0, 10)}</span>
                   </div>
                   <div className="hm-req-actions">
-                    {r.status === "pending" ? (
-                      <>
-                        <button className="hm-btn-ok" onClick={() => setReqStatus(r.id, "approved")}>
-                          <Check size={14} /> {t.approve ?? "Onayla"}
-                        </button>
-                        <button className="hm-btn-err" onClick={() => setReqStatus(r.id, "rejected")}>
-                          <X size={14} /> {t.reject ?? "Reddet"}
-                        </button>
-                      </>
-                    ) : (
-                      <Badge tone={r.status === "approved" ? "ok" : "err"}>
-                        {r.status === "approved" ? (t.admApproved ?? "Onaylandı") : (t.admRejected ?? "Reddedildi")}
-                      </Badge>
-                    )}
+                    <button
+                      className="hm-btn-ok"
+                      disabled={acctBusy === a.email}
+                      onClick={() => decide(a.email, "active")}
+                    >
+                      <Check size={14} /> {t.approve}
+                    </button>
+                    <button
+                      className="hm-btn-err"
+                      disabled={acctBusy === a.email}
+                      onClick={() => decide(a.email, "rejected")}
+                    >
+                      <X size={14} /> {t.reject}
+                    </button>
                   </div>
                 </div>
               ))}
