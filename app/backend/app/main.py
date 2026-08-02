@@ -32,6 +32,39 @@ async def _migrate_users() -> None:
         )
 
 
+async def _refresh_if_stale() -> None:
+    """Rebuild the H3 analytics on boot when they are behind the source.
+
+    The cron only fires at 00:00, so a deploy that ships a data fix — or a
+    container that was down at midnight — would keep serving stale periods
+    until the following night with no way to tell. Runs in the background so
+    startup is not blocked; the nightly schedule still applies afterwards.
+    """
+    import asyncio
+    import logging
+    from datetime import date, timedelta
+
+    from sqlalchemy import func, select
+
+    from app.db.session import async_session_factory
+    from app.models.h3_analytics import H3AnalyticsRecord
+    from app.services.nightly_job import run_nightly_job
+
+    log = logging.getLogger(__name__)
+    if not settings.source_database_url:
+        return
+    async with async_session_factory() as session:
+        newest = (
+            await session.execute(select(func.max(H3AnalyticsRecord.period)))
+        ).scalar_one_or_none()
+    # "Behind" = empty, or the newest month predates last month. Anything more
+    # eager would rebuild on every restart for no reason.
+    cutoff = date.today().replace(day=1) - timedelta(days=31)
+    if newest is None or newest < cutoff:
+        log.info("Analytics stale (newest=%s, cutoff=%s) — rebuilding.", newest, cutoff)
+        asyncio.create_task(run_nightly_job())
+
+
 async def _seed_admin() -> None:
     """Seed a first admin so the OTP login has a user to check against (team #8)."""
     from sqlalchemy import select
@@ -65,6 +98,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     await _migrate_users()
     await _seed_admin()
+    await _refresh_if_stale()
     # A batch valuation that was mid-flight when the process stopped picks up
     # where it left off instead of being silently abandoned.
     from app.services.valuation_jobs import resume_unfinished
