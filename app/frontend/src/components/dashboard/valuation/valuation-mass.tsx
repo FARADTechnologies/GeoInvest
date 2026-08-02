@@ -26,7 +26,13 @@ import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/da
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { geocodeAddress } from "@/components/dashboard/valuation/valuation-maps";
 import { fetchValuationMeta, newId, valuateBatch } from "@/lib/valuation-data";
-import { predictByParams, LinkValuationError } from "@/lib/valuation-report";
+import {
+  buildPredictPayload,
+  predictByParams,
+  reportFromPredict,
+  LinkValuationError
+} from "@/lib/valuation-report";
+import { createValuationJob, fetchValuationJob } from "@/lib/auth";
 import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
 import type { RateReportData, ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
 
@@ -67,6 +73,41 @@ async function valuateInput(input: ValuationInput, id: string): Promise<{ item: 
   }
   const report = await predictByParams(filled);
   return { item: opropFromReport(id, report), report };
+}
+
+// Which server job belongs to which portfolio, so a reload (or a different
+// device) can re-attach to a run that is still going on the backend.
+const JOBS_KEY = "homora-valuation-jobs";
+
+type JobMemo = { jobId: string; ids: string[] };
+
+function readJobs(): Record<string, JobMemo> {
+  try {
+    return JSON.parse(window.localStorage.getItem(JOBS_KEY) || "{}") as Record<string, JobMemo>;
+  } catch {
+    return {};
+  }
+}
+
+function rememberJob(portfolioId: string, jobId: string, ids: string[]): void {
+  try {
+    window.localStorage.setItem(
+      JOBS_KEY,
+      JSON.stringify({ ...readJobs(), [portfolioId]: { jobId, ids } })
+    );
+  } catch {
+    /* ignore quota errors */
+  }
+}
+
+function forgetJob(portfolioId: string): void {
+  try {
+    const all = readJobs();
+    delete all[portfolioId];
+    window.localStorage.setItem(JOBS_KEY, JSON.stringify(all));
+  } catch {
+    /* ignore */
+  }
 }
 
 // Unvalued draft row from an input (shown in the list until valuated).
@@ -329,31 +370,101 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
     }
   };
 
-  // Valuate a set of rows sequentially against the real predict model (slow —
-  // ~20–55s each), updating the list + progress after each one. No DB fallback:
-  // rows whose address can't be geocoded / model fails are left as drafts.
+  // Valuate a set of rows against the real predict model.
+  //
+  // The per-flat loop used to run here in the browser, so leaving the page
+  // cancelled the whole run. It now goes to the backend as a job (one row at a
+  // time there, ~20–55 s each) and this component only submits and polls —
+  // closing the tab no longer stops anything, and re-opening re-attaches.
+  // Geocoding stays client-side: it needs the Maps SDK and is fast.
   const runBatch = async (targets: OProp[]) => {
     if (targets.length === 0) return;
     setImportErr(null);
     setProgress({ done: 0, total: targets.length, label: "" });
-    let failed = 0;
-    let cur = portfolio.items;
-    const gotReports: Record<string, RateReportData> = {};
-    for (let i = 0; i < targets.length; i++) {
-      const d = targets[i];
-      setProgress({ done: i, total: targets.length, label: d.address || d.district || "" });
-      try {
-        const { item, report } = await valuateInput(toInput(d), d.id);
-        gotReports[d.id] = report;
-        cur = cur.map((x) => (x.id === d.id ? item : x));
-        update({ ...portfolio, items: cur });
-      } catch {
-        failed++;
+
+    const inputs: ValuationInput[] = [];
+    const ids: string[] = [];
+    for (const d of targets) {
+      const base = toInput(d);
+      let filled = base;
+      if ((!base.latitude || !base.longitude) && base.address) {
+        try {
+          const geo = await geocodeAddress(base.address);
+          if (geo) filled = { ...base, latitude: geo.lat, longitude: geo.lng };
+        } catch {
+          /* keep the row; the backend reports it as failed */
+        }
       }
+      inputs.push(filled);
+      ids.push(d.id);
     }
-    setReports((prev) => ({ ...prev, ...gotReports }));
-    setProgress(null);
-    if (failed > 0) setImportErr(`${failed} mənzil qiymətləndirilə bilmədi (ünvan tapılmadı və ya model xətası).`);
+
+    try {
+      const job = await createValuationJob(
+        inputs.map((i) => buildPredictPayload(i)),
+        portfolio.id
+      );
+      rememberJob(portfolio.id, job.job_id, ids);
+      await pollJob(job.job_id, inputs, ids, targets.length);
+    } catch (err) {
+      setProgress(null);
+      setImportErr(
+        err instanceof Error && err.message ? err.message : T("Qiymətləndirmə modeli cavab vermir")
+      );
+    }
+  };
+
+  // Poll a server job until it finishes, folding each completed row into the
+  // portfolio as it lands so progress is visible (and survives a reload).
+  const pollJob = async (
+    jobId: string,
+    inputs: ValuationInput[],
+    ids: string[],
+    total: number
+  ) => {
+    for (;;) {
+      let job: Awaited<ReturnType<typeof fetchValuationJob>>;
+      try {
+        job = await fetchValuationJob(jobId);
+      } catch {
+        setProgress(null);
+        return;
+      }
+      const gotReports: Record<string, RateReportData> = {};
+      let cur = portfolio.items;
+      let failed = 0;
+      for (const r of job.results ?? []) {
+        const id = ids[r.index];
+        const input = inputs[r.index];
+        if (!id || !input) continue;
+        if (r.ok && r.result) {
+          const report = reportFromPredict(r.result as never, input);
+          gotReports[id] = report;
+          cur = cur.map((x) => (x.id === id ? opropFromReport(id, report) : x));
+        } else {
+          failed++;
+        }
+      }
+      if (Object.keys(gotReports).length) {
+        setReports((prev) => ({ ...prev, ...gotReports }));
+        update({ ...portfolio, items: cur });
+      }
+      setProgress({
+        done: job.done,
+        total: job.total || total,
+        label: inputs[job.done]?.address ?? ""
+      });
+
+      if (job.status === "done" || job.status === "failed") {
+        setProgress(null);
+        forgetJob(portfolio.id);
+        if (job.status === "failed") setImportErr(job.error || T("Qiymətləndirmə modeli cavab vermir"));
+        else if (failed > 0)
+          setImportErr(`${failed} mənzil qiymətləndirilə bilmədi (ünvan tapılmadı və ya model xətası).`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
   };
 
   const submit = async (input: ValuationInput, doValuate: boolean, existingId?: string) => {

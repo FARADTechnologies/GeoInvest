@@ -65,6 +65,11 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     await _migrate_users()
     await _seed_admin()
+    # A batch valuation that was mid-flight when the process stopped picks up
+    # where it left off instead of being silently abandoned.
+    from app.services.valuation_jobs import resume_unfinished
+
+    await resume_unfinished()
     start_scheduler()
     yield
     stop_scheduler()

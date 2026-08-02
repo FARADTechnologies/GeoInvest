@@ -5,8 +5,6 @@ import {
   LogOut,
   Moon,
   RefreshCcw,
-  Search,
-  Share2,
   Sun,
   User as UserIcon
 } from "lucide-react";
@@ -85,20 +83,11 @@ export function TopBar({
 
       <div className="flex-1" />
 
-      {/* Search — not yet wired to backend */}
-      <div
-        className="hidden h-9 items-center gap-2 rounded-lg border bg-muted/30 px-3 md:flex md:w-[280px]"
-        title={t.searchSoon ?? "Search coming soon"}
-      >
-        <Search className="h-3.5 w-3.5 text-muted-foreground" />
-        <input
-          type="text"
-          placeholder={`${t.searchPh} (${t.searchSoon ?? "soon"})`}
-          disabled
-          className="flex-1 cursor-not-allowed bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/60"
-        />
-      </div>
-
+      {/* A disabled "search (soon)" box and an export button with no click
+          handler used to sit here. Neither did anything, and both duplicate
+          controls the views already own (Elanlar has its own search; the
+          valuation screens have Excel/PDF export), so they were removed rather
+          than left as decoration. Refresh stays — it now reaches every view. */}
       <Button
         variant="outline"
         size="sm"
@@ -108,11 +97,6 @@ export function TopBar({
       >
         <RefreshCcw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
         {t.refresh}
-      </Button>
-
-      <Button size="sm" className="h-9 gap-1.5 text-[12px]">
-        <Share2 className="h-3.5 w-3.5" />
-        {t.export}
       </Button>
 
       <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -165,14 +165,14 @@ export function DashboardShell() {
   const hasCatalog = Boolean(filtersQuery.data && filters);
   const isLoading = filtersQuery.isLoading || !hasCatalog;
 
+  const queryClient = useQueryClient();
+
+  // Refresh used to refetch only these seven overview queries — all of which
+  // belong to the hidden V1 screens, so pressing it on a valuation view did
+  // nothing visible. Invalidating the whole cache refetches whatever the user
+  // is actually looking at, these included.
   const refresh = () => {
-    void metricsQuery.refetch();
-    void mapQuery.refetch();
-    void rayonsQuery.refetch();
-    void sparklinesQuery.refetch();
-    void histogramQuery.refetch();
-    void trendSeriesQuery.refetch();
-    void activityQuery.refetch();
+    void queryClient.invalidateQueries();
   };
 
   const mapData = useMemo(() => mapQuery.data ?? [], [mapQuery.data]);

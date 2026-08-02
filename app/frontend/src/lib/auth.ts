@@ -129,6 +129,37 @@ export async function setAccountStatus(
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
 }
 
+// ── Server-side batch valuation jobs ──────────────────────────────────
+// The mass-valuation loop lives on the backend, so closing the tab no longer
+// cancels it. The UI submits once, then polls until the job reports "done".
+export type ValuationJob = {
+  job_id: string;
+  status: "pending" | "running" | "done" | "failed";
+  total: number;
+  done: number;
+  portfolio_id?: string;
+  results?: { index: number; ok: boolean; result?: unknown; error?: string }[];
+  error?: string | null;
+};
+
+export async function createValuationJob(
+  items: unknown[],
+  portfolioId?: string
+): Promise<ValuationJob> {
+  return postJson<ValuationJob>("/valuation/jobs", {
+    items,
+    portfolio_id: portfolioId ?? null
+  });
+}
+
+export async function fetchValuationJob(jobId: string): Promise<ValuationJob> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/jobs/${jobId}`, {
+    headers: { Accept: "application/json", ...authHeaders() }
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Tapılmadı");
+  return (await res.json()) as ValuationJob;
+}
+
 // ── User directory (super admin) ──────────────────────────────────────
 export type DirectoryUser = {
   email: string;
