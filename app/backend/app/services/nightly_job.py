@@ -48,31 +48,36 @@ _SALE_TYPE_ID = 1
 # rows are newer and carry predictions. Rows without a source_url fall back to
 # a table-qualified id so they stay distinct. De-duplicating here — before the
 # H3 grouping — keeps a repeat from inflating a cell's ad_count or its median.
-_SOURCE_CTE = """\
-WITH pool AS (
-    SELECT 1 AS pri, i.id, i.source_url, i.latitude, i.longitude,
-           i.owner_price, i.size, i.created_date, i.category_id
-    FROM item_app_items i
-    WHERE i.deleted IS NOT TRUE
-      AND i.type_id = {sale_type}
-      AND i.latitude IS NOT NULL
-      AND i.longitude IS NOT NULL
-      AND i.owner_price IS NOT NULL
-      AND i.owner_price >= {min_price}
-      AND i.size > 0
-      AND i.category_id IN ({cats})
-    UNION ALL
-    SELECT 2 AS pri, e.id, e.source_url, e.latitude, e.longitude,
-           e.owner_price, e.size, e.created_date, e.category_id
-    FROM item_app_items_excel e
-    WHERE e.deleted IS NOT TRUE
-      AND e.type_id = {sale_type}
-      AND e.latitude IS NOT NULL
-      AND e.longitude IS NOT NULL
-      AND e.owner_price IS NOT NULL
-      AND e.owner_price >= {min_price}
-      AND e.size > 0
-      AND e.category_id IN ({cats})
+def _pool_select(table: str, pri: int) -> str:
+    return f"""\
+    SELECT {pri} AS pri, t.id, t.source_url, t.latitude, t.longitude,
+           t.owner_price, t.size, t.created_date, t.category_id
+    FROM {table} t
+    WHERE t.deleted IS NOT TRUE
+      AND t.type_id = {{sale_type}}
+      AND t.latitude IS NOT NULL
+      AND t.longitude IS NOT NULL
+      AND t.owner_price IS NOT NULL
+      AND t.owner_price >= {{min_price}}
+      AND t.size > 0
+      AND t.category_id IN ({{cats}})"""
+
+
+def _source_cte(include_excel: bool) -> str:
+    """Build the source CTE, optionally folding in the bulk-import table.
+
+    The deployment's DB role may not be granted SELECT on
+    item_app_items_excel. Losing those rows costs coverage, but failing the
+    whole job would freeze every period — so the caller probes access first and
+    the archive is simply left out when it is unreadable.
+    """
+    branches = [_pool_select("item_app_items", 1)]
+    if include_excel:
+        branches.append(_pool_select("item_app_items_excel", 2))
+    return (
+        "WITH pool AS (\n"
+        + "\n    UNION ALL\n".join(branches)
+        + """
 ), src AS (
     SELECT DISTINCT ON (COALESCE(source_url, pri::text || '-' || id::text))
         id, latitude, longitude, owner_price, size, created_date, category_id
@@ -80,10 +85,9 @@ WITH pool AS (
     ORDER BY COALESCE(source_url, pri::text || '-' || id::text), pri, created_date DESC, id DESC
 )
 """
+    )
 
-_GEOM_SQL = (
-    _SOURCE_CTE
-    + """\
+_GEOM_BODY = """\
 SELECT
     'geom'                                                               AS analysis_type,
     o.name                                                               AS rayon_name,
@@ -104,11 +108,8 @@ WHERE o.type_id = 22
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, rayon_name;
 """
-)
 
-_PURE_H3_SQL = (
-    _SOURCE_CTE
-    + """\
+_PURE_H3_BODY = """\
 SELECT
     'pure_h3'                                                            AS analysis_type,
     'GLOBAL'                                                             AS rayon_name,
@@ -126,7 +127,6 @@ LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, ad_count DESC;
 """
-)
 
 
 def _fetch_from_source_db(conn_str: str) -> list[tuple]:
@@ -147,13 +147,33 @@ def _fetch_from_source_db(conn_str: str) -> list[tuple]:
         keepalives_count=5,
         options="-c statement_timeout=300000",  # 5 min per statement
     ) as conn:
+        # Probe the archive table in its own transaction: the deployment role
+        # may lack SELECT on it, and a failed statement would otherwise poison
+        # the connection for everything that follows.
+        include_excel = True
+        try:
+            with conn.cursor() as probe:
+                probe.execute("SELECT 1 FROM item_app_items_excel LIMIT 1")
+                probe.fetchall()
+        except psycopg.Error as exc:
+            include_excel = False
+            logger.warning(
+                "item_app_items_excel unavailable (%s) — continuing with the "
+                "live table only; historical coverage will be reduced.",
+                type(exc).__name__,
+            )
+        conn.rollback()
+
+        cte = _source_cte(include_excel)
+        geom_sql, pure_sql = cte + _GEOM_BODY, cte + _PURE_H3_BODY
+        fmt = {"cats": cats, "min_price": _MIN_LISTING_PRICE, "sale_type": _SALE_TYPE_ID}
         with conn.cursor() as cur:
             for res in _RESOLUTIONS:
                 logger.info("Fetching geom path (res=%d)…", res)
-                cur.execute(_GEOM_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE, sale_type=_SALE_TYPE_ID))
+                cur.execute(geom_sql.format(res=res, **fmt))
                 rows.extend(cur.fetchall())
                 logger.info("Fetching pure_h3 path (res=%d)…", res)
-                cur.execute(_PURE_H3_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE, sale_type=_SALE_TYPE_ID))
+                cur.execute(pure_sql.format(res=res, **fmt))
                 rows.extend(cur.fetchall())
     return rows
 
