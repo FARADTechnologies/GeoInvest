@@ -29,6 +29,13 @@ _TARGET_CATEGORIES = (3, 4)  # Yeni Tikili, Köhne Tikili
 # so they never distort a cell's median ₼/m² or ad_count. Fixed, not a slider.
 _MIN_LISTING_PRICE = 5000
 
+# item_app_items holds sale AND rent listings, both keeping the amount in
+# owner_price. type_id 1 = sale, 3 = rent. Without this the heat map mixed the
+# two: ~695 rentals priced over the noise floor were being averaged into the
+# sale ₼/m² medians, dragging them down. The price floor stays as a garbage
+# filter — the cheapest "sale" in the table is 49 ₼, which is not a real flat.
+_SALE_TYPE_ID = 1
+
 # Source rows, de-duplicated.
 #
 # This used to read `item_app_items_excel` — a one-off manual import from back
@@ -48,6 +55,7 @@ WITH src AS (
         i.created_date, i.category_id
     FROM item_app_items i
     WHERE i.deleted IS NOT TRUE
+      AND i.type_id = {sale_type}
       AND i.latitude IS NOT NULL
       AND i.longitude IS NOT NULL
       AND i.owner_price IS NOT NULL
@@ -127,10 +135,10 @@ def _fetch_from_source_db(conn_str: str) -> list[tuple]:
         with conn.cursor() as cur:
             for res in _RESOLUTIONS:
                 logger.info("Fetching geom path (res=%d)…", res)
-                cur.execute(_GEOM_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE))
+                cur.execute(_GEOM_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE, sale_type=_SALE_TYPE_ID))
                 rows.extend(cur.fetchall())
                 logger.info("Fetching pure_h3 path (res=%d)…", res)
-                cur.execute(_PURE_H3_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE))
+                cur.execute(_PURE_H3_SQL.format(res=res, cats=cats, min_price=_MIN_LISTING_PRICE, sale_type=_SALE_TYPE_ID))
                 rows.extend(cur.fetchall())
     return rows
 
