@@ -27,3 +27,22 @@ class ApproveRequest(BaseModel):
     email: str
     # "active" approves the account, "rejected" turns it down.
     status: str = "active"
+
+
+class RoleRequest(BaseModel):
+    email: str
+    role: str  # super_admin | company_admin | employee
+
+
+class StatusRequest(BaseModel):
+    email: str
+    status: str  # active | blocked | rejected
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ProfileRequest(BaseModel):
+    name: str

@@ -17,6 +17,7 @@ import { Alert } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { B2CView, ListingsViewV3, RayonsViewV3 } from "@/components/dashboard/v3-views";
+import { AccountView, SettingsView } from "@/components/dashboard/account-view";
 import { AdminView } from "@/components/dashboard/admin-view";
 import { ValuationSingleView } from "@/components/dashboard/valuation/valuation-single";
 import { ValuationMassView } from "@/components/dashboard/valuation/valuation-mass";
@@ -282,11 +283,9 @@ export function DashboardShell() {
             {activeView === "reports" ? <ReportsView t={t} /> : null}
             {activeView === "alerts" ? <AlertsView t={t} /> : null}
             {activeView === "admin" ? <AdminView t={t} /> : null}
-            {activeView === "settings" || activeView === "account" ? (
-              <PlaceholderView
-                title={activeView === "settings" ? t.navSettings : t.navAccount}
-                subtitle="Profile, permissions, billing, and workspace controls."
-              />
+            {activeView === "account" ? <AccountView t={t} /> : null}
+            {activeView === "settings" ? (
+              <SettingsView t={t} lang={lang} onLangChange={setLang} />
             ) : null}
           </div>
         </section>

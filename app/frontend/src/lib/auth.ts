@@ -129,6 +129,64 @@ export async function setAccountStatus(
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
 }
 
+// ── User directory (super admin) ──────────────────────────────────────
+export type DirectoryUser = {
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  created_at: string | null;
+};
+
+async function postJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
+  return (await res.json()) as T;
+}
+
+/** Every account on the platform. */
+export async function fetchUsers(): Promise<DirectoryUser[]> {
+  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/users`, {
+    headers: { Accept: "application/json", ...authHeaders() }
+  });
+  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");
+  return ((await res.json()) as { items: DirectoryUser[] }).items ?? [];
+}
+
+export function setUserRole(email: string, role: string) {
+  return postJson<DirectoryUser>("/auth/user/role", { email, role });
+}
+
+export function setUserStatus(email: string, status: string) {
+  return postJson<DirectoryUser>("/auth/user/status", { email, status });
+}
+
+// ── Own account ───────────────────────────────────────────────────────
+export function updateProfile(name: string) {
+  return postJson<DirectoryUser>("/auth/profile", { name });
+}
+
+export function changePassword(current_password: string, new_password: string) {
+  return postJson<{ ok: boolean }>("/auth/change-password", {
+    current_password,
+    new_password
+  });
+}
+
+/** Revoke the session server-side, then clear it locally. */
+export async function signOutEverywhere(): Promise<void> {
+  try {
+    await postJson<{ ok: boolean }>("/auth/logout", {});
+  } catch {
+    /* the local session is cleared regardless */
+  }
+  signOut();
+}
+
 export type AuthUser = {
   email: string;
   name: string;

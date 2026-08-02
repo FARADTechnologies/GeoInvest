@@ -22,7 +22,11 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import {
   fetchPendingAccounts,
+  fetchUsers,
   setAccountStatus,
+  setUserRole as apiSetUserRole,
+  setUserStatus as apiSetUserStatus,
+  type DirectoryUser,
   type PendingAccount
 } from "@/lib/auth";
 
@@ -139,7 +143,39 @@ export function AdminView({ t }: { t: Record<string, string> }) {
   const [reqs, setReqs] = useState<SuperRequest[]>(() => SUPER_REQUESTS.map((r) => ({ ...r })));
   const [companies, setCompanies] = useState<SuperCompany[]>(() => SUPER_COMPANIES.map((c) => ({ ...c })));
   const [openCo, setOpenCo] = useState<string | null>(null);
-  const [tab, setTab] = useState<"companies" | "requests">("companies");
+  const [tab, setTab] = useState<"companies" | "requests" | "users">("companies");
+  // Real platform accounts — the super admin's user directory.
+  const [users, setUsers] = useState<DirectoryUser[]>([]);
+  const loadUsers = useCallback(async () => {
+    try {
+      setUsers(await fetchUsers());
+    } catch {
+      /* the Users tab shows an empty list; the Requests tab surfaces errors */
+    }
+  }, []);
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  const changeRole = async (email: string, role: string) => {
+    try {
+      await apiSetUserRole(email, role);
+      setUsers((p) => p.map((u) => (u.email === email ? { ...u, role } : u)));
+      setToast(`${email} · ${role}`);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "…");
+    }
+  };
+
+  const changeStatus = async (email: string, status: string) => {
+    try {
+      await apiSetUserStatus(email, status);
+      setUsers((p) => p.map((u) => (u.email === email ? { ...u, status } : u)));
+      setToast(`${email} · ${status}`);
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "…");
+    }
+  };
   const [q, setQ] = useState("");
   const [sector, setSector] = useState("all");
   const [statusF, setStatusF] = useState("all");
@@ -319,7 +355,16 @@ export function AdminView({ t }: { t: Record<string, string> }) {
             setTab("requests");
           }}
         >
-          {t.admTabRequests ?? "Hesap Talepleri"} {pending > 0 && <span className="hm-tab-pill">{pending}</span>}
+          {t.admTabRequests} {accounts.length > 0 && <span className="hm-tab-pill">{accounts.length}</span>}
+        </button>
+        <button
+          className={tab === "users" ? "on" : ""}
+          onClick={(e) => {
+            e.stopPropagation();
+            setTab("users");
+          }}
+        >
+          {t.admTabUsers} <span className="hm-tab-count">{users.length}</span>
         </button>
       </div>
 
@@ -481,6 +526,68 @@ export function AdminView({ t }: { t: Record<string, string> }) {
               ))}
             </div>
           )}
+        </Card>
+      )}
+
+      {tab === "users" && (
+        <Card title={t.admUsersTitle} sub={t.admUsersSub}>
+          <div className="hm-table-wrap">
+            <table className="hm-table">
+              <thead>
+                <tr>
+                  <th>{t.admColEmployee}</th>
+                  <th>{t.email}</th>
+                  <th>{t.admColRole}</th>
+                  <th>{t.admColStatus}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.email}>
+                    <td>{u.name || "—"}</td>
+                    <td className="muted">{u.email}</td>
+                    <td>
+                      <select
+                        value={u.role}
+                        onChange={(e) => changeRole(u.email, e.target.value)}
+                      >
+                        <option value="super_admin">Super admin</option>
+                        <option value="company_admin">{t.admRoleCompanyAdmin}</option>
+                        <option value="employee">{t.admRoleEmployee}</option>
+                      </select>
+                    </td>
+                    <td>
+                      <Badge
+                        tone={
+                          u.status === "active" ? "ok" : u.status === "pending" ? "warn" : "err"
+                        }
+                      >
+                        {u.status}
+                      </Badge>
+                    </td>
+                    <td className="right">
+                      {u.status === "active" ? (
+                        <button
+                          className="hm-btn-err"
+                          onClick={() => changeStatus(u.email, "blocked")}
+                        >
+                          <Ban size={14} /> {t.block}
+                        </button>
+                      ) : (
+                        <button
+                          className="hm-btn-ok"
+                          onClick={() => changeStatus(u.email, "active")}
+                        >
+                          <Check size={14} /> {t.activate}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
 
