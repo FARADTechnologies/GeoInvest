@@ -24,13 +24,21 @@ const ROLE_LABEL: Record<string, string> = {
   employee: "İşçi"
 };
 
+// Label above value, not label-left/value-far-right: on a wide dashboard that
+// split leaves the eye travelling the full width of the card to pair them up.
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b py-2.5 last:border-b-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium">{value}</span>
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      <span className="text-sm font-semibold">{value}</span>
     </div>
   );
+}
+
+// Caps the reading width so form rows stay close to their labels instead of
+// stretching across the whole dashboard.
+function Pane({ children }: { children: React.ReactNode }) {
+  return <div className="flex w-full max-w-2xl flex-col gap-4">{children}</div>;
 }
 
 function Field({
@@ -118,17 +126,19 @@ export function AccountView({ t }: { t: Record<string, string> }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <Pane>
       <DashboardCard title={t.acProfile ?? "Profil"} subtitle={user.email}>
-        <div className="flex flex-col gap-3">
-          <Row label={t.email} value={user.email} />
-          <Row label={t.acRole ?? "Rol"} value={ROLE_LABEL[user.role] ?? user.role} />
-          <div className="flex items-end gap-2 pt-1">
+        <div className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Row label={t.email} value={user.email} />
+            <Row label={t.acRole ?? "Rol"} value={ROLE_LABEL[user.role] ?? user.role} />
+          </div>
+          <div className="flex items-end gap-2">
             <div className="flex-1">
               <Field label={t.acFullName ?? "Ad Soyad"} value={name} onChange={setName} />
             </div>
             <button
-              className="hm-btn hm-btn-primary h-9 px-4"
+              className="hm-btn hm-btn-primary h-9 shrink-0 px-4"
               disabled={savingName || !name.trim() || name === user.name}
               onClick={saveName}
             >
@@ -143,18 +153,20 @@ export function AccountView({ t }: { t: Record<string, string> }) {
         subtitle={t.acPasswordSub ?? ""}
       >
         <div className="flex flex-col gap-3">
-          <Field
-            label={t.acCurrentPw ?? "Cari şifrə"}
-            type="password"
-            value={cur}
-            onChange={setCur}
-          />
-          <Field
-            label={t.acNewPw ?? "Yeni şifrə"}
-            type="password"
-            value={next}
-            onChange={setNext}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field
+              label={t.acCurrentPw ?? "Cari şifrə"}
+              type="password"
+              value={cur}
+              onChange={setCur}
+            />
+            <Field
+              label={t.acNewPw ?? "Yeni şifrə"}
+              type="password"
+              value={next}
+              onChange={setNext}
+            />
+          </div>
           <button
             className="hm-btn hm-btn-primary h-9 self-start px-4"
             disabled={!cur || next.length < 5}
@@ -167,7 +179,7 @@ export function AccountView({ t }: { t: Record<string, string> }) {
 
       <DashboardCard title={t.acSession ?? "Sessiya"} subtitle={t.acSessionSub ?? ""}>
         <button
-          className="hm-btn hm-btn-ghost h-9 px-4"
+          className="hm-btn hm-btn-ghost h-9 self-start px-4"
           onClick={async () => {
             await signOutEverywhere();
             window.location.replace("/login");
@@ -187,7 +199,7 @@ export function AccountView({ t }: { t: Record<string, string> }) {
           {err || msg}
         </div>
       )}
-    </div>
+    </Pane>
   );
 }
 
@@ -204,11 +216,11 @@ export function SettingsView({
   const env = process.env.NEXT_PUBLIC_APP_ENV || "development";
 
   return (
-    <div className="flex flex-col gap-4">
+    <Pane>
       <DashboardCard title={t.stAppearance ?? "Görünüş"} subtitle={t.stAppearanceSub ?? ""}>
-        <div className="flex items-center justify-between py-1">
-          <span className="text-sm">{t.menuTheme}</span>
-          <button className="hm-btn hm-btn-ghost h-9 px-4" onClick={toggle}>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">{t.menuTheme}</span>
+          <button className="hm-btn hm-btn-ghost h-9 self-start px-4" onClick={toggle}>
             {theme === "light" ? (
               <>
                 <Sun className="h-3.5 w-3.5" /> {t.stLight ?? "İşıqlı"}
@@ -238,18 +250,20 @@ export function SettingsView({
       </DashboardCard>
 
       <DashboardCard title={t.stSystem ?? "Sistem"} subtitle={t.stSystemSub ?? ""}>
-        <div className="flex flex-col gap-1">
-          <Row label={t.stEnv ?? "Mühit"} value={env} />
-          <Row
-            label={t.stApi ?? "API"}
-            value={process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}
-          />
-          <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
-            <Monitor className="h-3.5 w-3.5" />
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 gap-4">
+            <Row label={t.stEnv ?? "Mühit"} value={env} />
+            <Row
+              label={t.stApi ?? "API"}
+              value={process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"}
+            />
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Monitor className="h-3.5 w-3.5 shrink-0" />
             {t.stSystemNote ?? ""}
           </div>
         </div>
       </DashboardCard>
-    </div>
+    </Pane>
   );
 }

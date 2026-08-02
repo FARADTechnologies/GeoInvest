@@ -10,7 +10,7 @@ Flow:
 
 import asyncio
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 
 import psycopg
 from sqlalchemy import delete, text
@@ -29,7 +29,38 @@ _TARGET_CATEGORIES = (3, 4)  # Yeni Tikili, Köhne Tikili
 # so they never distort a cell's median ₼/m² or ad_count. Fixed, not a slider.
 _MIN_LISTING_PRICE = 5000
 
-_GEOM_SQL = """\
+# Source rows, de-duplicated.
+#
+# This used to read `item_app_items_excel` — a one-off manual import from back
+# when there was no live DB. That table stopped being fed on 2026-04-10 and only
+# ever held three months, which is why the map's period list went stale while
+# Elanlar / Bazar analizi (which read `item_app_items`) stayed current. There is
+# now a single live source: `item_app_items`.
+#
+# The same listing can appear more than once (re-scrapes share a source_url), so
+# DISTINCT ON keeps only the newest row per source_url; rows without one fall
+# back to their id and stay distinct. Filtering here — before the H3 grouping —
+# keeps a duplicate from inflating a cell's ad_count or skewing its median.
+_SOURCE_CTE = """\
+WITH src AS (
+    SELECT DISTINCT ON (COALESCE(i.source_url, i.id::text))
+        i.id, i.latitude, i.longitude, i.owner_price, i.size,
+        i.created_date, i.category_id
+    FROM item_app_items i
+    WHERE i.deleted IS NOT TRUE
+      AND i.latitude IS NOT NULL
+      AND i.longitude IS NOT NULL
+      AND i.owner_price IS NOT NULL
+      AND i.owner_price >= {min_price}
+      AND i.size > 0
+      AND i.category_id IN ({cats})
+    ORDER BY COALESCE(i.source_url, i.id::text), i.created_date DESC, i.id DESC
+)
+"""
+
+_GEOM_SQL = (
+    _SOURCE_CTE
+    + """\
 SELECT
     'geom'                                                               AS analysis_type,
     o.name                                                               AS rayon_name,
@@ -42,21 +73,19 @@ SELECT
     )                                                                    AS median_price_kvm,
     {res}                                                                AS resolution,
     TO_CHAR(i.created_date, 'YYYY-MM')                                  AS period
-FROM item_app_items_excel i
+FROM src i
 LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
 JOIN index_app_object o
     ON ST_Contains(o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326))
-WHERE i.latitude IS NOT NULL
-  AND i.longitude IS NOT NULL
-  AND i.owner_price IS NOT NULL
-  AND i.owner_price >= {min_price}
-  AND o.type_id = 22
-  AND i.category_id IN ({cats})
+WHERE o.type_id = 22
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, rayon_name;
 """
+)
 
-_PURE_H3_SQL = """\
+_PURE_H3_SQL = (
+    _SOURCE_CTE
+    + """\
 SELECT
     'pure_h3'                                                            AS analysis_type,
     'GLOBAL'                                                             AS rayon_name,
@@ -69,16 +98,12 @@ SELECT
     )                                                                    AS median_price_kvm,
     {res}                                                                AS resolution,
     TO_CHAR(i.created_date, 'YYYY-MM')                                  AS period
-FROM item_app_items_excel i
+FROM src i
 LEFT JOIN item_app_itemcategory c ON i.category_id = c.id
-WHERE i.latitude IS NOT NULL
-  AND i.longitude IS NOT NULL
-  AND i.owner_price IS NOT NULL
-  AND i.owner_price >= {min_price}
-  AND i.category_id IN ({cats})
 GROUP BY 1, 2, 3, 4, 8, 9
 ORDER BY period DESC, ad_count DESC;
 """
+)
 
 
 def _fetch_from_source_db(conn_str: str) -> list[tuple]:
@@ -191,13 +216,35 @@ async def rebuild_precomputed() -> None:
     logger.info("Precomputed tables rebuilt from h3_analytics_records.")
 
 
+# Last-run bookkeeping so the dashboard can tell whether the data is fresh and
+# why a refresh failed — the job used to be a black box (no manual trigger, no
+# logs reachable from the app), which is how it stayed silently stale.
+_last_run: dict[str, object] = {
+    "started_at": None,
+    "finished_at": None,
+    "status": "never",  # never | running | ok | failed
+    "rows": 0,
+    "error": None,
+}
+
+
+def last_run_info() -> dict:
+    return dict(_last_run)
+
+
 async def run_nightly_job() -> None:
     """Full nightly job: fetch from source DB, then rebuild precomputed tables."""
     if not settings.source_database_url:
         logger.warning("SOURCE_DATABASE_URL not configured — nightly job skipped.")
+        _last_run.update(status="failed", error="SOURCE_DATABASE_URL not configured")
         return
 
     logger.info("Nightly job started.")
+    _last_run.update(
+        started_at=datetime.now(timezone.utc).isoformat(),
+        status="running",
+        error=None,
+    )
     try:
         rows = await asyncio.to_thread(_fetch_from_source_db, settings.source_database_url)
         logger.info("Fetched %d rows from source DB.", len(rows))
@@ -214,8 +261,19 @@ async def run_nightly_job() -> None:
 
         await rebuild_precomputed()
 
-    except Exception:
+    except Exception as exc:
         logger.exception("Nightly job failed.")
+        _last_run.update(
+            finished_at=datetime.now(timezone.utc).isoformat(),
+            status="failed",
+            error=f"{type(exc).__name__}: {exc}"[:500],
+        )
         raise
     else:
         logger.info("Nightly job completed successfully.")
+        _last_run.update(
+            finished_at=datetime.now(timezone.utc).isoformat(),
+            status="ok",
+            rows=len(records),
+            error=None,
+        )
