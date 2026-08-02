@@ -83,12 +83,11 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
       >
         {/* Official Homora.ai wordmark (team #4), inlined so it can't 404 on
             deploy; `.app-logo` inverts it to white in dark mode. */}
+        {/* The wordmark used to sit next to "İş sahəsi · Caspian Realty" — a
+            hardcoded tenant name every user saw regardless of who they were.
+            Dropped rather than faked; re-add it here once real companies
+            exist and the signed-in user can be mapped to one. */}
         <HomoraLogo height={22} className="app-logo" />
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate text-[10.5px] text-muted-foreground">
-            {t.workspace} · Caspian Realty
-          </span>
-        </div>
       </Link>
 
       <div className="flex flex-col gap-0.5">

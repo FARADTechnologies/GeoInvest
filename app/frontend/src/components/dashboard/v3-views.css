@@ -17,12 +17,19 @@
   font-family: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   color: var(--ink-900);
 }
+/* Dark tokens derive from the app shell (globals.css) so the v3 views and the
+   admin console sit on the same surface as everything else — they used to
+   define their own near-black palette, which showed as a seam against the
+   shell. `--hot-*` was still the old purple brand; it now follows the orange. */
 [data-theme="dark"] .hm-v3 {
-  --bg: #0b0d16; --surface: #13161f; --surface-2: #171a24; --card: #13161f;
-  --line: #252936; --line-2: #1f2330;
-  --ink-900: #f4f5fa; --ink-800: #e6e8f0; --ink-700: #cdd1dd; --ink-600: #aeb3c2;
-  --ink-500: #8b91a3; --ink-400: #6b7180; --ink-300: #454b5c; --ink-200: #2a2f3d; --ink-100: #1c2029;
-  --hot-bg: #2a1d5a; --hot-fg: #c4b5fd;
+  --bg: var(--app-bg); --surface: var(--app-surface);
+  --surface-2: var(--app-surface-2); --card: var(--app-surface);
+  --line: var(--app-line); --line-2: var(--app-surface-2);
+  --ink-900: var(--app-text); --ink-800: hsl(220 14% 90%);
+  --ink-700: hsl(220 12% 82%); --ink-600: hsl(220 11% 72%);
+  --ink-500: var(--app-text-2); --ink-400: var(--app-text-3);
+  --ink-300: hsl(222 16% 34%); --ink-200: var(--app-line); --ink-100: var(--app-surface-2);
+  --hot-bg: rgba(238,112,30,.16); --hot-fg: #f4a066;
   --sh-1: 0 1px 2px rgba(0,0,0,.4); --sh-2: 0 4px 14px rgba(0,0,0,.5); --sh-3: 0 20px 48px rgba(0,0,0,.6);
 }
 

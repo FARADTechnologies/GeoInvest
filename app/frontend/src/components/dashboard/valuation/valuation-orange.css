@@ -460,18 +460,22 @@
 .hm-val .modal { max-height: calc(100vh - 24px) !important; border-radius: 12px !important; }
 .hm-val .modal-backdrop { padding: 12px !important; }
 }
-/* ── Dark theme (prototype's own dark tokens, wired to the app's
-      <html data-theme="dark"> switch so valuation pages flip with the rest) */
+/* ── Dark theme ───────────────────────────────────────────────────────
+   These used to be the prototype's own navy palette (#0A1426 / #131F36).
+   Against the app shell's dark surface that read as a pasted-in navy panel
+   with a visible seam, so the tokens now DERIVE from the shell's theme
+   variables (globals.css) — one palette drives the whole product. Light
+   mode keeps the prototype's own values; only dark is unified here. */
 [data-theme="dark"] .hm-val {
-  --bg: #0A1426;
-  --bg-subtle: #0E1A30;
-  --card: #131F36;
-  --card-2: #182742;
-  --border: #21314F;
-  --border-strong: #2D406A;
-  --text-1: #F1F4FA;
-  --text-2: #A8B0C2;
-  --text-3: #6F7B95;
+  --bg: var(--app-bg);
+  --bg-subtle: var(--app-surface-2);
+  --card: var(--app-surface);
+  --card-2: var(--app-surface-2);
+  --border: var(--app-line);
+  --border-strong: var(--app-line-strong);
+  --text-1: var(--app-text);
+  --text-2: var(--app-text-2);
+  --text-3: var(--app-text-3);
   --orange-tint: rgba(217,83,30,0.12);
   --orange-fade: rgba(217,83,30,0.25);
   --teal-soft: rgba(42,139,126,0.16);

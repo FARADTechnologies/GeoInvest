@@ -29,6 +29,20 @@
   --ring: 24 86% 53%;
   --radius: 0.625rem;
 
+  /* Resolved surface aliases. The prototype stylesheets (.hm-val, .hm-v3) use
+     token names that collide with the shell's (--bg / --card / --border), so
+     they cannot reference those directly — `--card: hsl(var(--card))` is
+     self-referential and the browser drops it. These differently-named
+     aliases give those sheets one source of truth for the app's surfaces. */
+  --app-bg: hsl(220 24% 98%);
+  --app-surface: hsl(0 0% 100%);
+  --app-surface-2: hsl(220 16% 97%);
+  --app-line: hsl(220 14% 90%);
+  --app-line-strong: hsl(220 14% 82%);
+  --app-text: hsl(222 25% 10%);
+  --app-text-2: hsl(220 10% 42%);
+  --app-text-3: hsl(220 10% 55%);
+
   /* Homora brand palette — orange scale around #EE701E (logo colour). */
   --brand-50:  #fef3ea;
   --brand-100: #fbdfc7;
@@ -69,6 +83,16 @@
 }
 
 [data-theme="dark"] {
+  /* Dark values of the surface aliases (see :root for why these exist). */
+  --app-bg: hsl(222 28% 7%);
+  --app-surface: hsl(222 22% 11%);
+  --app-surface-2: hsl(222 18% 16%);
+  --app-line: hsl(222 18% 20%);
+  --app-line-strong: hsl(222 18% 30%);
+  --app-text: hsl(220 14% 96%);
+  --app-text-2: hsl(220 10% 64%);
+  --app-text-3: hsl(220 10% 50%);
+
   --background: 222 28% 7%;
   --foreground: 220 14% 96%;
   --card: 222 22% 11%;

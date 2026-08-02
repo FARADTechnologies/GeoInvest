@@ -73,11 +73,25 @@ async def login(
     # Only this account, only when DEV_LOGIN_BYPASS is on (off in production).
     if settings.dev_login_bypass and email == settings.seed_admin_email.strip().lower():
         return {"otp_required": False, **await _issue_token(user)}
+    # Throttle before generating/sending — this endpoint is public, and an
+    # unlimited send is both an inbox-spam vector and a way to exhaust the
+    # provider's daily quota for everyone.
+    allowed, reason = await otp.check_send_allowed(email)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "Çox tez-tez cəhd edirsiniz. Bir dəqiqə sonra yenidən yoxlayın."
+                if reason == "cooldown"
+                else "Bugünkü kod göndərmə limitinə çatdınız. Sabah yenidən cəhd edin."
+            ),
+        )
     code = await otp.generate(email)
     try:
         await email_svc.send_otp(email, code)
     except email_svc.EmailError as exc:
         raise HTTPException(status_code=502, detail="OTP kodu göndərilə bilmədi") from exc
+    await otp.mark_sent(email)
     # Logged in only after OTP verification.
     return {"otp_required": True, "email": email}
 
