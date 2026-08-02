@@ -108,6 +108,11 @@ ORDER BY period DESC, ad_count DESC;
 
 def _fetch_from_source_db(conn_str: str) -> list[tuple]:
     """Runs synchronously in a thread — must not use asyncio."""
+    # SOURCE_DATABASE_URL is written as a SQLAlchemy URL ("postgresql+asyncpg://"),
+    # but this path connects with psycopg, which rejects the "+driver" suffix
+    # ("missing '=' ... in connection info string") — the job had been failing at
+    # connect time on every run because of it. predict.py already strips it.
+    conn_str = conn_str.replace("postgresql+asyncpg://", "postgresql://")
     cats = ", ".join(str(c) for c in _TARGET_CATEGORIES)
     rows: list[tuple] = []
     # Keep-alive params prevent server-side SSL close on long-running queries.
