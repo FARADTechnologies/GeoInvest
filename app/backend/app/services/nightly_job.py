@@ -36,23 +36,22 @@ _MIN_LISTING_PRICE = 5000
 # filter — the cheapest "sale" in the table is 49 ₼, which is not a real flat.
 _SALE_TYPE_ID = 1
 
-# Source rows, de-duplicated.
+# Source rows: both listing tables, merged and de-duplicated.
 #
-# This used to read `item_app_items_excel` — a one-off manual import from back
-# when there was no live DB. That table stopped being fed on 2026-04-10 and only
-# ever held three months, which is why the map's period list went stale while
-# Elanlar / Bazar analizi (which read `item_app_items`) stayed current. There is
-# now a single live source: `item_app_items`.
+# `item_app_items` is the live table the scraper writes to, but it only holds
+# ~13k sale listings because the scraper has been idle. `item_app_items_excel`
+# is an earlier bulk import with the *same schema* and ~60k sale listings, only
+# 8.5k of which overlap. Reading either alone throws away most of the market:
+# together they give ~67k (e.g. 2026-03 goes from 1.7k to 40k listings).
 #
-# The same listing can appear more than once (re-scrapes share a source_url), so
-# DISTINCT ON keeps only the newest row per source_url; rows without one fall
-# back to their id and stay distinct. Filtering here — before the H3 grouping —
-# keeps a duplicate from inflating a cell's ad_count or skewing its median.
+# Rows are keyed on source_url; the live table wins ties (pri=1) because its
+# rows are newer and carry predictions. Rows without a source_url fall back to
+# a table-qualified id so they stay distinct. De-duplicating here — before the
+# H3 grouping — keeps a repeat from inflating a cell's ad_count or its median.
 _SOURCE_CTE = """\
-WITH src AS (
-    SELECT DISTINCT ON (COALESCE(i.source_url, i.id::text))
-        i.id, i.latitude, i.longitude, i.owner_price, i.size,
-        i.created_date, i.category_id
+WITH pool AS (
+    SELECT 1 AS pri, i.id, i.source_url, i.latitude, i.longitude,
+           i.owner_price, i.size, i.created_date, i.category_id
     FROM item_app_items i
     WHERE i.deleted IS NOT TRUE
       AND i.type_id = {sale_type}
@@ -62,7 +61,23 @@ WITH src AS (
       AND i.owner_price >= {min_price}
       AND i.size > 0
       AND i.category_id IN ({cats})
-    ORDER BY COALESCE(i.source_url, i.id::text), i.created_date DESC, i.id DESC
+    UNION ALL
+    SELECT 2 AS pri, e.id, e.source_url, e.latitude, e.longitude,
+           e.owner_price, e.size, e.created_date, e.category_id
+    FROM item_app_items_excel e
+    WHERE e.deleted IS NOT TRUE
+      AND e.type_id = {sale_type}
+      AND e.latitude IS NOT NULL
+      AND e.longitude IS NOT NULL
+      AND e.owner_price IS NOT NULL
+      AND e.owner_price >= {min_price}
+      AND e.size > 0
+      AND e.category_id IN ({cats})
+), src AS (
+    SELECT DISTINCT ON (COALESCE(source_url, pri::text || '-' || id::text))
+        id, latitude, longitude, owner_price, size, created_date, category_id
+    FROM pool
+    ORDER BY COALESCE(source_url, pri::text || '-' || id::text), pri, created_date DESC, id DESC
 )
 """
 
