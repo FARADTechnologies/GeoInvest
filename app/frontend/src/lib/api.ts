@@ -23,7 +23,13 @@ const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 // network entirely and resolve to mock instantly. After the cooldown we
 // retry, so the app auto-recovers when the backend returns.
 const BACKEND_COOLDOWN_MS = 15_000;
-const FETCH_TIMEOUT_MS = 1_500;
+// 1.5 s was far too tight for a real deployment: a cold container, a VPN hop
+// or any brief hiccup aborted the request, and the app silently served the
+// frozen snapshot instead — with the period list stuck months in the past.
+// Worse, one such abort tripped the cooldown below and pushed every other
+// query to the fallback too. The backend answers in ~0.2–0.6 s when healthy,
+// so this only fires when something is genuinely wrong.
+const FETCH_TIMEOUT_MS = 12_000;
 let backendDownUntil = 0;
 
 function backendIsDown(): boolean {
