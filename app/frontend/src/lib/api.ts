@@ -4,6 +4,7 @@ import type {
   MapDataPoint,
   MetricsResponse
 } from "@/types/api";
+import { apiUrl } from "@/lib/api-url";
 import {
   fetchFallbackFilters,
   fetchFallbackMapData,
@@ -12,8 +13,6 @@ import {
 import { dashKey, loadSnapshot } from "@/lib/snapshot";
 import { mockAllowed } from "@/lib/mock-gate";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 // ── Backend availability short-circuit ────────────────────────────────
 // When the backend is unreachable (DB down, container stopped), every
@@ -49,7 +48,7 @@ export async function apiGet<T>(
     throw new Error("backend-cooldown");
   }
 
-  const url = new URL(`${API_PREFIX}${path}`, API_BASE_URL);
+  const url = new URL(apiUrl(path));
   if (filters) {
     url.searchParams.set("period", filters.period);
     url.searchParams.set("resolution", String(filters.resolution));

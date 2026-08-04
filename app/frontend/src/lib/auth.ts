@@ -1,13 +1,11 @@
-// Token-based auth helpers.
-// In this prototype we don't have a real backend yet — `signIn` accepts any
-// non-empty credentials. When the FastAPI backend exposes POST /api/auth/login,
-// swap the body of signIn() to a real fetch and keep the same return contract.
+// Token-based auth helpers, plus the small API clients that need the session
+// token (account approval, user directory, batch valuation jobs).
+
+import { apiUrl } from "@/lib/api-url";
 
 const STORAGE_KEY = "homora-auth-token";
 const USER_KEY = "homora-auth-user";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 export class AuthError extends Error {
   constructor(public status: number, message: string) {
@@ -57,7 +55,7 @@ function storeSession(
 // we persist the session and report otpRequired:false so the caller can enter
 // the dashboard directly. Throws AuthError on bad creds.
 export async function loginRequest(email: string, password: string): Promise<LoginResult> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/login`, {
+  const res = await fetch(apiUrl(`/auth/login`), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email, password })
@@ -78,7 +76,7 @@ export async function loginRequest(email: string, password: string): Promise<Log
 
 // Step 2: verify the OTP; on success stores the token + user and returns it.
 export async function verifyOtp(email: string, code: string): Promise<AuthUser> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/verify-otp`, {
+  const res = await fetch(apiUrl(`/auth/verify-otp`), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ email, code })
@@ -91,7 +89,7 @@ export async function verifyOtp(email: string, code: string): Promise<AuthUser> 
 // Create the pending account (team #7). Throws AuthError so the form can show
 // why it failed — most usefully 409 "this email is already registered".
 export async function registerRequest(data: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/register`, {
+  const res = await fetch(apiUrl(`/auth/register`), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify(data)
@@ -109,7 +107,7 @@ function authHeaders(): Record<string, string> {
 
 /** Accounts waiting for super-admin approval. */
 export async function fetchPendingAccounts(): Promise<PendingAccount[]> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/pending`, {
+  const res = await fetch(apiUrl(`/auth/pending`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");
@@ -121,7 +119,7 @@ export async function setAccountStatus(
   email: string,
   status: "active" | "rejected"
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/approve`, {
+  const res = await fetch(apiUrl(`/auth/approve`), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ email, status })
@@ -153,7 +151,7 @@ export async function createValuationJob(
 }
 
 export async function fetchValuationJob(jobId: string): Promise<ValuationJob> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/jobs/${jobId}`, {
+  const res = await fetch(apiUrl(`/valuation/jobs/${jobId}`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Tapılmadı");
@@ -170,7 +168,7 @@ export type DirectoryUser = {
 };
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+  const res = await fetch(apiUrl(`${path}`), {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body)
@@ -181,7 +179,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 
 /** Every account on the platform. */
 export async function fetchUsers(): Promise<DirectoryUser[]> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/users`, {
+  const res = await fetch(apiUrl(`/auth/users`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
   if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");

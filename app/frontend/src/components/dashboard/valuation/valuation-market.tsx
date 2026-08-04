@@ -5,6 +5,7 @@
 // scoped under .hm-val. Dataset is the prototype's static baseline.
 
 import { useQuery } from "@tanstack/react-query";
+import { apiUrl } from "@/lib/api-url";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
@@ -63,14 +64,12 @@ const MKT_METRIC_KEYS = Object.keys(MKT_METRICS);
 // analytics tables). Yield / liquidity / rent / txn / growth are modelled from
 // those anchors here on the client, because the source DB holds no such data.
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 type ApiMarketRayon = { rayon: string; ppm_new: number | null; ppm_old: number | null; ad_count: number };
 type ApiMarket = { period: string | null; city_median_kvm: number | null; new_share: number; total_ad_count: number; rayons: ApiMarketRayon[] };
 
 async function fetchMarketAnalysis(): Promise<ApiMarket> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/market`, { headers: { Accept: "application/json" } });
+  const res = await fetch(apiUrl(`/valuation/market`), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("market analysis unavailable");
   return res.json();
 }
@@ -80,7 +79,7 @@ async function fetchMarketAnalysis(): Promise<ApiMarket> {
 type SegRow = { rooms: string; ppm: number; rent: number; yield_pct: number; count: number; share: number };
 type SegData = { all: SegRow[]; new: SegRow[]; old: SegRow[] };
 async function fetchMarketSegments(): Promise<SegData> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/segments`, { headers: { Accept: "application/json" } });
+  const res = await fetch(apiUrl(`/model/market/segments`), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("market segments unavailable");
   return res.json();
 }
@@ -90,7 +89,7 @@ type TrendPoint = { date: string; value: number };
 type TrendCat = { all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[] };
 type MarketTrends = { sale: TrendCat; rent: TrendCat };
 async function fetchMarketTrends(): Promise<MarketTrends> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/trends`, { headers: { Accept: "application/json" } });
+  const res = await fetch(apiUrl(`/model/market/trends`), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("market trends unavailable");
   return res.json();
 }
@@ -99,7 +98,7 @@ async function fetchMarketTrends(): Promise<MarketTrends> {
 type RayonRow = { rayon: string; yield_pct?: number; rent?: number; recent_count?: number; growth_pct?: number; growth_count?: number };
 type RayonData = { rayons: RayonRow[]; min_sample: number };
 async function fetchMarketRayons(): Promise<RayonData> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/rayons`, { headers: { Accept: "application/json" } });
+  const res = await fetch(apiUrl(`/model/market/rayons`), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("market rayons unavailable");
   return res.json();
 }
@@ -107,7 +106,7 @@ async function fetchMarketRayons(): Promise<RayonData> {
 // Real price index (base 100 = Aug 2023) per build type (team #3c).
 type IndexData = { base: string; all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[]; latest_yoy: { all?: number; new?: number; old?: number } };
 async function fetchMarketIndex(): Promise<IndexData> {
-  const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/market/index`, { headers: { Accept: "application/json" } });
+  const res = await fetch(apiUrl(`/model/market/index`), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("market index unavailable");
   return res.json();
 }

@@ -12,6 +12,7 @@ import type {
   ValuationInput,
   ValuationResult
 } from "@/types/valuation";
+import { apiUrl } from "@/lib/api-url";
 import { genTrend } from "@/components/dashboard/valuation/valuation-ui";
 
 // ── Date helpers ───────────────────────────────────────────────────────
@@ -212,7 +213,7 @@ export async function predictByParams(input: ValuationInput): Promise<RateReport
   const timer = setTimeout(() => controller.abort(), 125000);
   let res: Response;
   try {
-    res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/predict`, {
+    res = await fetch(apiUrl(`/model/predict`), {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify(buildPredictPayload(input)),
@@ -253,8 +254,6 @@ function hashUnit(text: string): number {
   return ((h >>> 0) % 100000) / 100000;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 // Thrown for explicit HTTP failures from the real predict-link endpoint so
 // the UI can map 400/404/other to the BA-specified copy (§17).
@@ -279,7 +278,7 @@ export async function valuateByLink(url: string): Promise<LinkResult> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
     try {
-      res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/predict/link`, {
+      res = await fetch(apiUrl(`/model/predict/link`), {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({ flat_link: url }),
@@ -377,7 +376,7 @@ export type NearbyCategory = { category: string; items: NearbyObject[] };
 
 export async function fetchNearby(lat: number, lon: number): Promise<NearbyCategory[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}${API_PREFIX}/model/nearby`, {
+    const res = await fetch(apiUrl(`/model/nearby`), {
       method: "POST",
       headers: { Accept: "application/json", "Content-Type": "application/json" },
       body: JSON.stringify({ latitude: lat, longitude: lon })

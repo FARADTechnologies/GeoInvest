@@ -11,10 +11,9 @@ import type {
   ValuationResult,
   ValuationSource
 } from "@/types/valuation";
+import { apiUrl } from "@/lib/api-url";
 import { loadSnapshot, type Snapshot } from "@/lib/snapshot";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 const COOLDOWN_MS = 15_000;
 const TIMEOUT_MS = 2_000;
@@ -29,7 +28,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+    const res = await fetch(apiUrl(`${path}`), {
       ...init,
       headers: { Accept: "application/json", "Content-Type": "application/json", ...(init?.headers ?? {}) },
       signal: controller.signal

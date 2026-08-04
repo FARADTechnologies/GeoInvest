@@ -19,6 +19,7 @@ import type {
   Sparklines,
   TrendSeries
 } from "@/types/api";
+import { apiUrl } from "@/lib/api-url";
 import { apiGet } from "@/lib/api";
 import {
   fetchActivity as mockActivity,
@@ -124,8 +125,6 @@ type ListingApiRow = {
 // 15 s backend-down cooldown that pushed other views to mock too. Use a
 // dedicated fetch with a generous timeout instead.
 const LISTINGS_TIMEOUT_MS = 20_000;
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 // Number of real listings loaded into the Elanlar view for client-side
 // filter/sort/paginate. The DB has ~13-19k; loading all is too heavy, so we
@@ -140,7 +139,7 @@ export async function fetchListingsDB(): Promise<ListingsResult> {
     const timer = setTimeout(() => controller.abort(), LISTINGS_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}${API_PREFIX}/model/listings?limit=${LISTINGS_PAGE}`, {
+      response = await fetch(apiUrl(`/model/listings?limit=${LISTINGS_PAGE}`), {
         headers: { Accept: "application/json" },
         signal: controller.signal
       });

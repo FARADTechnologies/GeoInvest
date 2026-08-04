@@ -6,6 +6,7 @@
 // mock fallback. Existing dashboard views are untouched.
 
 import { useQuery } from "@tanstack/react-query";
+import { apiUrl } from "@/lib/api-url";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
@@ -36,8 +37,6 @@ import { createValuationJob, fetchValuationJob } from "@/lib/auth";
 import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
 import type { RateReportData, ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
-const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX ?? "/api/v1";
 
 // One imported Excel row (parsed by the backend /valuation/parse-excel).
 type ParsedRow = {
@@ -353,7 +352,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`${API_BASE_URL}${API_PREFIX}/valuation/parse-excel`, { method: "POST", body: fd });
+      const res = await fetch(apiUrl(`/valuation/parse-excel`), { method: "POST", body: fd });
       if (!res.ok) {
         let msg = "";
         try { const j = (await res.json()) as { detail?: string }; msg = j?.detail || ""; } catch { /* no body */ }
