@@ -3,6 +3,7 @@
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { DashboardCard } from "@/components/dashboard/dashboard-card";
@@ -40,6 +41,7 @@ import {
 import { MONTH_LABELS_EN, MONTH_LABELS_TR } from "@/lib/mock-data";
 import { useStrings, type Lang } from "@/lib/i18n";
 import { queryKeys } from "@/lib/query-keys";
+import { DEFAULT_VIEW, pathForView } from "@/lib/view-routes";
 import type {
   ActivityItem,
   DashboardFilters,
@@ -79,13 +81,30 @@ function createDefaultFilters(catalog: FiltersResponse): DashboardFilters | null
   };
 }
 
-export function DashboardShell() {
+export function DashboardShell({
+  initialView = DEFAULT_VIEW
+}: {
+  initialView?: DashboardView;
+} = {}) {
   const [lang, setLang] = useState<Lang>("az");
   const t = useStrings(lang);
+  const router = useRouter();
 
   const [filters, setFilters] = useState<DashboardFilters | null>(null);
   const [minAdsThreshold] = useState(0);
-  const [activeView, setActiveView] = useState<DashboardView>("valuation-single");
+  const [activeView, setActiveView] = useState<DashboardView>(initialView);
+
+  // Keep the URL and the visible screen in step. Switching screens pushes a new
+  // entry so the back button walks through them; landing on a URL directly (or
+  // pressing back) syncs the other way via the initialView prop.
+  const showView = (view: DashboardView) => {
+    setActiveView(view);
+    router.push(pathForView(view));
+  };
+
+  useEffect(() => {
+    setActiveView(initialView);
+  }, [initialView]);
 
   // ── Backend-served queries ────────────────────────────────────────
   const filtersQuery = useQuery({
@@ -184,7 +203,7 @@ export function DashboardShell() {
       <div className="grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[260px_1fr]">
         {/* Left rail: nav (its own scroll, independent of the content) */}
         <aside className="border-b bg-card/40 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
-          <NavSidebar t={t} activeView={activeView} onViewChange={setActiveView} />
+          <NavSidebar t={t} activeView={activeView} onViewChange={showView} />
         </aside>
 
         {/* Right: pinned top bar + independently scrolling content */}
@@ -246,9 +265,9 @@ export function DashboardShell() {
             {activeView === "trends" ? (
               <TrendsView t={t} trendSeries={trendSeriesQuery.data ?? []} labels={monthLabels} />
             ) : null}
-            {activeView === "valuation-single" ? <ValuationSingleView lang={lang} onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-single" ? <ValuationSingleView lang={lang} onNavigate={showView} /> : null}
             {activeView === "valuation-mass" ? <ValuationMassView lang={lang} /> : null}
-            {activeView === "valuation-analysis" ? <ValuationAnalysisView lang={lang} onNavigate={setActiveView} /> : null}
+            {activeView === "valuation-analysis" ? <ValuationAnalysisView lang={lang} onNavigate={showView} /> : null}
             {activeView === "valuation-market" ? <ValuationMarketView lang={lang} /> : null}
             {activeView === "valuation-hexmap" ? <ValuationMapView lang={lang} /> : null}
             {activeView === "valuation-map" ? (
