@@ -32,15 +32,18 @@ import { buildB2C, buildRayonStats, filterListings } from "@/lib/listings-data";
 import { dashKey, loadSnapshot, trendKey } from "@/lib/snapshot";
 import { mockAllowed } from "@/lib/mock-gate";
 
+// The legacy V1 views below have no backend endpoint — they only ever had mock
+// data. With the fallback switched off they return nothing rather than invented
+// figures; the mock calls stay so re-enabling the gate restores them.
 export function fetchRayons(): Promise<Rayon[]> {
-  return mockRayons();
+  return mockAllowed() ? mockRayons() : Promise.resolve([]);
 }
 
 export async function fetchSparklines(
   filters?: DashboardFilters,
   minAdsPerCell = 0
 ): Promise<Sparklines> {
-  if (!filters) return mockSparklines();
+  if (!filters) return mockAllowed() ? mockSparklines() : Promise.resolve({} as Sparklines);
 
   try {
     return await apiGet<Sparklines>("/sparklines", filters, {
@@ -56,7 +59,7 @@ export async function fetchSparklines(
 }
 
 export function fetchHistogram(): Promise<HistogramBucket[]> {
-  return mockHistogram();
+  return mockAllowed() ? mockHistogram() : Promise.resolve([]);
 }
 
 // 12-month trend for the top-5 rayons, reacting to period + category.
@@ -101,7 +104,7 @@ export async function fetchTrendSeries(filters?: DashboardFilters): Promise<Tren
 }
 
 export function fetchActivity(lang: "tr" | "en" | "az" = "tr"): Promise<ActivityItem[]> {
-  return mockActivity(lang);
+  return mockAllowed() ? mockActivity(lang) : Promise.resolve([]);
 }
 
 // ── v3 views (Rayons / Listings / B2C) — period + category aware ──────
@@ -109,7 +112,7 @@ export function fetchActivity(lang: "tr" | "en" | "az" = "tr"): Promise<Activity
 // toolbar); with period/categories it returns the filtered set used by the
 // Rayons detail modal and the B2C listing count.
 export function fetchListings(period?: string, categories?: string[]): Promise<Listing[]> {
-  return Promise.resolve(filterListings(period, categories));
+  return Promise.resolve(mockAllowed() ? filterListings(period, categories) : []);
 }
 
 // Elanlar view — real apartment listings from the source DB (team #10).
@@ -177,6 +180,7 @@ export async function fetchListingsDB(): Promise<ListingsResult> {
 }
 
 export function fetchRayonStats(period?: string, categories?: string[]): Promise<RayonStat[]> {
+  if (!mockAllowed()) return Promise.resolve([]);
   return Promise.resolve(buildRayonStats(filterListings(period, categories)));
 }
 

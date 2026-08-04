@@ -213,6 +213,13 @@ _LISTING_CATEGORY = {3: "Yeni tikili", 4: "Köhnə tikili"}
 # before H3 aggregation (services/nightly_job.py `_MIN_LISTING_PRICE`).
 _MIN_LISTING_PRICE = 5000
 
+# item_app_items mixes sale and rent listings and both keep their amount in
+# owner_price, so a rental would show in Elanlar with its monthly rent sitting
+# in the "Qiymət" column. type_id is unreliable here (its lookup table is
+# mislabeled and it misclassifies hundreds of rows); the published title is
+# authoritative — sales start with "Satılır …", rentals with "İcarəyə …".
+_SALE_TITLE_PREFIX = "Satılır%"
+
 # item_app_items has no rayon column — derive a label from the free-text
 # address by matching known Baku rayon names (best effort; "—" when unknown).
 _BAKU_RAYONS = [
@@ -287,10 +294,11 @@ def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
                 "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
                 "WHERE i.deleted IS NOT TRUE AND i.prediction_info IS NOT NULL "
                 "AND i.category_id IN (3, 4) AND i.size > 0 "
+                "AND i.title ILIKE %s "
                 "AND COALESCE(i.owner_price, i.predicted_sale_price, 0) >= %s "
                 "ORDER BY i.prediction_updated_at DESC NULLS LAST "
                 "LIMIT %s OFFSET %s",
-                (_MIN_LISTING_PRICE, limit, offset),
+                (_SALE_TITLE_PREFIX, _MIN_LISTING_PRICE, limit, offset),
             )
             return cur.fetchall()
 
@@ -303,8 +311,9 @@ def _count_listings(conn_str: str) -> int:
                 "SELECT count(*) FROM item_app_items "
                 "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
                 "AND category_id IN (3, 4) AND size > 0 "
+                "AND title ILIKE %s "
                 "AND COALESCE(owner_price, predicted_sale_price, 0) >= %s",
-                (_MIN_LISTING_PRICE,),
+                (_SALE_TITLE_PREFIX, _MIN_LISTING_PRICE),
             )
             return int(cur.fetchone()[0] or 0)
 

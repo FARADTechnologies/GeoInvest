@@ -30,31 +30,38 @@ _TARGET_CATEGORIES = (3, 4)  # Yeni Tikili, Köhne Tikili
 _MIN_LISTING_PRICE = 5000
 
 # item_app_items holds sale AND rent listings, both keeping the amount in
-# owner_price. type_id 1 = sale, 3 = rent. Without this the heat map mixed the
-# two: ~695 rentals priced over the noise floor were being averaged into the
-# sale ₼/m² medians, dragging them down. The price floor stays as a garbage
-# filter — the cheapest "sale" in the table is 49 ₼, which is not a real flat.
-_SALE_TYPE_ID = 1
+# owner_price, so rentals have to be excluded or they drag the ₼/m² medians
+# down (a monthly rent averages ~413 ₼/m² against ~2 819 ₼/m² for a sale).
+#
+# type_id looks like the obvious discriminator but is unreliable: the lookup
+# table itself is mislabeled (id 3 = "Kirayə" with description "Sales"), and
+# filtering on type_id = 1 drops 669 genuine sale listings while still letting
+# rentals through. The published title is authoritative — every listing starts
+# with either "Satılır …" (for sale) or "İcarəyə verilir …" (for rent).
+_SALE_TITLE_PREFIX = "Satılır%"
 
-# Source rows: both listing tables, merged and de-duplicated.
+# Merge of the legacy bulk-import table (item_app_items_excel) into the source
+# pool. Turned OFF by decision: the live table is the single source of truth.
+# The merge code below is kept intact — flip this to True (and make sure the
+# deployment role has SELECT on that table) to fold the archive back in.
+_MERGE_ARCHIVE_TABLE = False
+
+# Source rows, de-duplicated. `item_app_items` is the single source of truth.
 #
-# `item_app_items` is the live table the scraper writes to, but it only holds
-# ~13k sale listings because the scraper has been idle. `item_app_items_excel`
-# is an earlier bulk import with the *same schema* and ~60k sale listings, only
-# 8.5k of which overlap. Reading either alone throws away most of the market:
-# together they give ~67k (e.g. 2026-03 goes from 1.7k to 40k listings).
+# The same listing can appear more than once (re-scrapes share a source_url), so
+# DISTINCT ON keeps the newest row per source_url; rows without one fall back to
+# a table-qualified id and stay distinct. De-duplicating here — before the H3
+# grouping — stops a repeat inflating a cell's ad_count or skewing its median.
 #
-# Rows are keyed on source_url; the live table wins ties (pri=1) because its
-# rows are newer and carry predictions. Rows without a source_url fall back to
-# a table-qualified id so they stay distinct. De-duplicating here — before the
-# H3 grouping — keeps a repeat from inflating a cell's ad_count or its median.
+# The UNION branch for the archive table is retained but disabled above; when
+# re-enabled the live table wins ties (pri=1) since its rows are newer.
 def _pool_select(table: str, pri: int) -> str:
     return f"""\
     SELECT {pri} AS pri, t.id, t.source_url, t.latitude, t.longitude,
            t.owner_price, t.size, t.created_date, t.category_id
     FROM {table} t
     WHERE t.deleted IS NOT TRUE
-      AND t.type_id = {{sale_type}}
+      AND t.title ILIKE '{{sale_title}}'
       AND t.latitude IS NOT NULL
       AND t.longitude IS NOT NULL
       AND t.owner_price IS NOT NULL
@@ -147,26 +154,29 @@ def _fetch_from_source_db(conn_str: str) -> list[tuple]:
         keepalives_count=5,
         options="-c statement_timeout=300000",  # 5 min per statement
     ) as conn:
-        # Probe the archive table in its own transaction: the deployment role
-        # may lack SELECT on it, and a failed statement would otherwise poison
-        # the connection for everything that follows.
-        include_excel = True
-        try:
-            with conn.cursor() as probe:
-                probe.execute("SELECT 1 FROM item_app_items_excel LIMIT 1")
-                probe.fetchall()
-        except psycopg.Error as exc:
-            include_excel = False
-            logger.warning(
-                "item_app_items_excel unavailable (%s) — continuing with the "
-                "live table only; historical coverage will be reduced.",
-                type(exc).__name__,
-            )
-        conn.rollback()
+        # The archive merge is disabled (_MERGE_ARCHIVE_TABLE). When it is
+        # switched back on, probe the table in its own transaction first: the
+        # deployment role may lack SELECT on it, and a failed statement would
+        # otherwise poison the connection for everything that follows.
+        include_excel = False
+        if _MERGE_ARCHIVE_TABLE:
+            include_excel = True
+            try:
+                with conn.cursor() as probe:
+                    probe.execute("SELECT 1 FROM item_app_items_excel LIMIT 1")
+                    probe.fetchall()
+            except psycopg.Error as exc:
+                include_excel = False
+                logger.warning(
+                    "item_app_items_excel unavailable (%s) — continuing with "
+                    "the live table only.",
+                    type(exc).__name__,
+                )
+            conn.rollback()
 
         cte = _source_cte(include_excel)
         geom_sql, pure_sql = cte + _GEOM_BODY, cte + _PURE_H3_BODY
-        fmt = {"cats": cats, "min_price": _MIN_LISTING_PRICE, "sale_type": _SALE_TYPE_ID}
+        fmt = {"cats": cats, "min_price": _MIN_LISTING_PRICE, "sale_title": _SALE_TITLE_PREFIX}
         with conn.cursor() as cur:
             for res in _RESOLUTIONS:
                 logger.info("Fetching geom path (res=%d)…", res)
