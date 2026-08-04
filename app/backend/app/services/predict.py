@@ -220,6 +220,26 @@ _MIN_LISTING_PRICE = 5000
 # authoritative — sales start with "Satılır …", rentals with "İcarəyə …".
 _SALE_TITLE_PREFIX = "Satılır%"
 
+
+def _market_rows(alias: str = "i") -> str:
+    """Which listings count as market data — one definition for every query.
+
+    These conditions used to be copy-pasted into each SQL string, so a fix
+    landed in one screen and not the others (rentals were excluded from the map
+    and Elanlar but still made up ~32% of the Bazar analizi rows). Every query
+    now composes this fragment instead.
+
+    The percent in the LIKE pattern is doubled: these strings are handed to
+    psycopg together with parameters, where a single % is a placeholder.
+    """
+    p = f"{alias}." if alias else ""
+    return (
+        f"{p}deleted IS NOT TRUE "
+        f"AND {p}category_id IN (3, 4) "
+        f"AND {p}size > 0 "
+        f"AND {p}title ILIKE 'Satılır%%' "
+    )
+
 # item_app_items has no rayon column — derive a label from the free-text
 # address by matching known Baku rayon names (best effort; "—" when unknown).
 _BAKU_RAYONS = [
@@ -292,13 +312,11 @@ def _query_listings(conn_str: str, limit: int, offset: int) -> list[tuple]:
                 "FROM item_app_items i "
                 "LEFT JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
                 "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
-                "WHERE i.deleted IS NOT TRUE AND i.prediction_info IS NOT NULL "
-                "AND i.category_id IN (3, 4) AND i.size > 0 "
-                "AND i.title ILIKE %s "
+                f"WHERE {_market_rows('i')} AND i.prediction_info IS NOT NULL "
                 "AND COALESCE(i.owner_price, i.predicted_sale_price, 0) >= %s "
                 "ORDER BY i.prediction_updated_at DESC NULLS LAST "
                 "LIMIT %s OFFSET %s",
-                (_SALE_TITLE_PREFIX, _MIN_LISTING_PRICE, limit, offset),
+                (_MIN_LISTING_PRICE, limit, offset),
             )
             return cur.fetchall()
 
@@ -309,11 +327,9 @@ def _count_listings(conn_str: str) -> int:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT count(*) FROM item_app_items "
-                "WHERE deleted IS NOT TRUE AND prediction_info IS NOT NULL "
-                "AND category_id IN (3, 4) AND size > 0 "
-                "AND title ILIKE %s "
+                f"WHERE {_market_rows('')} AND prediction_info IS NOT NULL "
                 "AND COALESCE(owner_price, predicted_sale_price, 0) >= %s",
-                (_SALE_TITLE_PREFIX, _MIN_LISTING_PRICE),
+                (_MIN_LISTING_PRICE,),
             )
             return int(cur.fetchone()[0] or 0)
 
@@ -386,8 +402,8 @@ def _query_room_segments(conn_str: str) -> list[tuple]:
                 "    NULLIF(predicted_sale_price, 0) * 100)::numeric, 1) AS yield_pct, "
                 "  count(*) AS n "
                 "FROM item_app_items "
-                "WHERE category_id IN (3, 4) AND prediction_info IS NOT NULL "
-                "  AND deleted IS NOT TRUE AND size > 0 AND rooms_qty BETWEEN 1 AND 8 "
+                f"WHERE {_market_rows('')} AND prediction_info IS NOT NULL "
+                "  AND rooms_qty BETWEEN 1 AND 8 "
                 "  AND predicted_sale_price >= %s AND predicted_rent_price IS NOT NULL "
                 "GROUP BY 1, 2 ORDER BY 2",
                 (_MIN_LISTING_PRICE,),
@@ -479,8 +495,7 @@ def _query_trend(conn_str: str, kind: str) -> list[tuple]:
                 "FROM item_app_items i, jsonb_array_elements(COALESCE("
                 f"  i.prediction_info->'{node}', "
                 f"  i.prediction_info->'ai_data'->'{node}')->'price_trend') pt "
-                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
-                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                f"WHERE {_market_rows('i')} AND i.prediction_info IS NOT NULL "
                 "  AND i.predicted_sale_price >= %s "
                 "GROUP BY 1, 2 ORDER BY 2",
                 (_MIN_LISTING_PRICE,),
@@ -554,8 +569,7 @@ def _query_rayon_yield(conn_str: str) -> list[tuple]:
                 "FROM item_app_items i "
                 "JOIN index_app_object o ON o.type_id = 22 AND ST_Contains("
                 "  o.geom, ST_SetSRID(ST_MakePoint(i.longitude, i.latitude), 4326)) "
-                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
-                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                f"WHERE {_market_rows('i')} AND i.prediction_info IS NOT NULL "
                 "  AND i.predicted_sale_price >= %s "
                 "  AND i.predicted_rent_price IS NOT NULL "
                 "  AND i.prediction_updated_at >= ("
@@ -611,8 +625,7 @@ def _query_rayon_growth(conn_str: str) -> list[tuple]:
                 "             'YYYY-MM')) AS base_v "
                 f"  FROM {_TREND_JSON} pt"
                 ") tr "
-                "WHERE i.category_id IN (3, 4) AND i.prediction_info IS NOT NULL "
-                "  AND i.deleted IS NOT TRUE AND i.size > 0 "
+                f"WHERE {_market_rows('i')} AND i.prediction_info IS NOT NULL "
                 "  AND i.predicted_sale_price >= %s "
                 "  AND tr.base_v > 0 AND tr.last_v IS NOT NULL "
                 "GROUP BY 1",
