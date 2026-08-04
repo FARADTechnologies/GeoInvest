@@ -49,7 +49,10 @@ class Settings(BaseSettings):
     # Email (Resend) + OTP auth. Secrets live in the gitignored .env only.
     resend_api_key: str = ""
     default_from_email: str = "hello@updates.homora.ai"
-    account_request_email: str = "m.aydayev@gmail.com"  # #7 — submissions go here
+    # Where account requests are sent. Kept as a role address, never a personal
+    # one — this file is committed, and a private inbox does not belong in it.
+    # Override with ACCOUNT_REQUEST_EMAIL to route them somewhere else.
+    account_request_email: str = "office@homora.ai"
     # Seed a first admin so the OTP login has a user to check against.
     seed_admin_email: str = "admin@homora.ai"
     seed_admin_password: str = "12345"
