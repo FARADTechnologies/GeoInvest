@@ -1,14 +1,11 @@
-// Valuation data layer — talks to the backend /valuation/* endpoints and
-// falls back to a deterministic local mock when the backend is unreachable
-// (same resilience pattern as lib/api.ts). Components consume these fetchers
-// and never call the network directly.
+// Valuation data layer — talks to the backend /valuation/* endpoints.
+// Components consume these fetchers and never call the network directly. A
+// failed call throws; nothing here substitutes a locally-computed number.
 
 import type {
   RayonPrice,
-  ValuationInput,
   ValuationItem,
   ValuationMeta,
-  ValuationResult,
   ValuationSource
 } from "@/types/valuation";
 import { apiUrl } from "@/lib/api-url";
@@ -56,21 +53,11 @@ export async function fetchValuationMeta(): Promise<Sourced<ValuationMeta>> {
   return { data: await request<ValuationMeta>("/valuation/meta"), source: "db" };
 }
 
-export async function valuateSingle(input: ValuationInput): Promise<Sourced<ValuationResult>> {
-  const data = await request<ValuationResult>("/valuation/single", {
-    method: "POST",
-    body: JSON.stringify(input)
-  });
-  return { data, source: "db" };
-}
-
-export async function valuateBatch(inputs: ValuationInput[]): Promise<Sourced<ValuationResult[]>> {
-  const data = await request<{ results: ValuationResult[]; period: string | null }>(
-    "/valuation/batch",
-    { method: "POST", body: JSON.stringify({ items: inputs }) }
-  );
-  return { data: data.results, source: "db" };
-}
+// valuateSingle() / valuateBatch() called /valuation/single and
+// /valuation/batch — the backend's own valuation engine. It anchored the price
+// on a real market median but invented rent, yield, payback, liquidity and
+// score, so it has been removed. Both UI flows now go through the team's
+// predict model (lib/valuation-report.ts).
 
 // ── Portfolio stats + formatting helpers (used across the views) ──────
 export const fmtMoney = (n: number | null | undefined, suffix = " ₼") =>
@@ -83,10 +70,10 @@ export type PortfolioStats = {
   totalValue: number;
   totalRent: number;
   avgYield: number;
-  avgScore: number;
+  avgScore: number | null;
   avgPayback: number;
   avgPricePerM2: number;
-  avgLiquidity: number;
+  avgLiquidity: number | null;
   avgArea: number;
   newCount: number;
   byRayon: Record<string, number>;

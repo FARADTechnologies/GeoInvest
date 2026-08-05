@@ -19,7 +19,9 @@ import type { ValuationSource } from "@/types/valuation";
 export function ValuationAnalysisView({ lang = "az", onNavigate }: { lang?: Lang; onNavigate?: (v: DashboardView) => void }) {
   setValLang(lang);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [source, setSource] = useState<ValuationSource>("mock");
+  // Everything on this page comes from the backend now, so the badge starts at
+  // "db" instead of flashing MOCK before the stored portfolios load.
+  const [source, setSource] = useState<ValuationSource>("db");
   const [pfId, setPfId] = useState<string | null>(null);
 
   useEffect(() => {

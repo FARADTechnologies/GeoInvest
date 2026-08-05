@@ -14,36 +14,10 @@ export const fmtNumber = (n: number | null | undefined) =>
   n == null ? "—" : new Intl.NumberFormat("az-AZ").format(Math.round(n));
 export const fmtPercent = (n: number | null | undefined) => (n == null ? "—" : n.toFixed(1) + "%");
 
-// Deterministic-ish 12-month synthetic trend around `base` (presentational).
-const seedRandom = (seed: number) => {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-};
-export function genTrend(base: number, vol = 0.08, seed = 1): number[] {
-  const r = seedRandom(seed * 13 + 1);
-  const out: number[] = [];
-  let v = base * (1 - vol * 0.6);
-  for (let i = 0; i < 12; i++) {
-    v = v * (1 + (r() - 0.45) * 0.04);
-    if (i === 6) v *= 1.08;
-    out.push(Math.round(v));
-  }
-  const scale = base / out[out.length - 1];
-  return out.map((x) => Math.round(x * scale));
-}
-export function monthsLabels(start = "2025-06"): string[] {
-  const [y, m] = start.split("-").map(Number);
-  const out: string[] = [];
-  for (let i = 0; i < 12; i++) {
-    const dy = y + Math.floor((m - 1 + i) / 12);
-    const dm = ((m - 1 + i) % 12) + 1;
-    out.push(`${dy}-${String(dm).padStart(2, "0")}`);
-  }
-  return out;
-}
+// A genTrend()/monthsLabels() pair used to live here — a seeded random walk
+// that manufactured a 12-month curve around any single number, plus the month
+// labels to put under it. Every chart it fed has been either wired to a real
+// series or removed, so it is gone.
 
 // ── Pills / badges ────────────────────────────────────────────────────
 
@@ -58,14 +32,6 @@ export const TypePill = ({ type }: { type: string }) => (
   <Pill tone={(type || "").toLowerCase().includes("yeni") ? "teal" : "navy"}>{type}</Pill>
 );
 
-export const RiskPill = ({ risk }: { risk: string }) => {
-  const tone = risk === "Aşağı" ? "green" : risk === "Orta" ? "amber" : "red";
-  return (
-    <Pill tone={tone} dot>
-      {risk} risk
-    </Pill>
-  );
-};
 
 export const Delta = ({ value, suffix = "%", invert = false }: { value: number | null; suffix?: string; invert?: boolean }) => {
   if (value == null || isNaN(value)) return <span className="stat-delta flat">—</span>;

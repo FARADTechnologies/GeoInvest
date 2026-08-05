@@ -12,6 +12,7 @@ import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import { Icons, LineChart, Pill, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
 import { MapPanel } from "@/components/map/map-panel";
 import { fetchFilters, fetchMapData } from "@/lib/api";
+import { fetchMarketTrends } from "@/lib/market-api";
 import { useStrings, type Lang } from "@/lib/i18n";
 import type { DashboardFilters } from "@/types/api";
 
@@ -23,34 +24,6 @@ const METRICS: Record<string, { label: string; short: string; fmt: (v: number) =
   price: { label: "Qiymət (₼/m²)", short: "Qiymət/m²", fmt: (v) => fmtMoney(v, " ₼/m²") },
   listings: { label: "Elan sayı", short: "Elan", fmt: (v) => fmtNumber(v) }
 };
-
-const seedRandom = (seed: number) => {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-};
-function synthTrend(base: number, seedStr: string): number[] {
-  const r = seedRandom(seedStr.split("").reduce((s, c) => s + c.charCodeAt(0), 0) + 12);
-  const g = Math.pow(1.1, 1 / 12) - 1;
-  const out: number[] = [];
-  let v = base / Math.pow(1 + g, 11);
-  for (let i = 0; i < 12; i++) {
-    v = v * (1 + g + (r() - 0.5) * 0.02);
-    out.push(v);
-  }
-  const k = base / out[11];
-  return out.map((x) => Math.round(x * k));
-}
-function monthShorts(): string[] {
-  const names = ["Yan", "Fev", "Mar", "Apr", "May", "İyn", "İyl", "Avq", "Sen", "Okt", "Noy", "Dek"];
-  const now = new Date(2026, 5, 1);
-  return Array.from({ length: 12 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-    return `${names[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
-  });
-}
 
 const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
 const median = (a: number[]) => {
@@ -157,8 +130,19 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
 
   const aggLabel = agg === "median" ? T(`Median`) : T(`Orta`);
   const meta = METRICS[metric];
-  const months = monthShorts();
-  const trendData = synthTrend(kpis.ppm || 1800, "maptrend" + activePeriod + res + metric + agg);
+
+  // Real monthly ₼/m² curve for Baku, split by build type so the Kateqoriya
+  // selector applies. This card used to draw a seeded random walk around the
+  // current KPI; there is no monthly series for "Elan sayı", so that metric
+  // shows a gap rather than a fabricated one.
+  const trendsQuery = useQuery({ queryKey: ["market", "trends"], queryFn: fetchMarketTrends });
+  const trendPoints = useMemo(() => {
+    if (metric !== "price") return [];
+    const cat = category === "new" ? "new" : category === "old" ? "old" : "all";
+    return (trendsQuery.data?.sale[cat] ?? []).slice(-12);
+  }, [trendsQuery.data, metric, category]);
+  const trendData = trendPoints.map((p) => p.value);
+  const months = trendPoints.map((p) => p.date.slice(0, 7));
 
   return (
     <div className="hm-val">
@@ -226,9 +210,21 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
         {/* Bottom: trend + distribution */}
         <div style={{ display: "grid", gridTemplateColumns: "1.6fr 1fr", gap: 14 }}>
           <div className="card card-pad">
-            <div className="card-title">{T(`12 aylıq trend`)} · {T(meta.short)}</div>
-            <div className="card-sub" style={{ margin: "4px 0 10px" }}>{aggLabel} · {activePeriod}</div>
-            <LineChart data={trendData} labels={months} height={220} color="#D9531E" />
+            <div className="card-title">{T(`12 aylıq trend`)} · {T(`Qiymət/m²`)}</div>
+            <div className="card-sub" style={{ margin: "4px 0 10px" }}>
+              {T(`Bakı üzrə median satış qiyməti`)} · {category === "new" ? T(`Yeni tikili`) : category === "old" ? T(`Köhnə tikili`) : T(`Hamısı`)}
+            </div>
+            {trendData.length >= 2 ? (
+              <LineChart data={trendData} labels={months} height={220} color="#D9531E" />
+            ) : (
+              <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+                {metric === "listings"
+                  ? T(`Elan sayı üçün aylıq seriya yoxdur.`)
+                  : trendsQuery.isLoading
+                    ? T(`Yüklənir…`)
+                    : T(`Məlumat yoxdur.`)}
+              </div>
+            )}
           </div>
           <div className="card card-pad">
             <Distribution data={data} metric={metric} agg={agg} />

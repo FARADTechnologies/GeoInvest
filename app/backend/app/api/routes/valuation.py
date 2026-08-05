@@ -16,17 +16,12 @@ from app.models.user import User
 from app.models.valuation_job import ValuationJob
 from app.schemas.predict import PredictRequest
 from app.schemas.valuation import (
-    BatchValuationRequest,
-    BatchValuationResponse,
     ExcelParseResponse,
     MarketAnalysis,
     ParsedListing,
     ValuationMeta,
-    ValuationRequest,
-    ValuationResult,
 )
 from app.services import valuation_jobs
-from app.services.analytics import format_period
 from app.services.excel import parse_listings
 from app.services.valuation import ValuationService
 from pydantic import BaseModel
@@ -56,15 +51,6 @@ async def get_market_analysis(
     return await ValuationService(session).market_analysis()
 
 
-@router.post("/valuation/single", response_model=ValuationResult)
-async def valuate_single(
-    payload: ValuationRequest,
-    session: Annotated[AsyncSession, Depends(get_session)],
-) -> ValuationResult:
-    """Valuate one property against real market medians (rayon + category)."""
-    return await ValuationService(session).valuate_one(payload)
-
-
 @router.post("/valuation/parse-excel", response_model=ExcelParseResponse)
 async def parse_excel(file: UploadFile = File(...)) -> ExcelParseResponse:
     """Parse an uploaded mass-valuation Excel (.xlsx) into listing rows.
@@ -86,14 +72,11 @@ async def parse_excel(file: UploadFile = File(...)) -> ExcelParseResponse:
     return ExcelParseResponse(rows=parsed, count=len(parsed))
 
 
-@router.post("/valuation/batch", response_model=BatchValuationResponse)
-async def valuate_batch(
-    payload: BatchValuationRequest,
-    session: Annotated[AsyncSession, Depends(get_session)],
-) -> BatchValuationResponse:
-    """Valuate a portfolio (5–500 properties) in one call."""
-    results, period = await ValuationService(session).valuate_many(payload.items)
-    return BatchValuationResponse(results=results, period=format_period(period))
+# /valuation/single and /valuation/batch used to live here. They anchored the
+# fair value on a real market median but derived rent, yield, payback,
+# liquidity and the investment score from fixed assumptions plus a hash-based
+# jitter, so every one of those figures was invented. Both the UI flows now go
+# through the team's predict model (/model/predict and the job runner below).
 
 
 # ── Server-side batch jobs (predict model) ───────────────────────────────────

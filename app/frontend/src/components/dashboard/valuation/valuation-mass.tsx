@@ -13,27 +13,26 @@ import type { Lang } from "@/lib/i18n";
 
 
 import "@/components/dashboard/valuation/valuation-orange.css";
-import { Icons, DonutChart, HBars, Pill, RiskPill, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
+import { Icons, DonutChart, HBars, Pill, SourceBadge, TypePill, fmtMoney } from "@/components/dashboard/valuation/valuation-ui";
 import {
   opropFromReport,
   PropertyEntryModal,
   PropertyReport,
   statsOf,
-  toOProp,
   type OProp,
   type Stats
 } from "@/components/dashboard/valuation/valuation-core";
 import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/dashboard/valuation/valuation-columns";
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { geocodeAddress } from "@/components/dashboard/valuation/valuation-maps";
-import { fetchValuationMeta, newId, valuateBatch } from "@/lib/valuation-data";
+import { fetchValuationMeta, newId } from "@/lib/valuation-data";
 import {
   buildPredictPayload,
   predictByParams,
   reportFromPredict,
   LinkValuationError
 } from "@/lib/valuation-report";
-import { createValuationJob, fetchValuationJob } from "@/lib/auth";
+import { createValuationJob, fetchValuationJob, getUser } from "@/lib/auth";
 import { loadPortfolios, savePortfolios, type Portfolio } from "@/components/dashboard/valuation/valuation-store";
 import type { RateReportData, ValuationInput, ValuationMeta, ValuationSource } from "@/types/valuation";
 
@@ -120,42 +119,17 @@ function draftFromInput(input: ValuationInput, id: string): OProp {
     rooms: input.rooms ?? null,
     floor: input.floor ?? null,
     totalFloors: input.total_floors ?? null,
-    fairValue: 0, pricePerM2: 0, monthlyRent: 0, yield: 0, payback: 0, liquidity: 0,
-    score: 0, risk: "Orta",
+    fairValue: 0, pricePerM2: 0, monthlyRent: 0, yield: 0, payback: 0,
+    liquidity: null, score: null, risk: null,
     residence: input.residence ?? null, repair: input.repair ?? null, extract: input.extract ?? null,
     range: [0, 0], rentRange: [0, 0]
   };
 }
 
-const SEED_RAYONS = ["Yasamal", "Səbail", "Nərimanov", "Xətai", "Nəsimi", "Binəqədi", "Nizami", "Sabunçu"];
-function seedInputs(n: number, salt: number): ValuationInput[] {
-  const out: ValuationInput[] = [];
-  for (let i = 0; i < n; i++) {
-    const s = (i + 1) * 9301 + salt * 49297;
-    const rnd = (k: number) => ((s * (k + 3)) % 233280) / 233280;
-    const isNew = rnd(1) > 0.45;
-    const area = Math.round(45 + rnd(2) * 120);
-    const totalFloors = Math.max(5, Math.round(rnd(4) * 22));
-    out.push({
-      address: null,
-      rayon: `${SEED_RAYONS[Math.floor(rnd(5) * SEED_RAYONS.length)]} rayonu`,
-      type: isNew ? "Yeni tikili" : "Köhnə tikili",
-      area,
-      rooms: Math.max(1, Math.min(5, Math.round(area / 32))),
-      floor: Math.max(1, Math.round(rnd(3) * totalFloors)),
-      total_floors: totalFloors,
-      repair: ["Əla", "Var", "Orta", "Yox"][Math.floor(rnd(6) * 4)],
-      extract: rnd(7) > 0.5 ? "Var" : "Yox",
-      residence: null
-    });
-  }
-  return out;
-}
-const SEEDS = [
-  { id: "pf-yasamal", name: "Yasamal — Q2 portfeli", description: "Yasamal və Səbail rayonlarında mənzillərin qiymətləndirilməsi.", createdAt: "2026-05-28", createdBy: "Əvəz Yusibov", inputs: seedInputs(16, 1) },
-  { id: "pf-kollateral", name: "Bank kollateral dəyərləndirilməsi", description: "Kredit təminatı üçün lüks mənzillər.", createdAt: "2026-05-14", createdBy: "Əvəz Yusibov", inputs: seedInputs(12, 7) },
-  { id: "pf-yield", name: "Kirayə yield analizi", description: "Yüksək gəlirli kirayə potensialı olan obyektlər.", createdAt: "2026-04-30", createdBy: "Səbinə Məmmədova", inputs: seedInputs(8, 13) }
-];
+// This view used to seed three demo portfolios (36 invented apartments with
+// invented owners and dates) on first load, so a new account never saw an
+// empty screen. They were indistinguishable from real customer portfolios, so
+// they are gone: the list starts empty and fills with what the user creates.
 
 type Sub = { name: "list" } | { name: "portfolio"; id: string } | { name: "analysis"; id: string };
 
@@ -170,26 +144,14 @@ export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
 
   useEffect(() => {
     if (seeded) return;
-    // Saved portfolios survive view switches and reloads.
+    // Saved portfolios survive view switches and reloads. Nothing is created
+    // on the user's behalf — an empty list means the account has no portfolios.
     const saved = loadPortfolios();
-    if (saved && saved.portfolios.length > 0) {
+    if (saved) {
       setPortfolios(saved.portfolios);
       setSource(saved.source);
-      setSeeded(true);
-      return;
     }
-    let cancelled = false;
-    (async () => {
-      const built: Portfolio[] = [];
-      let src: ValuationSource = "db";
-      for (const seed of SEEDS) {
-        const res = await valuateBatch(seed.inputs);
-        src = res.source;
-        built.push({ id: seed.id, name: seed.name, description: seed.description, createdAt: seed.createdAt, createdBy: seed.createdBy, items: res.data.map((r) => toOProp(r, newId("H"), true)) });
-      }
-      if (!cancelled) { setPortfolios(built); setSource(src); setSeeded(true); }
-    })();
-    return () => { cancelled = true; };
+    setSeeded(true);
   }, [seeded]);
 
   // Persist every change once the initial load/seed is done.
@@ -213,7 +175,8 @@ export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
         loading={!seeded}
         onOpen={(id) => setRoute({ name: "portfolio", id })}
         onCreate={(name) => {
-          const pf: Portfolio = { id: newId("pf"), name: name || `Yeni portfel · ${new Date().toLocaleDateString("az-AZ")}`, description: "Boş portfel — mənzilləri əl ilə əlavə edin.", createdAt: new Date().toISOString().slice(0, 10), createdBy: "Əvəz Yusibov", items: [] };
+          // The author is whoever is signed in — never a placeholder name.
+          const pf: Portfolio = { id: newId("pf"), name: name || `Yeni portfel · ${new Date().toLocaleDateString("az-AZ")}`, description: "Boş portfel — mənzilləri əl ilə əlavə edin.", createdAt: new Date().toISOString().slice(0, 10), createdBy: getUser()?.name || "—", items: [] };
           setPortfolios((prev) => [pf, ...prev]);
           setRoute({ name: "portfolio", id: pf.id });
         }}
@@ -254,7 +217,7 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
                     <div className="card-title" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pf.name}</div>
                     <div className="cell-muted" style={{ marginTop: 4 }}>{pf.createdAt} · {pf.createdBy}</div>
                   </div>
-                  {st ? <DonutChart value={st.avgScore} size={56} label="skor" /> : <Pill tone="amber" dot>{T(`Qaralama`)}</Pill>}
+                  {st ? null : <Pill tone="amber" dot>{T(`Qaralama`)}</Pill>}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", marginTop: 14, gap: 10 }}>
                   <CardMicro k={T(`Mənzil`)} v={String(pf.items.length)} />
@@ -637,7 +600,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
       {openItem && openItem.valued !== false && reports[openItem.id] ? (
         <RateReport data={reports[openItem.id]} onClose={() => setOpenId(null)} />
       ) : openItem && openItem.valued !== false && stats ? (
-        <PropertyReport property={openItem} portfolioName={portfolio.name} itemsCount={valued.length} stats={stats} rank={[...valued].sort((a, b) => b.score - a.score).findIndex((x) => x.id === openItem.id) + 1} onClose={() => setOpenId(null)} onPrev={() => openIdx > 0 && setOpenId(items[openIdx - 1].id)} onNext={() => openIdx >= 0 && openIdx < items.length - 1 && setOpenId(items[openIdx + 1].id)} />
+        <PropertyReport property={openItem} portfolioName={portfolio.name} itemsCount={valued.length} stats={stats} rank={[...valued].sort((a, b) => b.yield - a.yield).findIndex((x) => x.id === openItem.id) + 1} onClose={() => setOpenId(null)} onPrev={() => openIdx > 0 && setOpenId(items[openIdx - 1].id)} onNext={() => openIdx >= 0 && openIdx < items.length - 1 && setOpenId(items[openIdx + 1].id)} />
       ) : null}
       <PropertyEntryModal open={entryOpen} portfolioName={portfolio.name} meta={meta} busy={busy} onClose={() => setEntryOpen(false)} onSubmit={(input, v) => submit(input, v)} />
       <PropertyEntryModal open={!!editTarget} portfolioName={portfolio.name} meta={meta} initial={editTarget} busy={busy} onClose={() => setEditTarget(null)} onSubmit={(input, v) => submit(input, v, editTarget?.id)} />
@@ -659,13 +622,11 @@ function MiniStat({ k, v, accent, last }: { k: string; v: string; accent?: boole
 
 const METRICS: Record<string, { label: string; fmt: (v: number) => string; get: (x: OProp) => number }> = {
   yield: { label: "Gəlirlilik", fmt: (v) => `${v.toFixed(1)}%`, get: (x) => x.yield },
-  liquidity: { label: "Likvidlik", fmt: (v) => `${Math.round(v)} gün`, get: (x) => x.liquidity },
   monthlyRent: { label: "Aylıq kirayə", fmt: (v) => fmtMoney(v), get: (x) => x.monthlyRent },
   payback: { label: "Geri ödəmə", fmt: (v) => `${v.toFixed(1)} il`, get: (x) => x.payback },
   pricePerM2: { label: "Qiymət / m²", fmt: (v) => fmtMoney(v, " ₼/m²"), get: (x) => x.pricePerM2 },
   fairValue: { label: "Fair value", fmt: (v) => fmtMoney(v), get: (x) => x.fairValue },
-  area: { label: "Sahə", fmt: (v) => `${Math.round(v)} m²`, get: (x) => x.area },
-  score: { label: "Sərmayə skoru", fmt: (v) => Math.round(v).toString(), get: (x) => x.score }
+  area: { label: "Sahə", fmt: (v) => `${Math.round(v)} m²`, get: (x) => x.area }
 };
 const MK = Object.keys(METRICS);
 const mean = (a: number[]) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
@@ -695,11 +656,8 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
   const reportIdx = reportId ? items.findIndex((x) => x.id === reportId) : -1;
   const reportItem = reportIdx >= 0 ? items[reportIdx] : null;
 
-  const low = items.filter((x) => x.score >= 78).length;
-  const med = items.filter((x) => x.score >= 60 && x.score < 78).length;
-  const high = items.filter((x) => x.score < 60).length;
   const districtBars = Object.entries(stats.byDistrict).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, value]) => ({ label, value }));
-  const sorted = [...items].sort((a, b) => b.score - a.score);
+  const sorted = [...items].sort((a, b) => b.yield - a.yield);
   const top = sorted.slice(0, 5);
   const bottom = sorted.slice(-5).reverse();
 
@@ -717,11 +675,12 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
       <div className="summary-band" style={{ marginTop: 4 }}>
         <div className="card card-pad">
           <div className="fl-row" style={{ gap: 16 }}>
-            <DonutChart value={Math.round(agg(items.map((x) => x.score), aggKind))} label={aggKind === "median" ? "Median skor" : "Orta skor"} size={96} />
             <div>
-              <div className="card-title">{T(`Portfel skoru`)}</div>
-              <div className="card-sub" style={{ marginTop: 4, maxWidth: "36ch" }}>{stats.n} mənzilin {aggKind === "median" ? "median" : "orta"} sərmayə skoru. 78+ aşağı, 60-77 orta, 60-dan aşağı yüksək risk.</div>
-              <div className="fl-row" style={{ gap: 8, marginTop: 10, flexWrap: "wrap" }}><Pill tone="green">{low} aşağı risk</Pill><Pill tone="amber">{med} orta</Pill><Pill tone="red">{high} yüksək</Pill></div>
+              <div className="card-title">{T(`Portfel gəlirliyi`)}</div>
+              <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>
+                {agg(items.map((x) => x.yield), aggKind).toFixed(1)}%
+              </div>
+              <div className="card-sub" style={{ marginTop: 4, maxWidth: "36ch" }}>{stats.n} mənzilin {aggKind === "median" ? "median" : "orta"} illik kirayə gəlirliyi.</div>
             </div>
           </div>
         </div>
@@ -796,7 +755,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           portfolioName={portfolio.name}
           itemsCount={items.length}
           stats={stats}
-          rank={[...items].sort((a, b) => b.score - a.score).findIndex((x) => x.id === reportItem.id) + 1}
+          rank={[...items].sort((a, b) => b.yield - a.yield).findIndex((x) => x.id === reportItem.id) + 1}
           onClose={() => setReportId(null)}
           onPrev={() => reportIdx > 0 && setReportId(items[reportIdx - 1].id)}
           onNext={() => reportIdx >= 0 && reportIdx < items.length - 1 && setReportId(items[reportIdx + 1].id)}
@@ -907,7 +866,6 @@ function RankList({ items, variant }: { items: OProp[]; variant: "top" | "bottom
         <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: i < items.length - 1 ? "1px solid var(--border)" : "none" }}>
           <div style={{ width: 22, fontVariantNumeric: "tabular-nums", fontWeight: 700, fontSize: 12, color: variant === "top" ? "var(--green)" : "var(--red)" }}>#{i + 1}</div>
           <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontWeight: 600, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.address}</div><div className="cell-muted" style={{ marginTop: 1 }}>{fmtMoney(x.fairValue)} · {x.yield}%</div></div>
-          <DonutChart value={x.score} size={36} />
         </div>
       ))}
     </div>
@@ -932,7 +890,7 @@ function BigScatter({ items, xKey, yKey }: { items: OProp[]; xKey: string; yKey:
       {Array.from({ length: 7 }, (_, i) => { const v = x0 + (i / 6) * (x1 - x0); return <text key={i} x={sx(v)} y={padT + innerH + 18} textAnchor="middle" fontSize="10.5" fill="var(--text-3)" fontFamily="Manrope">{mX.fmt(v)}</text>; })}
       <line x1={sx(aggX)} y1={padT} x2={sx(aggX)} y2={padT + innerH} stroke="var(--orange)" strokeWidth="2" strokeDasharray="6 4" />
       <line x1={padL} y1={sy(aggY)} x2={W - padR} y2={sy(aggY)} stroke="var(--orange)" strokeWidth="2" strokeDasharray="6 4" />
-      {items.map((p, i) => { const c = p.score >= 78 ? "#1F8A5B" : p.score >= 60 ? "#C58A1A" : "#C0392B"; const r = Math.max(5, Math.min(13, (p.area || 70) / 16)); return <circle key={i} cx={sx(mX.get(p))} cy={sy(mY.get(p))} r={r} fill={c} fillOpacity="0.5" stroke={c} strokeWidth="1.6"><title>{`${p.address}\n${mX.label}: ${mX.fmt(mX.get(p))}\n${mY.label}: ${mY.fmt(mY.get(p))}\nSahə: ${p.area} m² · Skor: ${p.score}`}</title></circle>; })}
+      {items.map((p, i) => { const avgY = mean(items.map((x) => x.yield)); const c = p.yield >= avgY * 1.1 ? "#1F8A5B" : p.yield >= avgY * 0.9 ? "#C58A1A" : "#C0392B"; const r = Math.max(5, Math.min(13, (p.area || 70) / 16)); return <circle key={i} cx={sx(mX.get(p))} cy={sy(mY.get(p))} r={r} fill={c} fillOpacity="0.5" stroke={c} strokeWidth="1.6"><title>{`${p.address}\n${mX.label}: ${mX.fmt(mX.get(p))}\n${mY.label}: ${mY.fmt(mY.get(p))}\nSahə: ${p.area} m²`}</title></circle>; })}
     </svg>
   );
 }

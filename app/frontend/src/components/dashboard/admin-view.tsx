@@ -409,6 +409,16 @@ export function AdminView({ t }: { t: Record<string, string> }) {
                 </tr>
               </thead>
               <tbody>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={7}>
+                      <div className="hm-empty">
+                        <Building2 size={22} />
+                        <span>{t.admNoCompanies ?? "Şirkət siyahısı üçün hələ mənbə yoxdur."}</span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {rows.map((c) => (
                   <tr key={c.id} onClick={() => setOpenCo(c.id)}>
                     <td>

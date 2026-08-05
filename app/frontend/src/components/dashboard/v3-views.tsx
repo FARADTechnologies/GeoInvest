@@ -74,31 +74,6 @@ function Card({
   );
 }
 
-function Sparkline({ data, h = 28, color = "var(--brand-500)" }: { data: number[]; h?: number; color?: string }) {
-  const { path, area } = useMemo(() => {
-    if (!data || data.length < 2) return { path: "", area: "" };
-    const w = 100;
-    const min = Math.min(...data);
-    const max = Math.max(...data);
-    const rng = max - min || 1;
-    const step = w / (data.length - 1);
-    const pts = data.map((v, i) => [i * step, h - ((v - min) / rng) * (h - 4) - 2]);
-    const p = pts.map((q, i) => (i ? "L" : "M") + q[0].toFixed(1) + " " + q[1].toFixed(1)).join(" ");
-    return { path: p, area: p + ` L100 ${h} L0 ${h} Z` };
-  }, [data, h]);
-  return (
-    <svg viewBox={`0 0 100 ${h}`} preserveAspectRatio="none" style={{ width: "100%", height: h, display: "block", color }}>
-      <defs>
-        <linearGradient id="hmv3sg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="currentColor" stopOpacity=".22" />
-          <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#hmv3sg)" />
-      <path d={path} stroke="currentColor" strokeWidth="1.7" fill="none" />
-    </svg>
-  );
-}
 
 function Donut({
   slices,
@@ -146,24 +121,10 @@ function Donut({
   );
 }
 
-// deterministic mini sparkline series per rayon (visual only)
-function miniSeries(seed: number, end: number, n = 8) {
-  let a = seed >>> 0;
-  const rnd = () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-  const out: number[] = [];
-  let v = end * (0.9 + rnd() * 0.05);
-  for (let i = 0; i < n; i++) {
-    v += (end - v) * 0.25 + (rnd() - 0.5) * end * 0.02;
-    out.push(Math.round(v));
-  }
-  out[n - 1] = end;
-  return out;
-}
+// A miniSeries() lived here: a seeded random walk that drew an eight-point
+// sparkline "history" for each rayon card, ending at the real median. The
+// shape was invented, so the sparkline is gone until there is a per-rayon
+// monthly series to draw (the city-wide one is in Bazar analizi).
 
 // ── Rayon detail (modal body) ───────────────────────────────────────────
 function RayonDetail({ t, rayon, listings, onClose }: { t: Record<string, string>; rayon: RayonStat; listings: Listing[]; onClose: () => void }) {
@@ -250,7 +211,7 @@ export function RayonsViewV3({
   return (
     <div className="hm-v3 hm-rayons">
       <div className="hm-rcards">
-        {rows.slice(0, 4).map((r, i) => (
+        {rows.slice(0, 4).map((r) => (
           <div className="hm-rcard" key={r.id} onClick={() => setSel(r.id)}>
             <div className="hm-rcard-top">
               <span className="hm-rcard-dot" style={{ background: colorFor(heatOf(r)) }} />
@@ -259,9 +220,6 @@ export function RayonsViewV3({
             </div>
             <div className="hm-rcard-val">{nf(r.median)}<small> ₼/m²</small></div>
             <div className="hm-rcard-foot"><Trend v={r.trend} /><span>{nf(r.listings)} ilan</span></div>
-            <div className="hm-rcard-spark">
-              <Sparkline data={miniSeries(i + 7, r.median)} h={28} color={colorFor(heatOf(r))} />
-            </div>
           </div>
         ))}
       </div>

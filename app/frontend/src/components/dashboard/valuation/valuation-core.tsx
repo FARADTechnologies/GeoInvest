@@ -15,14 +15,11 @@ import {
   DonutChart,
   Icons,
   InfoCell,
-  LineChart,
   Modal,
   fmtMoney,
-  fmtPercent,
-  genTrend,
-  monthsLabels
+  fmtPercent
 } from "@/components/dashboard/valuation/valuation-ui";
-import type { RateReportData, RayonPrice, ValuationInput, ValuationMeta, ValuationResult } from "@/types/valuation";
+import type { RateReportData, RayonPrice, ValuationInput, ValuationMeta } from "@/types/valuation";
 
 // Prototype property shape (camelCase) the UI components expect.
 export type OProp = {
@@ -40,9 +37,12 @@ export type OProp = {
   monthlyRent: number;
   yield: number;
   payback: number;
-  liquidity: number;
-  score: number;
-  risk: string;
+  // The predict model returns no time-on-market, no investment score and no
+  // risk band. These were derived on the client from fixed constants plus a
+  // hash-based jitter; they are now null until the team supplies a basis.
+  liquidity: number | null;
+  score: number | null;
+  risk: string | null;
   residence: string | null;
   repair: string | null;
   extract: string | null;
@@ -54,88 +54,11 @@ export type OProp = {
   growth?: number;
 };
 
-export function toOProp(r: ValuationResult, id: string, valued = true): OProp {
-  return {
-    id,
-    valued,
-    address: r.address || r.rayon || "",
-    district: r.rayon || "—",
-    type: r.type,
-    area: r.area,
-    rooms: r.rooms ?? null,
-    floor: r.floor ?? null,
-    totalFloors: r.total_floors ?? null,
-    fairValue: r.fair_value,
-    pricePerM2: r.price_per_m2,
-    monthlyRent: r.monthly_rent,
-    yield: r.yield_pct,
-    payback: r.payback_years,
-    liquidity: r.liquidity_days,
-    score: r.score,
-    risk: r.risk,
-    residence: r.residence ?? null,
-    repair: r.repair ?? null,
-    extract: r.extract ?? null,
-    range: (r.price_range as number[]) ?? [r.fair_value, r.fair_value],
-    rentRange: (r.rent_range as number[]) ?? [r.monthly_rent, r.monthly_rent],
-    priceBasis: r.price_basis,
-    marketMedian: r.market_median_kvm ?? null
-  };
-}
-
-// Deterministic value in [-spread, +spread] from a text seed — mirrors the
-// backend `_stable_jitter` (services/valuation.py) so re-valuations stay
-// reproducible while charts still get a natural spread, not identical numbers.
-function stableJitter(seed: string, spread: number): number {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const unit = ((h >>> 0) % 1_000_000) / 1_000_000; // 0..1
-  return (unit - 0.5) * 2 * spread;
-}
-const clampNum = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
-
-// Model the investment score / liquidity / risk from the predict figures.
-// The predict server returns fair value, rent, yield and payback but no score
-// or time-on-market, so we derive them here (the DB flow gets these from
-// services/valuation.py). We follow the same shape as the backend but recentre
-// the constants: the real predict yields run noticeably LOWER than the backend's
-// modelled 5.5% / 7.2% (Baku new builds land ~3.5-5%), so reusing the backend
-// centre (yield−6) would clamp almost every property to the 38 floor and
-// collapse the analysis charts. Yield is the dominant driver; payback is
-// dropped because it is ≈100/yield (redundant) and double-counting it is exactly
-// what crushed the score. Deterministic jitter keeps re-valuations reproducible.
-export function modelInvestment(args: {
-  type: string | null;
-  yieldPct: number;
-  floor: number | null;
-  totalFloors: number | null;
-  seed: string;
-}): { score: number; liquidity: number; risk: string } {
-  const isNew = (args.type || "").toLowerCase().includes("yeni");
-  let liquidity = isNew ? 70 : 95; // base time-on-market (days) by build type
-  // Ground / top floors sell a touch slower (mirrors the backend adjustment).
-  if (args.floor && args.totalFloors) {
-    if (args.floor === 1) liquidity += 6;
-    else if (args.floor >= args.totalFloors) liquidity += 4;
-  }
-  liquidity += stableJitter(args.seed + "l", 18);
-  const liquidityDays = clampNum(20, 260, Math.round(liquidity));
-
-  // Centre ~62 for a typical listing; ±8 per point of yield around a 4.5%
-  // pivot, minus a mild time-on-market penalty. Gives a real spread (≈40-88)
-  // across the predict server's actual output range instead of a flat floor.
-  const score =
-    62 +
-    (args.yieldPct - 4.5) * 8 -
-    (liquidityDays - 85) * 0.12 +
-    stableJitter(args.seed + "s", 6);
-  const scoreInt = clampNum(38, 96, Math.round(score));
-  const risk = scoreInt >= 78 ? "Aşağı" : scoreInt >= 60 ? "Orta" : "Yüksək";
-  return { score: scoreInt, liquidity: liquidityDays, risk };
-}
+// A stableJitter()/modelInvestment() pair used to live here. The predict model
+// returns value, rent, yield and payback but no investment score, no
+// time-on-market and no risk band, so those three were manufactured from fixed
+// constants plus a hash of the address. They are now left unset and render as
+// "—" (tracker S1 asks the team for a real days-on-market basis).
 
 // Build a history row (OProp) from a predict report. The predict model returns
 // value / rent / yield / payback; score, liquidity and risk are modelled above
@@ -155,14 +78,6 @@ export function opropFromReport(id: string, data: RateReportData): OProp {
       label = data.source.url;
     }
   }
-  const seed = `${f?.address || ""}|${f?.area ?? ""}|${f?.rooms ?? ""}|${f?.floor ?? ""}|${f?.type || ""}|${id}`;
-  const model = modelInvestment({
-    type: f?.type ?? null,
-    yieldPct: inv.rent_yield_percent,
-    floor: f?.floor ?? null,
-    totalFloors: f?.total_floors ?? null,
-    seed
-  });
   return {
     id,
     valued: true,
@@ -179,9 +94,11 @@ export function opropFromReport(id: string, data: RateReportData): OProp {
     monthlyRent: rentv.point_estimate,
     yield: inv.rent_yield_percent,
     payback: inv.payback_period_years,
-    liquidity: model.liquidity,
-    score: model.score,
-    risk: model.risk,
+    // Not in the model's response — see the note above the removed
+    // modelInvestment(). Rendered as "—".
+    liquidity: null,
+    score: null,
+    risk: null,
     residence: f?.residence_owner ?? null,
     repair: f?.repair ?? null,
     extract: f?.extract ?? null,
@@ -207,10 +124,10 @@ export type Stats = {
   totalValue: number;
   totalRent: number;
   avgYield: number;
-  avgScore: number;
+  avgScore: number | null;
   avgPayback: number;
   avgPricePerM2: number;
-  avgLiquidity: number;
+  avgLiquidity: number | null;
   avgArea: number;
   newCount: number;
   byDistrict: Record<string, number>;
@@ -220,17 +137,18 @@ export function statsOf(items: OProp[]): Stats {
   const xs = items.filter((x) => x.valued !== false);
   const n = xs.length;
   if (n === 0)
-    return { n: 0, totalValue: 0, totalRent: 0, avgYield: 0, avgScore: 0, avgPayback: 0, avgPricePerM2: 0, avgLiquidity: 0, avgArea: 0, newCount: 0, byDistrict: {} };
+    return { n: 0, totalValue: 0, totalRent: 0, avgYield: 0, avgScore: null, avgPayback: 0, avgPricePerM2: 0, avgLiquidity: null, avgArea: 0, newCount: 0, byDistrict: {} };
   const sum = (f: (x: OProp) => number) => xs.reduce((s, x) => s + (f(x) || 0), 0);
   return {
     n,
     totalValue: sum((x) => x.fairValue),
     totalRent: sum((x) => x.monthlyRent),
     avgYield: +(sum((x) => x.yield) / n).toFixed(2),
-    avgScore: Math.round(sum((x) => x.score) / n),
+    // No score / time-on-market from the model, so no average either.
+    avgScore: null,
     avgPayback: +(sum((x) => x.payback) / n).toFixed(1),
     avgPricePerM2: Math.round(sum((x) => x.pricePerM2) / n),
-    avgLiquidity: Math.round(sum((x) => x.liquidity) / n),
+    avgLiquidity: null,
     avgArea: Math.round(sum((x) => x.area) / n),
     newCount: xs.filter((x) => (x.type || "").toLowerCase().includes("yeni")).length,
     byDistrict: xs.reduce<Record<string, number>>((m, x) => {
@@ -777,18 +695,19 @@ export function PropertyReport({
     window.addEventListener("afterprint", cleanup);
     setTimeout(() => window.print(), 60);
   };
-  const salesTrend = useMemo(() => genTrend(p.fairValue, 0.08, parseInt(p.id.slice(-3)) || 1), [p.id, p.fairValue]);
-  const rentTrend = useMemo(() => genTrend(p.monthlyRent, 0.06, (parseInt(p.id.slice(-3)) || 1) + 3), [p.id, p.monthlyRent]);
-  const labels = monthsLabels("2025-06");
   const deltaPct = (v: number, avg: number) => (avg ? +(((v - avg) / avg) * 100).toFixed(1) : 0);
 
-  const benches = [
-    { k: "500m radiusda orta qiymət", v: fmtMoney(Math.round(p.pricePerM2 * 0.98), " ₼/m²"), d: -1.2 },
+  // Only comparisons we can actually compute stay here. The three price-growth
+  // rows ("+9.1% / +10.2% / +10.1%") were literal constants in the source — the
+  // same three numbers for every apartment in every rayon — and the "500 m
+  // radius" figure was just this property's own ₼/m² multiplied by 0.98. The
+  // per-rayon growth that would replace them lives in Bazar analizi
+  // (/model/market/rayons); wiring it per property needs the rayon key on the
+  // portfolio row, which the batch result does not carry yet (tracker B9).
+  const benches: { k: string; v: string; d?: number; invert?: boolean; vsLabel?: string }[] = [
     { k: "Kirayə gəlirliyi", v: fmtPercent(p.yield), d: deltaPct(p.yield, stats.avgYield), vsLabel: "portfel orta" },
     { k: "Kirayə ilə geri ödəmə", v: `${p.payback} il`, d: deltaPct(p.payback, stats.avgPayback), invert: true, vsLabel: "portfel orta" },
-    { k: "Mənzilin qiymət artımı (12 ay)", v: "+9.1%", d: 9.1 },
-    { k: "Bakı üzrə qiymət artımı", v: "+10.2%", d: 10.2 },
-    { k: `${p.district} üzrə qiymət artımı`, v: "+10.1%", d: 10.1 }
+    { k: "Qiymət / m²", v: fmtMoney(p.pricePerM2, " ₼/m²"), d: deltaPct(p.pricePerM2, stats.avgPricePerM2), vsLabel: "portfel orta" }
   ];
 
   return (
@@ -852,18 +771,17 @@ export function PropertyReport({
 
           <div className="card" style={{ padding: 16, marginBottom: 18 }}>
             <div className="fl-row" style={{ gap: 16, flexWrap: "wrap" }}>
-              <DonutChart value={p.score} label={T(`Sərmayə skoru`)} size={84} />
               <div style={{ flex: 1, minWidth: 220 }}>
-                <div className="card-title">Sərmayə skoru: {p.score}/100</div>
+                <div className="card-title">Portfel müqayisəsi</div>
                 <div className="card-sub" style={{ marginTop: 4, maxWidth: "52ch" }}>
-                  Bu mənzil <strong>{portfolioName}</strong> portfelində <strong>#{rank} / {itemsCount}</strong> sırasındadır (gəlirlilik və risk üzrə).
+                  Bu mənzil <strong>{portfolioName}</strong> portfelində <strong>#{rank} / {itemsCount}</strong> sırasındadır (gəlirlilik üzrə).
                 </div>
               </div>
               <div className="divider-y" style={{ height: 60 }} />
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, flex: 1, minWidth: 320 }}>
                 <PortDelta label="Fair value vs portfel" value={fmtMoney(p.fairValue)} delta={deltaPct(p.fairValue, stats.totalValue / Math.max(stats.n, 1))} />
                 <PortDelta label="Gəlirlilik vs portfel" value={fmtPercent(p.yield)} delta={deltaPct(p.yield, stats.avgYield)} />
-                <PortDelta label="Likvidlik vs portfel" value={`${p.liquidity} gün`} delta={deltaPct(p.liquidity, stats.avgLiquidity)} invert />
+                <PortDelta label="Geri ödəmə vs portfel" value={`${p.payback} il`} delta={deltaPct(p.payback, stats.avgPayback)} invert />
               </div>
             </div>
           </div>
@@ -886,25 +804,17 @@ export function PropertyReport({
             </div>
           </div>
 
-          <div className="card chart-card" style={{ marginBottom: 14 }}>
-            <div className="chart-title">Satış qiymətinin trendi</div>
-            <div className="chart-sub">Qrafik son 1 ildə qiymətləndirilmiş potensial satış dəyərinin dinamikasını əks etdirir.</div>
-            <LineChart data={salesTrend} labels={labels} height={220} color="#2A8B7E" />
-          </div>
-
-          <div className="card chart-card" style={{ marginBottom: 14 }}>
-            <div className="chart-title">Kirayə qiymətinin trendi</div>
-            <div className="chart-sub">Qrafik son 1 ildə qiymətləndirilmiş potensial kirayə qiymətinin dinamikasını əks etdirir.</div>
-            <LineChart data={rentTrend} labels={labels} height={200} color="#D9531E" />
-          </div>
+          {/* The sale / rent trend charts that sat here drew a 12-month curve
+              generated on the client from the current valuation — the model
+              stores no monthly history per apartment. Bazar analizi carries
+              the real city curves; a per-property one needs the team's
+              valuation history (tracker S8). */}
 
           <div className="card card-pad">
             <div className="card-title" style={{ marginBottom: 6 }}>Analitik şərhi</div>
             <div style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
-              Mənzilin sərmayə dəyərləndirməsi <strong>{p.score >= 78 ? "yuxarı" : p.score >= 60 ? "orta" : "aşağı"}</strong> səviyyəlidir.
               Süni intellekt əsasında qiymətləndirilmiş bazar dəyəri <strong>{fmtMoney(p.fairValue)}</strong>, aylıq kirayə dəyəri <strong>{fmtMoney(p.monthlyRent)}</strong> təyin edilmişdir.
               İllik kirayə gəlirliyi <strong>{p.yield}%</strong> (portfel ortası ilə müqayisədə <Delta value={deltaPct(p.yield, stats.avgYield)} />) və geri ödəmə müddəti <strong>{p.payback} il</strong> təxmin edilmişdir.
-              Orta likvidlik müddəti <strong>{p.liquidity} gün</strong>dür.
             </div>
           </div>
         </div>

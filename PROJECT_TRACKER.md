@@ -1,7 +1,7 @@
 # Homora B2B — İş Takip Belgesi
 
 > Tek kaynak. Her tur sonunda güncellenir. Bitenler silinmez, arşive taşınır.
-> Son güncelleme: **2026-08-05**
+> Son güncelleme: **2026-08-06**
 
 ---
 
@@ -36,20 +36,33 @@
 
 | # | İş | Not |
 |---|---|---|
-| B1 | **`valuation-market.tsx` derin temizlik** | Rayon tablosundaki `yield/liq/rent/txn/growth` rayon adının **hash'inden** türetilen formüllerle uyduruluyor. Sadece ₼/m² ve ilan sayısı ölçülmüş. Şu an mock kapısıyla gizleniyor ama kod duruyor — sökülmesi gerek. **Dosya çok bağlantılı, kendi turunu istiyor** |
 | B2 | **Rapor arayüzü** | Ekibin gönderdiği 30 dosyalık React paketi (`homora-valuation-report-ui-20260804`) bizim TypeScript yapımıza taşınacak. Başlı başına bir oturum |
-| B3 | **Portfel analizi denetimi** | Bazar analizi denetlendi, Portfel henüz değil |
 | B4 | Portföy URL'i değişmiyor | `/bulk` sabit kalıyor, portföy id'si girmeli |
 | B5 | İki "qiymətləndir" butonu | Turuncu/beyaz — farkı ne, neden iki tane |
 | B6 | Sol bar aç/kapa | Klavye kısayolu + fare ile |
 | B7 | Yuvarlak yüzde göstergesi | Tasarımı kötü, değiştirilecek |
 | B8 | Toplu değerleme canlı testi | Kod hazır, deploy sonrası "başlat → sekmeyi kapat → dön" senaryosu denenmeli |
+| B9 | Rayon bazlı artım mənzil hesabatında | `/model/market/rayons` gerçek artımı veriyor; portföy satırında rayon anahtarı yok, eklenmeli |
+| B10 | Boş ekran metinleri | Uydurma veriler kalkınca bazı kartlar boş kaldı; "veri yok" mesajları gözden geçirilmeli |
 
 ---
 
 ## ✅ Tamamlananlar (arşiv)
 
-**Veri bütünlüğü**
+**Veri bütünlüğü — 2. tur (2026-08-06): sistemde uydurma veri kalmadı**
+- **Bazar analizi** rayon tablosu: `Gəlirlilik / Kirayə / Artım` artık gerçek (`/model/market/rayons`); `Likvidlik / Əqd-ay` veri yok → "—". Hash tabanlı `unitOf()`, `mktSeries()`, `seedRandom()`, `SALES_DAYS`, üç `MKT_*_FALLBACK` sabiti silindi
+- **Trend grafiği** yalnız gerçek aylık seriler (satış ₼/m², kirayə, indeks); veri olmayan metrikalar listeden çıktı
+- **Xəritə analizi** 12 aylık trend: uydurma eğri → gerçek Bakı satış eğrisi
+- **Backend değerleme motoru silindi** (`/valuation/single`, `/valuation/batch`): kirayə, gəlirlilik, geri ödəmə, likvidlik ve skor sabit + hash jitter ile üretiliyordu. Artık tek yol ekibin predict modeli
+- **Sərmayə skoru / risk / likvidlik** ön yüzde de üretiliyordu (`modelInvestment`) → kaldırıldı, sütunlar çıkarıldı
+- **3 sahte demo portföy** (36 uydurma mənzil, uydurma sahipler) silindi — liste boş başlıyor
+- **Super admin konsolundaki 10 sahte şirket** silindi: gerçek banka adları (ABB, Kapital Bank, PAŞA Bank…), sahte VÖEN, ~114 uydurma çalışan
+- `reportFromLinkMock` (URL hash'inden tam değerleme üreten fonksiyon) silindi
+- `genTrend`, `miniSeries`, rayon kartlarındaki sahte sparkline'lar silindi
+- Mənzil hesabatındaki sabit "+9.1% / +10.2% / +10.1%" artım satırları ve "500m radius" uydurması kaldırıldı
+- `mock-gate.ts` gereksiz kaldı, silindi
+
+**Veri bütünlüğü — 1. tur**
 - Uydurma veri dosyaları **tamamen silindi** (`mock-data.ts`, `listings-data.ts`, `snapshot.ts`, `public/snapshot/data.json`)
 - Tüm fallback yolları kaldırıldı — gerçek veri yoksa artık **"—"** veya boş
 - Yerel sahte değerleme motoru silindi

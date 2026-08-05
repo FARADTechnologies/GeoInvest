@@ -1,12 +1,37 @@
 "use client";
 
-// Bazar analizi — city-wide Baku market metrics. 1:1 port of the prototype's
-// MarketAnalysisPage (self-contained dataset + interactive charts + table),
-// scoped under .hm-val. Dataset is the prototype's static baseline.
+// Bazar analizi — city-wide Baku market metrics.
+//
+// Every figure on this page comes from the backend. There is no baseline
+// dataset and nothing is modelled on the client any more: what the source DB
+// cannot answer renders as "—" rather than as a plausible-looking number.
+//
+// Real sources:
+//   /valuation/market      → per-rayon median ₼/m² (yeni/köhnə) + listing counts,
+//                            city median, new-build share
+//   /model/market/rayons   → per-rayon rental yield, rent, price growth
+//   /model/market/trends   → monthly sale ₼/m² and rent ₼ curves per build type
+//   /model/market/index    → price index, base 100 = Aug 2023
+//   /model/market/segments → room-count segments (₼/m², rent, yield, share)
+//
+// Still missing at the source (asked of the team, tracker S1–S4): days on
+// market (likvidlik), monthly transaction volume (əqd həcmi), per-rayon trend
+// curves, and the YoY deltas for those two.
 
 import { useQuery } from "@tanstack/react-query";
-import { mockAllowed } from "@/lib/mock-gate";
-import { apiUrl } from "@/lib/api-url";
+import {
+  fetchMarketAnalysis,
+  fetchMarketIndex,
+  fetchMarketRayons,
+  fetchMarketSegments,
+  fetchMarketTrends,
+  yoyPct,
+  type ApiMarket,
+  type RayonRow,
+  type SegData,
+  type TrendCat,
+  type TrendPoint
+} from "@/lib/market-api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
@@ -15,173 +40,96 @@ import type { Lang } from "@/lib/i18n";
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { Delta, DonutChart, HBars, Icons, Pill, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
 
-// ─── Dataset (ported 1:1) ─────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────
 
-type Dist = { name: string; ppmNew: number; ppmOld: number; yield: number; liq: number; rent: number; txn: number; supply: number; growth: number; tier: string };
-
-// Static baseline — used only as a fallback while the real market query loads
-// or if the backend is unreachable. Real data comes from /valuation/market.
-const MKT_DISTRICTS_FALLBACK: Dist[] = [
-  { name: "Səbail", ppmNew: 4200, ppmOld: 2950, yield: 5.4, liq: 72, rent: 1650, txn: 312, supply: 1840, growth: 12.4, tier: "premium" },
-  { name: "Nəsimi", ppmNew: 3450, ppmOld: 2480, yield: 6.1, liq: 64, rent: 1280, txn: 486, supply: 2310, growth: 11.1, tier: "premium" },
-  { name: "Nərimanov", ppmNew: 3200, ppmOld: 2350, yield: 6.4, liq: 68, rent: 1180, txn: 524, supply: 2480, growth: 10.8, tier: "mid" },
-  { name: "Yasamal", ppmNew: 2950, ppmOld: 2180, yield: 6.8, liq: 76, rent: 1050, txn: 612, supply: 2960, growth: 10.2, tier: "mid" },
-  { name: "Xətai", ppmNew: 2650, ppmOld: 1920, yield: 7.2, liq: 84, rent: 920, txn: 548, supply: 2740, growth: 9.6, tier: "mid" },
-  { name: "Nizami", ppmNew: 2480, ppmOld: 1840, yield: 7.4, liq: 88, rent: 860, txn: 472, supply: 2380, growth: 9.1, tier: "mid" },
-  { name: "Binəqədi", ppmNew: 2050, ppmOld: 1480, yield: 8.1, liq: 102, rent: 720, txn: 698, supply: 3420, growth: 8.4, tier: "value" },
-  { name: "Sabunçu", ppmNew: 1780, ppmOld: 1290, yield: 8.6, liq: 118, rent: 640, txn: 542, supply: 2980, growth: 7.8, tier: "value" },
-  { name: "Suraxanı", ppmNew: 1620, ppmOld: 1180, yield: 8.9, liq: 128, rent: 580, txn: 418, supply: 2540, growth: 7.2, tier: "value" },
-  { name: "Xəzər", ppmNew: 1880, ppmOld: 1340, yield: 8.3, liq: 124, rent: 690, txn: 286, supply: 1680, growth: 8.9, tier: "value" },
-  { name: "Qaradağ", ppmNew: 1450, ppmOld: 1050, yield: 9.2, liq: 142, rent: 510, txn: 224, supply: 1420, growth: 6.4, tier: "value" },
-  { name: "Pirallahı", ppmNew: 1280, ppmOld: 940, yield: 9.6, liq: 156, rent: 460, txn: 96, supply: 580, growth: 5.8, tier: "value" }
-];
-
-const MKT_CITY_FALLBACK = {
-  ppm: 2640, ppmIndex: 142.6, ppmIndexYoY: 9.8, yield: 7.6, yieldYoY: -0.4,
-  liquidity: 98, liquidityYoY: -6, rent: 920, rentYoY: 13.2,
-  txnVolume: 5268, txnYoY: 4.6, supply: 29720, supplyYoY: -3.1, newShare: 38
+// A rayon row. `ppmNew` / `ppmOld` / `supply` are measured; `yield` / `rent` /
+// `growth` come from the valuation pipeline and are null where the sample is
+// too small; `liq` / `txn` have no source at all and are always null.
+type Dist = {
+  name: string;
+  ppmNew: number | null;
+  ppmOld: number | null;
+  yield: number | null;
+  liq: number | null;
+  rent: number | null;
+  txn: number | null;
+  supply: number;
+  growth: number | null;
+  tier: "premium" | "mid" | "value";
 };
 
-const MKT_ROOM_SEGMENTS_FALLBACK = [
-  { rooms: "1 otaq", ppm: 2980, yield: 8.2, share: 14, rent: 640, liq: 78 },
-  { rooms: "2 otaq", ppm: 2740, yield: 7.8, share: 34, rent: 880, liq: 86 },
-  { rooms: "3 otaq", ppm: 2560, yield: 7.4, share: 31, rent: 1180, liq: 98 },
-  { rooms: "4 otaq", ppm: 2420, yield: 6.9, share: 15, rent: 1520, liq: 124 },
-  { rooms: "5+ otaq", ppm: 2280, yield: 6.2, share: 6, rent: 1980, liq: 152 }
-];
+// City-level aggregates. Nullable wherever the DB has nothing to say.
+type City = {
+  ppm: number | null;
+  ppmIndex: number | null;
+  ppmIndexYoY: number | null;
+  yield: number | null;
+  yieldYoY: number | null;
+  liquidity: number | null;
+  liquidityYoY: number | null;
+  rent: number | null;
+  rentYoY: number | null;
+  txnVolume: number | null;
+  txnYoY: number | null;
+  supply: number | null;
+  newShare: number | null;
+};
 
-const MKT_METRICS: Record<string, { label: string; fmt: (v: number) => string; cityKey: keyof typeof MKT_CITY_FALLBACK }> = {
-  ppm: { label: "Qiymət (₼/m²)", fmt: (v) => fmtMoney(v, " ₼/m²"), cityKey: "ppm" },
-  index: { label: "Qiymət indeksi", fmt: (v) => v.toFixed(1), cityKey: "ppmIndex" },
-  yield: { label: "Kirayə gəlirliyi", fmt: (v) => v.toFixed(1) + "%", cityKey: "yield" },
-  rent: { label: "Orta kirayə (₼/ay)", fmt: (v) => fmtMoney(v), cityKey: "rent" },
-  liq: { label: "Likvidlik (gün)", fmt: (v) => Math.round(v) + " gün", cityKey: "liquidity" },
-  txn: { label: "Əqd həcmi", fmt: (v) => fmtNumber(v), cityKey: "txnVolume" }
+// Only the metrics with a real monthly curve behind them are offered here.
+// Yield / liquidity / transactions have no time series in the source DB, so
+// charting them would mean inventing one.
+const MKT_METRICS: Record<string, { label: string; fmt: (v: number) => string }> = {
+  ppm: { label: "Qiymət (₼/m²)", fmt: (v) => fmtMoney(v, " ₼/m²") },
+  index: { label: "Qiymət indeksi", fmt: (v) => v.toFixed(1) },
+  rent: { label: "Orta kirayə (₼/ay)", fmt: (v) => fmtMoney(v) }
 };
 const MKT_METRIC_KEYS = Object.keys(MKT_METRICS);
 
-// ─── Real market data (from /valuation/market) ────────────────────────
-// ppm(new/old), listing counts, city median and new-share are REAL (from the
-// analytics tables). Yield / liquidity / rent / txn / growth are modelled from
-// those anchors here on the client, because the source DB holds no such data.
+// ─── Assembly ─────────────────────────────────────────────────────────
 
+// The two endpoints name rayons slightly differently (the spatial join keeps
+// the " rayonu" suffix, the analytics tables do not), so they are matched on a
+// normalised key rather than on the raw string.
+const shortRayon = (n: string) => n.replace(/\s*rayonu\s*$/i, "").trim();
+const rayonKey = (n: string) => shortRayon(n).toLocaleLowerCase("az");
 
-type ApiMarketRayon = { rayon: string; ppm_new: number | null; ppm_old: number | null; ad_count: number };
-type ApiMarket = { period: string | null; city_median_kvm: number | null; new_share: number; total_ad_count: number; rayons: ApiMarketRayon[] };
-
-async function fetchMarketAnalysis(): Promise<ApiMarket> {
-  const res = await fetch(apiUrl(`/valuation/market`), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("market analysis unavailable");
-  return res.json();
-}
-
-// Real room-count segments (₼/m², rent, yield, share) from the source DB,
-// split by build type so the Kateqoriya dropdown (#3a) can switch (team #3h).
-type SegRow = { rooms: string; ppm: number; rent: number; yield_pct: number; count: number; share: number };
-type SegData = { all: SegRow[]; new: SegRow[]; old: SegRow[] };
-async function fetchMarketSegments(): Promise<SegData> {
-  const res = await fetch(apiUrl(`/model/market/segments`), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("market segments unavailable");
-  return res.json();
-}
-
-// Real monthly sale (₼/m²) + rent (₼) curves per build type (team #3b/d/e).
-type TrendPoint = { date: string; value: number };
-type TrendCat = { all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[] };
-type MarketTrends = { sale: TrendCat; rent: TrendCat };
-async function fetchMarketTrends(): Promise<MarketTrends> {
-  const res = await fetch(apiUrl(`/model/market/trends`), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("market trends unavailable");
-  return res.json();
-}
-
-// Per-rayon rental yield (last month, #3g) and price growth (#3j) — real.
-type RayonRow = { rayon: string; yield_pct?: number; rent?: number; recent_count?: number; growth_pct?: number; growth_count?: number };
-type RayonData = { rayons: RayonRow[]; min_sample: number };
-async function fetchMarketRayons(): Promise<RayonData> {
-  const res = await fetch(apiUrl(`/model/market/rayons`), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("market rayons unavailable");
-  return res.json();
-}
-
-// Real price index (base 100 = Aug 2023) per build type (team #3c).
-type IndexData = { base: string; all: TrendPoint[]; new: TrendPoint[]; old: TrendPoint[]; latest_yoy: { all?: number; new?: number; old?: number } };
-async function fetchMarketIndex(): Promise<IndexData> {
-  const res = await fetch(apiUrl(`/model/market/index`), { headers: { Accept: "application/json" } });
-  if (!res.ok) throw new Error("market index unavailable");
-  return res.json();
-}
-
-const clamp = (lo: number, hi: number, v: number) => Math.max(lo, Math.min(hi, v));
-function unitOf(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return ((h >>> 0) % 100000) / 100000;
-}
-
-type MarketData = {
-  MKT_DISTRICTS: Dist[];
-  MKT_CITY: typeof MKT_CITY_FALLBACK;
-  MKT_ROOM_SEGMENTS: typeof MKT_ROOM_SEGMENTS_FALLBACK;
+const EMPTY_CITY: City = {
+  ppm: null, ppmIndex: null, ppmIndexYoY: null, yield: null, yieldYoY: null,
+  liquidity: null, liquidityYoY: null, rent: null, rentYoY: null,
+  txnVolume: null, txnYoY: null, supply: null, newShare: null
 };
 
-const FALLBACK_MARKET: MarketData = {
-  MKT_DISTRICTS: MKT_DISTRICTS_FALLBACK,
-  MKT_CITY: MKT_CITY_FALLBACK,
-  MKT_ROOM_SEGMENTS: MKT_ROOM_SEGMENTS_FALLBACK
-};
+function buildDistricts(api: ApiMarket, rayons: RayonRow[]): Dist[] {
+  // Treat implausibly-low medians (bad source rows) as missing rather than
+  // showing an absurd ₼/m² or inventing a counterpart from it.
+  const sane = (v: number | null | undefined) => (v && v > 300 ? v : null);
+  const byKey = new Map(rayons.map((r) => [rayonKey(r.rayon), r]));
+  const city = sane(api.city_median_kvm);
 
-function buildMarket(api: ApiMarket): MarketData {
-  const city = api.city_median_kvm || 2000;
-  // Treat implausibly-low medians (bad source rows) as missing and derive the
-  // counterpart instead, so no rayon shows an absurd ₼/m².
-  const sane = (v: number | null) => (v && v > 300 ? v : null);
-  const districts: Dist[] = api.rayons
+  return api.rayons
     .filter((r) => sane(r.ppm_new) || sane(r.ppm_old))
     .map((r) => {
-      const rn = sane(r.ppm_new);
-      const ro = sane(r.ppm_old);
-      const ppmNew = Math.round(rn ?? (ro ? ro / 0.72 : city));
-      const ppmOld = Math.round(ro ?? (rn ? rn * 0.72 : city * 0.72));
-      const rel = ppmNew / city;
-      const u = unitOf(r.rayon);
-      const yieldV = +clamp(5.2, 9.6, 8.8 - rel * 2.6 + (u - 0.5) * 0.5).toFixed(1);
-      const liq = Math.round(clamp(60, 165, 78 + (rel - 1) * 70 + (u - 0.5) * 16));
-      const rent = Math.round((ppmOld * 80 * (yieldV / 100)) / 12 / 10) * 10;
-      const txn = Math.max(20, Math.round(r.ad_count * (0.14 + u * 0.08)));
-      const growth = +clamp(5.5, 12.8, 6 + rel * 3.4 + (u - 0.5) * 1.2).toFixed(1);
-      const tier = rel >= 1.28 ? "premium" : rel >= 0.9 ? "mid" : "value";
-      return { name: r.rayon, ppmNew, ppmOld, yield: yieldV, liq, rent, txn, supply: r.ad_count, growth, tier };
+      const ppmNew = sane(r.ppm_new);
+      const ppmOld = sane(r.ppm_old);
+      const extra = byKey.get(rayonKey(r.rayon));
+      // Segment is a classification of a measured price, not a new figure.
+      const ref = ppmNew ?? ppmOld;
+      const rel = city && ref ? ref / city : null;
+      const tier: Dist["tier"] = rel == null ? "mid" : rel >= 1.28 ? "premium" : rel >= 0.9 ? "mid" : "value";
+      return {
+        name: shortRayon(r.rayon),
+        ppmNew,
+        ppmOld,
+        yield: extra?.yield_pct != null ? +extra.yield_pct.toFixed(1) : null,
+        rent: extra?.rent != null && extra.rent > 0 ? Math.round(extra.rent) : null,
+        growth: extra?.growth_pct != null ? +extra.growth_pct.toFixed(1) : null,
+        // No days-on-market and no transaction feed in the source DB (S1/S2).
+        liq: null,
+        txn: null,
+        supply: r.ad_count,
+        tier
+      };
     });
-  if (districts.length === 0) return FALLBACK_MARKET;
-  const n = districts.length;
-  const avg = (f: (d: Dist) => number) => districts.reduce((s, d) => s + f(d), 0) / n;
-  const MKT_CITY: typeof MKT_CITY_FALLBACK = {
-    ppm: Math.round(city),
-    ppmIndex: +(city / 18.5).toFixed(1),
-    ppmIndexYoY: 9.8,
-    yield: +avg((d) => d.yield).toFixed(1),
-    yieldYoY: -0.4,
-    liquidity: Math.round(avg((d) => d.liq)),
-    liquidityYoY: -6,
-    rent: Math.round(avg((d) => d.rent)),
-    rentYoY: 13.2,
-    txnVolume: districts.reduce((s, d) => s + d.txn, 0),
-    txnYoY: 4.6,
-    supply: api.total_ad_count || districts.reduce((s, d) => s + d.supply, 0),
-    supplyYoY: -3.1,
-    newShare: api.new_share || 38
-  };
-  const roomMult = [1.13, 1.04, 0.97, 0.92, 0.86];
-  const roomYield = [8.2, 7.8, 7.4, 6.9, 6.2];
-  const roomShare = [14, 34, 31, 15, 6];
-  const roomLiq = [78, 86, 98, 124, 152];
-  const roomLabels = ["1 otaq", "2 otaq", "3 otaq", "4 otaq", "5+ otaq"];
-  const MKT_ROOM_SEGMENTS: typeof MKT_ROOM_SEGMENTS_FALLBACK = roomLabels.map((rooms, i) => {
-    const ppm = Math.round(city * roomMult[i]);
-    return { rooms, ppm, yield: roomYield[i], share: roomShare[i], rent: Math.round((ppm * 70 * (roomYield[i] / 100)) / 12 / 10) * 10, liq: roomLiq[i] };
-  });
-  return { MKT_DISTRICTS: districts, MKT_CITY, MKT_ROOM_SEGMENTS };
 }
 
 const TIME_RANGES = [
@@ -191,51 +139,7 @@ const TIME_RANGES = [
   { key: "36m", label: "3 il", months: 36 }
 ];
 
-const SALES_DAYS = [
-  { bucket: "<100k", old: 92, new: 91, oldMed: 84, newMed: 82 },
-  { bucket: "100k-200k", old: 136, new: 98, oldMed: 122, newMed: 88 },
-  { bucket: "200k-300k", old: 135, new: 122, oldMed: 120, newMed: 109 },
-  { bucket: "300k-500k", old: 164, new: 140, oldMed: 146, newMed: 126 },
-  { bucket: "500k-800k", old: 209, new: 159, oldMed: 184, newMed: 142 },
-  { bucket: ">800k", old: 225, new: 202, oldMed: 196, newMed: 178 }
-];
-
-const seedRandom = (seed: number) => {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-};
-
-function mktSeries(base: number, months: number, seedStr: string, annualGrowth = 0.09, vol = 0.012): number[] {
-  const seed = seedStr.split("").reduce((s, c) => s + c.charCodeAt(0), 0) + months;
-  const r = seedRandom(seed);
-  const monthlyGrowth = Math.pow(1 + annualGrowth, 1 / 12) - 1;
-  const out: number[] = [];
-  let v = base / Math.pow(1 + monthlyGrowth, months - 1);
-  for (let i = 0; i < months; i++) {
-    const noise = (r() - 0.5) * vol * 2;
-    const season = Math.sin((i / 12) * Math.PI * 2) * vol * 0.6;
-    v = v * (1 + monthlyGrowth + noise + season);
-    out.push(v);
-  }
-  const scale = base / out[out.length - 1];
-  return out.map((x) => x * scale);
-}
-
-function mktMonthLabels(months: number) {
-  const names = ["Yan", "Fev", "Mar", "Apr", "May", "İyn", "İyl", "Avq", "Sen", "Okt", "Noy", "Dek"];
-  const now = new Date(2026, 5, 1);
-  const out: { short: string }[] = [];
-  for (let i = 0; i < months; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1) + i, 1);
-    out.push({ short: `${names[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` });
-  }
-  return out;
-}
-
-// ─── Small controls (ported) ──────────────────────────────────────────
+// ─── Small controls ───────────────────────────────────────────────────
 
 function MktSelect({ label, value, onChange, options, minWidth = 168 }: { label?: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; minWidth?: number }) {
   return (
@@ -260,7 +164,7 @@ function TimeRange({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function MktStat({ accent, label, value, delta, sub, icon }: { accent?: boolean; label: string; value: string; delta?: number; sub?: string; icon?: React.ReactNode }) {
+function MktStat({ accent, label, value, delta, sub, icon }: { accent?: boolean; label: string; value: string; delta?: number | null; sub?: string; icon?: React.ReactNode }) {
   return (
     <div className={`stat ${accent ? "stat-accent" : ""}`}>
       <div className="fl-row" style={{ gap: 10 }}>
@@ -280,17 +184,12 @@ function MktStat({ accent, label, value, delta, sub, icon }: { accent?: boolean;
   );
 }
 
-function MiniBar({ data, width = 80, height = 26, color = "#D9531E" }: { data: number[]; width?: number; height?: number; color?: string }) {
-  const max = Math.max(...data) || 1;
-  const gap = 2;
-  const bw = (width - gap * (data.length - 1)) / data.length;
+/** Shown in place of a chart whose data the source DB does not hold. */
+function NoData({ note }: { note: string }) {
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ display: "block" }}>
-      {data.map((v, i) => {
-        const h = Math.max(2, (v / max) * (height - 4));
-        return <rect key={i} x={i * (bw + gap)} y={height - h - 2} width={bw} height={h} rx="1.5" fill={color} fillOpacity={0.4 + (v / max) * 0.55} />;
-      })}
-    </svg>
+    <div style={{ padding: "28px 20px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+      {note}
+    </div>
   );
 }
 
@@ -299,153 +198,149 @@ function MiniBar({ data, width = 80, height = 26, color = "#D9531E" }: { data: n
 export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   setValLang(lang);
 
-  // Real market aggregates (ppm/counts/city median) → modelled into the page's
-  // full data model; falls back to the static baseline while loading / on error.
+  // Per-rayon median ₼/m², listing counts, city median and new-build share.
   const marketQuery = useQuery({ queryKey: ["valuation", "market"], queryFn: fetchMarketAnalysis });
-  // Real room-count segments (team #3h) — independent of the modelled fallback.
+  // Real room-count segments (team #3h).
   const segQuery = useQuery({ queryKey: ["valuation", "market", "segments"], queryFn: fetchMarketSegments });
-  // Real monthly sale/rent curves (team #3b/d/e) — used for the ppm & rent metrics.
+  // Real monthly sale/rent curves (team #3b/d/e).
   const trendsQuery = useQuery({ queryKey: ["valuation", "market", "trends"], queryFn: fetchMarketTrends });
   // Real per-rayon yield (#3g) + growth ranking (#3j).
   const rayonsQuery = useQuery({ queryKey: ["valuation", "market", "rayons"], queryFn: fetchMarketRayons });
   // Real price index, base 100 = Aug 2023 (#3c).
   const indexQuery = useQuery({ queryKey: ["valuation", "market", "index"], queryFn: fetchMarketIndex });
-  const { MKT_DISTRICTS, MKT_CITY, MKT_ROOM_SEGMENTS } = useMemo<MarketData>(
-    () => (marketQuery.data ? buildMarket(marketQuery.data) : FALLBACK_MARKET),
-    [marketQuery.data]
+
+  const districts = useMemo<Dist[]>(
+    () => (marketQuery.data ? buildDistricts(marketQuery.data, rayonsQuery.data?.rayons ?? []) : []),
+    [marketQuery.data, rayonsQuery.data]
   );
 
   const [range, setRange] = useState("12m");
   const [trendMetric, setTrendMetric] = useState("ppm");
   const [trendCat, setTrendCat] = useState("all");
-  const [trendDistrict, setTrendDistrict] = useState("all");
-  const [sortKey, setSortKey] = useState<keyof Dist>("growth");
+  const [sortKey, setSortKey] = useState<keyof Dist>("supply");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [segMetric, setSegMetric] = useState("ppm");
   const [segCat, setSegCat] = useState("all");
-  const [salesCat, setSalesCat] = useState("all");
-  const [salesRegion, setSalesRegion] = useState("all");
-  const salesBuffer = 30;
-  const [salesAgg, setSalesAgg] = useState("mean");
 
   const months = TIME_RANGES.find((r) => r.key === range)!.months;
-  const labels = mktMonthLabels(months);
 
-  // Real KPI values from the DB where available (latest month of the trend +
-  // count-weighted segment yield); index / liquidity / txn stay modelled until
-  // the PM index and the team's liquidity/txn data arrive.
-  const trendPct = (arr?: { value: number }[]) =>
-    arr && arr.length >= 2 ? +(((arr[arr.length - 1].value - arr[0].value) / arr[0].value) * 100).toFixed(1) : undefined;
-  const realPpm = trendsQuery.data?.sale.all?.at(-1)?.value;
-  const realRent = trendsQuery.data?.rent.all?.at(-1)?.value;
-  const realYield = (() => {
+  // ── City KPIs — each one measured or "—" ───────────────────────────
+  const saleSeries = trendsQuery.data?.sale.all;
+  const rentSeries = trendsQuery.data?.rent.all;
+  const indexSeries = indexQuery.data?.all;
+
+  const city = useMemo<City>(() => {
+    const api = marketQuery.data;
+    if (!api && !trendsQuery.data && !indexQuery.data && !segQuery.data) return EMPTY_CITY;
+    // Weighted mean gross yield across the room segments — every input is a
+    // real per-segment figure from the DB.
     const segs = segQuery.data?.all ?? [];
-    const n = segs.reduce((s, x) => s + x.count, 0);
-    return n ? +(segs.reduce((s, x) => s + x.yield_pct * x.count, 0) / n).toFixed(1) : undefined;
-  })();
-  const realIndex = indexQuery.data?.all?.at(-1)?.value;
-  const realIndexYoY = indexQuery.data?.latest_yoy?.all;
+    const segN = segs.reduce((s, x) => s + x.count, 0);
+    return {
+      ppm: saleSeries?.at(-1)?.value ?? api?.city_median_kvm ?? null,
+      ppmIndex: indexSeries?.at(-1)?.value ?? null,
+      ppmIndexYoY: indexQuery.data?.latest_yoy?.all ?? null,
+      yield: segN ? +(segs.reduce((s, x) => s + x.yield_pct * x.count, 0) / segN).toFixed(1) : null,
+      // The team has no history for gross yield yet, so no YoY to show.
+      yieldYoY: null,
+      // Days on market is not stored anywhere in the source DB (S1).
+      liquidity: null,
+      liquidityYoY: null,
+      rent: rentSeries?.at(-1)?.value ?? null,
+      rentYoY: yoyPct(rentSeries),
+      // No transaction (əqd) feed — only listings (S2).
+      txnVolume: null,
+      txnYoY: null,
+      supply: api?.total_ad_count ?? null,
+      newShare: api?.new_share ?? null
+    };
+  }, [marketQuery.data, segQuery.data, trendsQuery.data, indexQuery.data, saleSeries, rentSeries, indexSeries]);
+
   const indexBase = indexQuery.data?.base;
-
-  // Values with no backend source yet (liquidity, monthly transactions and the
-  // YoY deltas the PM hasn't supplied). They used to fall back to invented
-  // constants that looked like measurements; with the mock gate closed they
-  // render as "—" instead of a number nobody can trace.
-  const modelled = mockAllowed();
-  const dash = "—";
-
   const kpis = [
-    { label: "Orta qiymət/m²", value: realPpm != null ? fmtMoney(realPpm, " ₼") : modelled ? fmtMoney(MKT_CITY.ppm, " ₼") : dash, delta: trendPct(trendsQuery.data?.sale.all) ?? MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
-    { label: "Qiymət indeksi", value: realIndex != null ? realIndex.toFixed(1) : modelled ? MKT_CITY.ppmIndex.toFixed(1) : dash, delta: realIndexYoY ?? MKT_CITY.ppmIndexYoY, sub: `baza 100 = ${indexBase === "2023-08" ? "avqust 2023" : indexBase ?? "avqust 2023"}`, icon: <Icons.TrendUp size={16} />, accent: true },
-    { label: "Orta gəlirlilik", value: realYield != null ? realYield.toFixed(1) + "%" : modelled ? MKT_CITY.yield.toFixed(1) + "%" : dash, delta: modelled ? MKT_CITY.yieldYoY : undefined, icon: <Icons.Sparkle size={16} /> },
-    { label: "Orta likvidlik", value: modelled ? MKT_CITY.liquidity + " gün" : dash, delta: modelled ? -MKT_CITY.liquidityYoY : undefined, icon: <Icons.Refresh size={16} /> },
-    { label: "Orta kirayə", value: realRent != null ? fmtMoney(realRent) : modelled ? fmtMoney(MKT_CITY.rent) : dash, delta: trendPct(trendsQuery.data?.rent.all) ?? (modelled ? MKT_CITY.rentYoY : undefined), icon: <Icons.Building size={16} /> },
-    { label: "Aylıq əqd həcmi", value: modelled ? fmtNumber(MKT_CITY.txnVolume) : dash, delta: modelled ? MKT_CITY.txnYoY : undefined, icon: <Icons.Layers size={16} /> }
+    { label: "Orta qiymət/m²", value: fmtMoney(city.ppm, " ₼"), delta: yoyPct(saleSeries), icon: <Icons.Coin size={16} /> },
+    { label: "Qiymət indeksi", value: city.ppmIndex != null ? city.ppmIndex.toFixed(1) : "—", delta: city.ppmIndexYoY, sub: `baza 100 = ${indexBase === "2023-08" ? "avqust 2023" : indexBase ?? "avqust 2023"}`, icon: <Icons.TrendUp size={16} />, accent: true },
+    { label: "Orta gəlirlilik", value: city.yield != null ? city.yield.toFixed(1) + "%" : "—", delta: city.yieldYoY, icon: <Icons.Sparkle size={16} /> },
+    { label: "Orta likvidlik", value: city.liquidity != null ? city.liquidity + " gün" : "—", delta: city.liquidityYoY, icon: <Icons.Refresh size={16} /> },
+    { label: "Orta kirayə", value: fmtMoney(city.rent), delta: city.rentYoY, icon: <Icons.Building size={16} /> },
+    { label: "Aylıq əqd həcmi", value: fmtNumber(city.txnVolume), delta: city.txnYoY, icon: <Icons.Layers size={16} /> }
   ];
 
-  const trendSeries = useMemo(() => {
-    let base: number;
-    if (trendDistrict === "all") {
-      base = MKT_CITY[MKT_METRICS[trendMetric].cityKey] as number;
-    } else {
-      const d = MKT_DISTRICTS.find((x) => x.name === trendDistrict)!;
-      base = trendMetric === "ppm" ? d.ppmNew : trendMetric === "index" ? 100 + d.growth * 3.6 : trendMetric === "yield" ? d.yield : trendMetric === "rent" ? d.rent : trendMetric === "liq" ? d.liq : d.txn;
-    }
-    let growth: number, vol: number;
-    if (trendMetric === "ppm" || trendMetric === "index" || trendMetric === "rent") { growth = 0.1; vol = 0.01; }
-    else if (trendMetric === "yield") { growth = -0.01; vol = 0.014; }
-    else if (trendMetric === "liq") { growth = -0.05; vol = 0.02; }
-    else { growth = 0.05; vol = 0.03; }
-    return mktSeries(base, months, trendMetric + trendDistrict, growth, vol);
-  }, [MKT_CITY, MKT_DISTRICTS, trendMetric, trendDistrict, months]);
-
-  // Real monthly curve for ppm / rent from the DB (team #3b/d/e); the other
-  // metrics stay modelled for now (index needs the PM's data; yield/liq/txn are
-  // pending). The Kateqoriya dropdown selects all / new / old.
-  const realTrend = useMemo<TrendPoint[] | null>(() => {
-    const td = trendsQuery.data;
-    if (trendMetric === "index") return indexQuery.data?.[trendCat as keyof TrendCat] ?? null;
-    if (!td) return null;
-    if (trendMetric === "ppm") return td.sale[trendCat as keyof TrendCat] ?? null;
-    if (trendMetric === "rent") return td.rent[trendCat as keyof TrendCat] ?? null;
-    return null;
+  // ── Trend chart — real monthly curves only ─────────────────────────
+  const trendSource = useMemo<TrendPoint[]>(() => {
+    const cat = trendCat as keyof TrendCat;
+    if (trendMetric === "index") return indexQuery.data?.[cat] ?? [];
+    if (trendMetric === "ppm") return trendsQuery.data?.sale[cat] ?? [];
+    if (trendMetric === "rent") return trendsQuery.data?.rent[cat] ?? [];
+    return [];
   }, [trendsQuery.data, indexQuery.data, trendMetric, trendCat]);
-  const useReal = !!realTrend && realTrend.length > 0;
-  const realSlice = useReal ? realTrend!.slice(-months) : [];
-  const chartSeries = useReal ? realSlice.map((p) => p.value) : trendSeries;
-  const chartLabels = useReal ? realSlice.map((p) => ({ short: p.date.slice(0, 7) })) : labels;
 
+  const chartPoints = trendSource.slice(-months);
+  const chartSeries = chartPoints.map((p) => p.value);
+  const chartLabels = chartPoints.map((p) => ({ short: p.date.slice(0, 7) }));
   const trendMeta = MKT_METRICS[trendMetric];
-  const startV = chartSeries[0], endV = chartSeries[chartSeries.length - 1];
-  const changePct = startV ? ((endV - startV) / startV) * 100 : 0;
+  const startV = chartSeries[0];
+  const endV = chartSeries[chartSeries.length - 1];
+  const changePct = startV && endV != null ? ((endV - startV) / startV) * 100 : null;
+  const hasTrend = chartSeries.length >= 2;
 
-  const sortedDistricts = useMemo(
-    () => [...MKT_DISTRICTS].sort((a, b) => (sortDir === "asc" ? (a[sortKey] as number) - (b[sortKey] as number) : (b[sortKey] as number) - (a[sortKey] as number))),
-    [MKT_DISTRICTS, sortKey, sortDir]
-  );
+  // ── Rayon table ────────────────────────────────────────────────────
+  // Rows with no value for the sorted column go last in both directions —
+  // an empty cell is not "the smallest", it is unknown.
+  const sortedDistricts = useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...districts].sort((a, b) => {
+      const av = a[sortKey] as number | null;
+      const bv = b[sortKey] as number | null;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
+  }, [districts, sortKey, sortDir]);
   const toggleSort = (key: keyof Dist) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else { setSortKey(key); setSortDir("desc"); }
   };
 
   // #3g — rental yield per rayon from listings valuated in the last month.
-  const shortRayon = (n: string) => n.replace(" rayonu", "");
-  const yieldBars = useMemo(() => {
-    const real = rayonsQuery.data?.rayons.filter((r) => r.yield_pct != null) ?? [];
-    if (real.length > 0) {
-      return [...real].sort((a, b) => (b.yield_pct ?? 0) - (a.yield_pct ?? 0))
-        .map((r) => ({ label: shortRayon(r.rayon), value: r.yield_pct ?? 0 }));
-    }
-    return [...MKT_DISTRICTS].sort((a, b) => b.yield - a.yield).map((d) => ({ label: d.name, value: d.yield }));
-  }, [rayonsQuery.data, MKT_DISTRICTS]);
+  const yieldBars = useMemo(
+    () =>
+      [...(rayonsQuery.data?.rayons ?? [])]
+        .filter((r) => r.yield_pct != null)
+        .sort((a, b) => (b.yield_pct ?? 0) - (a.yield_pct ?? 0))
+        .map((r) => ({ label: shortRayon(r.rayon), value: r.yield_pct ?? 0 })),
+    [rayonsQuery.data]
+  );
 
-  // #3j — fastest / slowest growing rayons, ranked on real growth. Rayons with
-  // too few valuated listings are excluded so a 3-listing rayon can't top it.
+  // #3j — fastest / slowest growing rayons. Rayons with too few valuated
+  // listings are excluded so a 3-listing rayon can't top the ranking.
   const { rising, falling } = useMemo(() => {
     const min = rayonsQuery.data?.min_sample ?? 20;
-    const real = (rayonsQuery.data?.rayons ?? [])
+    const ranked = (rayonsQuery.data?.rayons ?? [])
       .filter((r) => r.growth_pct != null && (r.growth_count ?? 0) >= min)
       .sort((a, b) => (b.growth_pct ?? 0) - (a.growth_pct ?? 0))
       .map((r) => ({ name: shortRayon(r.rayon), growth: r.growth_pct ?? 0 }));
-    if (real.length > 0) return { rising: real.slice(0, 5), falling: real.slice(-5).reverse() };
-    const m = [...MKT_DISTRICTS].sort((a, b) => b.growth - a.growth);
-    return { rising: m.slice(0, 5), falling: m.slice(-5).reverse() };
-  }, [rayonsQuery.data, MKT_DISTRICTS]);
+    return { rising: ranked.slice(0, 5), falling: ranked.slice(-5).reverse() };
+  }, [rayonsQuery.data]);
 
-  // Real segments (source DB) filtered by the Kateqoriya dropdown; fall back to
-  // the modelled baseline while loading / on error. Liquidity ("liq") is not
-  // shown here yet — the team is providing that basis separately (#3h note).
-  const segSource = segQuery.data
-    ? (segQuery.data[segCat as keyof SegData] ?? segQuery.data.all).map((s) => ({ label: s.rooms, ppm: s.ppm, yieldV: s.yield_pct, rent: s.rent, share: s.share }))
-    : MKT_ROOM_SEGMENTS.map((s) => ({ label: s.rooms, ppm: s.ppm, yieldV: s.yield, rent: s.rent, share: s.share }));
-  const segValues = segSource.map((s) => ({
-    label: s.label,
-    value: segMetric === "ppm" ? s.ppm : segMetric === "yield" ? s.yieldV : s.rent,
+  // ── Room segments — real only ──────────────────────────────────────
+  const segRows = segQuery.data ? (segQuery.data[segCat as keyof SegData] ?? segQuery.data.all) : [];
+  const segValues = segRows.map((s) => ({
+    label: s.rooms,
+    value: segMetric === "ppm" ? s.ppm : segMetric === "yield" ? s.yield_pct : s.rent,
     share: s.share
   }));
   const segMax = Math.max(...segValues.map((s) => s.value), 1);
 
-  const distOptions = [{ value: "all", label: "Bütün Bakı" }, ...MKT_DISTRICTS.map((d) => ({ value: d.name, label: d.name }))];
+  // ── New vs old ─────────────────────────────────────────────────────
+  const withNew = districts.filter((d) => d.ppmNew != null);
+  const withOld = districts.filter((d) => d.ppmOld != null);
+  const avgNew = withNew.length ? withNew.reduce((s, d) => s + (d.ppmNew ?? 0), 0) / withNew.length : null;
+  const avgOld = withOld.length ? withOld.reduce((s, d) => s + (d.ppmOld ?? 0), 0) / withOld.length : null;
+  const newOldGap = avgNew && avgOld ? Math.round((avgNew / avgOld - 1) * 100) : null;
+
+  const loading = marketQuery.isLoading;
 
   return (
     <div className="hm-val">
@@ -454,7 +349,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
           <div>
             <div className="crumbs"><span>{T(`Bazar analizi`)}</span></div>
             <h1 className="page-title">{T(`Bazar analizi · Bakı`)}</h1>
-            <p className="page-sub">{T(`Şəhər üzrə əmlak bazarının canlı göstəriciləri — qiymət indeksi, kirayə gəlirliyi, likvidlik və əqd həcmi. Məlumat 12 rayon üzrə yenilənir.`)}</p>
+            <p className="page-sub">{T(`Şəhər üzrə əmlak bazarının göstəriciləri — qiymət indeksi, kirayə gəlirliyi və rayonlar üzrə müqayisə. Bütün rəqəmlər mənbə bazasından hesablanır; məlumat olmayan sahələr "—" göstərilir.`)}</p>
           </div>
           <div className="page-actions">
             <TimeRange value={range} onChange={setRange} />
@@ -472,27 +367,32 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
           <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ flex: 1, minWidth: 220 }}>
               <div className="card-title">{T(trendMeta.label)} dinamikası</div>
-              <div className="card-sub" style={{ marginTop: 4 }}>{trendDistrict === "all" ? "Bütün Bakı" : trendDistrict} üzrə son {months} ayın trendi.</div>
+              <div className="card-sub" style={{ marginTop: 4 }}>{T(`Bütün Bakı üzrə son`)} {months} {T(`ayın trendi.`)}</div>
             </div>
             <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
               <MktSelect label={T(`Kateqoriya`)} value={trendCat} onChange={setTrendCat} options={[{ value: "all", label: T(`Mənzillər`) }, { value: "new", label: T(`Yeni tikili`) }, { value: "old", label: T(`Köhnə tikili`) }]} minWidth={130} />
               <MktSelect label={T(`Metrika`)} value={trendMetric} onChange={setTrendMetric} options={MKT_METRIC_KEYS.map((k) => ({ value: k, label: T(MKT_METRICS[k].label) }))} />
-              <MktSelect label={T(`Rayon`)} value={trendDistrict} onChange={setTrendDistrict} options={distOptions} />
             </div>
           </div>
-          <div className="fl-row" style={{ gap: 22, margin: "14px 0 4px", flexWrap: "wrap" }}>
-            <TrendKpi k={T(`Hal-hazırkı`)} v={trendMeta.fmt(endV)} tone="orange" />
-            <TrendKpi k={`${months} ay əvvəl`} v={trendMeta.fmt(startV)} />
-            <TrendKpi k={T(`Dəyişiklik`)} v={`${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`} tone={changePct > 0 ? "green" : changePct < 0 ? "red" : "gray"} />
-          </div>
-          <MarketLineChart series={chartSeries} labels={chartLabels} metricKey={trendMetric} color={trendMetric === "liq" || trendMetric === "yield" ? "#2A6FDB" : "#D9531E"} />
+          {hasTrend ? (
+            <>
+              <div className="fl-row" style={{ gap: 22, margin: "14px 0 4px", flexWrap: "wrap" }}>
+                <TrendKpi k={T(`Hal-hazırkı`)} v={trendMeta.fmt(endV)} tone="orange" />
+                <TrendKpi k={`${chartSeries.length} ay əvvəl`} v={trendMeta.fmt(startV)} />
+                <TrendKpi k={T(`Dəyişiklik`)} v={changePct == null ? "—" : `${changePct > 0 ? "+" : ""}${changePct.toFixed(1)}%`} tone={changePct && changePct > 0 ? "green" : changePct && changePct < 0 ? "red" : "gray"} />
+              </div>
+              <MarketLineChart series={chartSeries} labels={chartLabels} metricKey={trendMetric} />
+            </>
+          ) : (
+            <NoData note={loading ? T(`Yüklənir…`) : T(`Bu metrika üçün mənbə bazasında aylıq məlumat yoxdur.`)} />
+          )}
         </div>
 
-        {/* District table */}
+        {/* Rayon table */}
         <div className="table-wrap" style={{ marginBottom: 16 }}>
           <div className="table-tools">
             <div className="card-title">{T(`Rayonlar üzrə müqayisə`)}</div>
-            <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>{MKT_DISTRICTS.length} rayon</span>
+            <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>{districts.length} rayon</span>
             <span className="sp" />
             <span className="muted" style={{ fontSize: 11.5 }}>{T(`Sütun başlığına klikləyib sıralayın`)}</span>
           </div>
@@ -510,7 +410,6 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                   <SortTh label={T(`Əqd/ay`)} k="txn" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
                   <SortTh label={T(`Təklif`)} k="supply" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
                   <SortTh label={T(`Artım (illik)`)} k="growth" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                  <th style={{ width: 90 }}>{T(`Trend`)}</th>
                 </tr>
               </thead>
               <tbody>
@@ -524,72 +423,64 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                     </td>
                     <td className="num cell-strong">{fmtMoney(d.ppmNew, "")}</td>
                     <td className="num">{fmtMoney(d.ppmOld, "")}</td>
-                    <td className="num"><span style={{ color: d.yield >= MKT_CITY.yield ? "var(--green)" : "var(--text-1)", fontWeight: 600 }}>{d.yield.toFixed(1)}%</span></td>
+                    <td className="num">
+                      {d.yield == null ? "—" : (
+                        <span style={{ color: city.yield != null && d.yield >= city.yield ? "var(--green)" : "var(--text-1)", fontWeight: 600 }}>{d.yield.toFixed(1)}%</span>
+                      )}
+                    </td>
                     <td className="num">{fmtMoney(d.rent)}</td>
-                    <td className="num">{d.liq} gün</td>
+                    <td className="num">{d.liq == null ? "—" : `${d.liq} gün`}</td>
                     <td className="num">{fmtNumber(d.txn)}</td>
                     <td className="num">{fmtNumber(d.supply)}</td>
-                    <td className="num"><span style={{ color: "var(--green)", fontWeight: 700 }}>↑ {d.growth.toFixed(1)}%</span></td>
-                    <td>
-                      {/* Synthesised from the current value, not measured. */}
-                      {modelled ? (
-                        <div style={{ width: 80 }}><MiniBar data={mktSeries(d.ppmNew, 12, "spark" + d.name, 0.1, 0.012).map(Math.round)} /></div>
-                      ) : (
-                        <span className="muted">—</span>
+                    <td className="num">
+                      {d.growth == null ? "—" : (
+                        <span style={{ color: d.growth >= 0 ? "var(--green)" : "var(--red)", fontWeight: 700 }}>
+                          {d.growth >= 0 ? "↑" : "↓"} {Math.abs(d.growth).toFixed(1)}%
+                        </span>
                       )}
                     </td>
                   </tr>
                 ))}
+                {sortedDistricts.length === 0 && (
+                  <tr><td colSpan={10}><NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} /></td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Sales-days by price bucket × category */}
+        {/* Days on market — no source yet (tracker S1) */}
         <div className="card card-pad" style={{ marginBottom: 16 }}>
-          <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
-            <div style={{ flex: 1, minWidth: 240 }}>
-              <div className="card-title">{T(`Qiymət aralığı və kateqoriyaya görə satış günlərinin ortalaması`)}</div>
-              <div className="card-sub" style={{ marginTop: 4 }}>
-                Hər qiymət seqmentində mənzilin satılması üçün orta gün sayı. Açıq rəng — <strong>+{salesBuffer} gün</strong> ssenari fərziyyəsi (bəd-bin şərait / az likvid bazar).
-              </div>
-            </div>
-            <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
-              <MktSelect label={T(`Kateqoriya`)} value={salesCat} onChange={setSalesCat} options={[{ value: "all", label: "Hamısı" }, { value: "new", label: "Yeni tikili" }, { value: "old", label: "Köhnə tikili" }]} minWidth={140} />
-              <MktSelect label={T(`Rayon`)} value={salesRegion} onChange={setSalesRegion} options={distOptions} />
-              <MktSelect label={T(`Mərkəz`)} value={salesAgg} onChange={setSalesAgg} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} minWidth={130} />
-            </div>
-          </div>
-          {/* SALES_DAYS is a fixed table in this file — there is no
-              days-on-market data in the source DB, so nothing here was ever
-              measured. Shown only while modelled data is enabled. */}
-          {modelled ? (
-            <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} districts={MKT_DISTRICTS} cityLiq={MKT_CITY.liquidity} />
-          ) : (
-            <div className="card-body" style={{ padding: "28px 20px", textAlign: "center", color: "var(--text-3)" }}>
-              {T(`Bu göstərici üçün hələ məlumat yoxdur.`)}
-            </div>
-          )}
+          <div className="card-title">{T(`Qiymət aralığına görə satış günləri`)}</div>
+          <NoData note={T(`Mənbə bazasında elanın neçə günə satıldığı saxlanılmır — bu göstərici üçün hələ məlumat yoxdur.`)} />
         </div>
 
         {/* Yield + movers */}
         <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 16, marginBottom: 16 }}>
           <div className="card card-pad">
             <div className="card-title">{T(`Rayonlar üzrə kirayə gəlirliyi`)}</div>
-            <div className="card-sub" style={{ margin: "4px 0 16px" }}>{T(`Əlçatan rayonlarda gəlirlilik daha yüksək, premium rayonlarda daha aşağıdır.`)}</div>
-            <HBars items={yieldBars} max={10} color="#2A8B7E" valueFmt={(v) => v.toFixed(1) + "%"} />
+            <div className="card-sub" style={{ margin: "4px 0 16px" }}>{T(`Son ayda qiymətləndirilmiş elanlar üzrə brüt kirayə gəlirliyi.`)}</div>
+            {yieldBars.length > 0
+              ? <HBars items={yieldBars} max={10} color="#2A8B7E" valueFmt={(v) => v.toFixed(1) + "%"} />
+              : <NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} />}
           </div>
           <div className="card card-pad">
             <div className="card-title">{T(`Ən sürətli artan rayonlar`)}</div>
             <div className="card-sub" style={{ margin: "4px 0 14px" }}>{T(`İllik qiymət artımı üzrə.`)}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {rising.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="up" />)}
-            </div>
-            <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-            <div className="card-sub" style={{ marginBottom: 10 }}>{T(`Ən yavaş artan rayonlar`)}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {falling.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="slow" />)}
-            </div>
+            {rising.length > 0 ? (
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {rising.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="up" />)}
+                </div>
+                <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
+                <div className="card-sub" style={{ marginBottom: 10 }}>{T(`Ən yavaş artan rayonlar`)}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {falling.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="slow" />)}
+                </div>
+              </>
+            ) : (
+              <NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} />
+            )}
           </div>
         </div>
 
@@ -606,38 +497,46 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                 <MktSelect value={segMetric} onChange={setSegMetric} options={[{ value: "ppm", label: "Qiymət ₼/m²" }, { value: "yield", label: "Gəlirlilik" }, { value: "rent", label: "Kirayə ₼" }]} minWidth={140} />
               </div>
             </div>
-            <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
-              {segValues.map((s, i) => (
-                <div key={i} className="fl-row" style={{ marginBottom: 5 }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, width: 78 }}>{s.label}</span>
-                  <div style={{ flex: 1, height: 22, background: "var(--bg-subtle)", borderRadius: 6, overflow: "hidden", position: "relative" }}>
-                    <div style={{ width: `${(s.value / segMax) * 100}%`, height: "100%", background: "linear-gradient(90deg, var(--orange) 0%, var(--orange-soft) 100%)", borderRadius: 6 }} />
+            {segValues.length > 0 ? (
+              <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 14 }}>
+                {segValues.map((s, i) => (
+                  <div key={i} className="fl-row" style={{ marginBottom: 5 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, width: 78 }}>{s.label}</span>
+                    <div style={{ flex: 1, height: 22, background: "var(--bg-subtle)", borderRadius: 6, overflow: "hidden", position: "relative" }}>
+                      <div style={{ width: `${(s.value / segMax) * 100}%`, height: "100%", background: "linear-gradient(90deg, var(--orange) 0%, var(--orange-soft) 100%)", borderRadius: 6 }} />
+                    </div>
+                    <span style={{ width: 96, textAlign: "right", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                      {segMetric === "ppm" ? fmtMoney(s.value, " ₼") : segMetric === "yield" ? s.value.toFixed(1) + "%" : fmtMoney(s.value)}
+                    </span>
+                    <span style={{ width: 56, textAlign: "right", fontSize: 11.5, color: "var(--text-3)" }}>{s.share}% pay</span>
                   </div>
-                  <span style={{ width: 96, textAlign: "right", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
-                    {segMetric === "ppm" ? fmtMoney(s.value, " ₼") : segMetric === "yield" ? s.value.toFixed(1) + "%" : segMetric === "rent" ? fmtMoney(s.value) : s.value + " gün"}
-                  </span>
-                  <span style={{ width: 56, textAlign: "right", fontSize: 11.5, color: "var(--text-3)" }}>{s.share}% pay</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} />
+            )}
           </div>
 
           <div className="card card-pad">
             <div className="card-title">{T(`Yeni vs köhnə tikili`)}</div>
             <div className="card-sub" style={{ margin: "4px 0 16px" }}>{T(`Şəhər üzrə təklif strukturu.`)}</div>
-            <div className="fl-row" style={{ gap: 18, alignItems: "center" }}>
-              <DonutChart value={MKT_CITY.newShare} label={T(`Yeni tikili`)} size={104} color="#2A8B7E" />
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                <SplitRow color="#2A8B7E" label={T(`Yeni tikili`)} ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmNew, 0) / MKT_DISTRICTS.length} share={MKT_CITY.newShare} />
-                <SplitRow color="#0F1E3D" label={T(`Köhnə tikili`)} ppm={MKT_DISTRICTS.reduce((s, d) => s + d.ppmOld, 0) / MKT_DISTRICTS.length} share={100 - MKT_CITY.newShare} />
-                <div style={{ height: 1, background: "var(--border)" }} />
-                <div className="fl-row" style={{ fontSize: 12.5 }}>
-                  <span className="muted">{T(`Yeni/köhnə qiymət fərqi`)}</span>
-                  <span className="sp" />
-                  <strong style={{ color: "var(--orange)" }}>+38%</strong>
+            {city.newShare != null ? (
+              <div className="fl-row" style={{ gap: 18, alignItems: "center" }}>
+                <DonutChart value={city.newShare} label={T(`Yeni tikili`)} size={104} color="#2A8B7E" />
+                <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <SplitRow color="#2A8B7E" label={T(`Yeni tikili`)} ppm={avgNew} share={city.newShare} />
+                  <SplitRow color="#0F1E3D" label={T(`Köhnə tikili`)} ppm={avgOld} share={100 - city.newShare} />
+                  <div style={{ height: 1, background: "var(--border)" }} />
+                  <div className="fl-row" style={{ fontSize: 12.5 }}>
+                    <span className="muted">{T(`Yeni/köhnə qiymət fərqi`)}</span>
+                    <span className="sp" />
+                    <strong style={{ color: "var(--orange)" }}>{newOldGap == null ? "—" : `${newOldGap > 0 ? "+" : ""}${newOldGap}%`}</strong>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} />
+            )}
           </div>
         </div>
       </div>
@@ -665,25 +564,26 @@ function TrendKpi({ k, v, tone = "gray" }: { k: string; v: string; tone?: string
 }
 
 function MoverRow({ rank, name, value, dir }: { rank: number; name: string; value: number; dir: "up" | "slow" }) {
+  const up = value >= 0;
   return (
     <div className="fl-row" style={{ gap: 10 }}>
       <span style={{ width: 18, fontWeight: 700, fontSize: 12, color: "var(--text-3)", fontVariantNumeric: "tabular-nums" }}>{rank}</span>
       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{name}</span>
       <div style={{ width: 90, height: 6, background: "var(--bg-subtle)", borderRadius: 99, overflow: "hidden" }}>
-        <div style={{ width: `${(value / 13) * 100}%`, height: "100%", background: dir === "up" ? "var(--green)" : "var(--amber)", borderRadius: 99 }} />
+        <div style={{ width: `${Math.min(100, Math.abs(value) / 13 * 100)}%`, height: "100%", background: dir === "up" ? "var(--green)" : "var(--amber)", borderRadius: 99 }} />
       </div>
-      <span style={{ width: 52, textAlign: "right", fontWeight: 700, fontSize: 13, color: dir === "up" ? "var(--green)" : "var(--amber)", fontVariantNumeric: "tabular-nums" }}>↑{value.toFixed(1)}%</span>
+      <span style={{ width: 52, textAlign: "right", fontWeight: 700, fontSize: 13, color: dir === "up" ? "var(--green)" : "var(--amber)", fontVariantNumeric: "tabular-nums" }}>{up ? "↑" : "↓"}{Math.abs(value).toFixed(1)}%</span>
     </div>
   );
 }
 
-function SplitRow({ color, label, ppm, share }: { color: string; label: string; ppm: number; share: number }) {
+function SplitRow({ color, label, ppm, share }: { color: string; label: string; ppm: number | null; share: number }) {
   return (
     <div className="fl-row" style={{ gap: 8 }}>
       <span style={{ width: 10, height: 10, borderRadius: 3, background: color, flexShrink: 0 }} />
       <span style={{ fontSize: 13 }}>{label}</span>
       <span className="sp" />
-      <span style={{ fontSize: 12, color: "var(--text-3)", marginRight: 8 }}>{fmtMoney(Math.round(ppm), " ₼/m²")}</span>
+      <span style={{ fontSize: 12, color: "var(--text-3)", marginRight: 8 }}>{fmtMoney(ppm, " ₼/m²")}</span>
       <strong style={{ fontVariantNumeric: "tabular-nums", fontSize: 13 }}>{share}%</strong>
     </div>
   );
@@ -743,128 +643,6 @@ function MarketLineChart({ series, labels, metricKey, color = "#D9531E", height 
           ) : null
         )}
       </svg>
-    </div>
-  );
-}
-
-function SalesDaysChart({ category, region, buffer, agg, districts, cityLiq, height = 420 }: { category: string; region: string; buffer: number; agg: string; districts: Dist[]; cityLiq: number; height?: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(1120);
-  useEffect(() => {
-    if (!ref.current) return;
-    const ro = new ResizeObserver((es) => { for (const e of es) setWidth(Math.max(520, Math.round(e.contentRect.width))); });
-    ro.observe(ref.current);
-    return () => ro.disconnect();
-  }, []);
-
-  const rd = districts.find((x) => x.name === region);
-  const factor = region === "all" || !rd ? 1 : rd.liq / (cityLiq || 1);
-  const data = SALES_DAYS.map((b) => ({
-    bucket: b.bucket,
-    old: Math.round((agg === "median" ? b.oldMed : b.old) * factor),
-    new: Math.round((agg === "median" ? b.newMed : b.new) * factor)
-  }));
-
-  const showOld = category === "all" || category === "old";
-  const showNew = category === "all" || category === "new";
-  const barsPerGroup = (showOld ? 1 : 0) + (showNew ? 1 : 0);
-
-  const padL = 56, padR = 20, padT = 36, padB = 64;
-  const innerW = width - padL - padR, innerH = height - padT - padB;
-  const maxVal = Math.max(...data.flatMap((d) => [(showOld ? d.old : 0) + buffer, (showNew ? d.new : 0) + buffer]));
-  const yMax = Math.ceil((maxVal * 1.08) / 50) * 50;
-  const sy = (v: number) => padT + innerH - (v / yMax) * innerH;
-  const groupW = innerW / data.length;
-  const barW = Math.min(64, (groupW * 0.62) / Math.max(1, barsPerGroup));
-  const gap = barsPerGroup > 1 ? 10 : 0;
-
-  const COL = { oldBase: "#2A6FDB", oldBuf: "#A9C7F0", newBase: "#D9531E", newBuf: "#F4C6AC" };
-
-  const renderBar = (cx: number, base: number, bufCol: string, baseCol: string, label: string) => {
-    const total = base + buffer;
-    return (
-      <g>
-        <rect x={cx - barW / 2} y={sy(base)} width={barW} height={sy(0) - sy(base)} rx="3" fill={baseCol}>
-          <title>{`${label}\nBaza: ${base} gün${buffer ? `\n+${buffer} gün ssenari = ${total} gün` : ""}`}</title>
-        </rect>
-        <text x={cx} y={(sy(0) + sy(base)) / 2 + 4} textAnchor="middle" fontSize="11.5" fontWeight="700" fill="white" fontFamily="Manrope">{base}</text>
-        {buffer > 0 && (
-          <>
-            <rect x={cx - barW / 2} y={sy(total)} width={barW} height={sy(base) - sy(total)} rx="3" fill={bufCol}>
-              <title>{`+${buffer} gün ssenari fərziyyəsi`}</title>
-            </rect>
-            <text x={cx} y={(sy(base) + sy(total)) / 2 + 4} textAnchor="middle" fontSize="10.5" fontWeight="600" fill="var(--navy-900)" fontFamily="Manrope">{buffer}</text>
-          </>
-        )}
-        <text x={cx} y={sy(total) - 8} textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--text-1)" fontFamily="Manrope">{total}</text>
-      </g>
-    );
-  };
-
-  return (
-    <div ref={ref} style={{ width: "100%", marginTop: 14 }}>
-      <div className="fl-row" style={{ gap: 16, flexWrap: "wrap", marginBottom: 10 }}>
-        {showOld && (
-          <>
-            <LegendSwatch color={COL.oldBase} label={T(`Köhnə tikili`)} />
-            {buffer > 0 && <LegendSwatch color={COL.oldBuf} label={`Köhnə tikili +${buffer} gün`} />}
-          </>
-        )}
-        {showNew && (
-          <>
-            <LegendSwatch color={COL.newBase} label={T(`Yeni tikili`)} />
-            {buffer > 0 && <LegendSwatch color={COL.newBuf} label={`Yeni tikili +${buffer} gün`} />}
-          </>
-        )}
-        <span className="sp" />
-        <span className="muted" style={{ fontSize: 12 }}>{region === "all" ? "Bütün Bakı" : region} · vahid: gün</span>
-      </div>
-
-      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} style={{ display: "block" }}>
-        {Array.from({ length: 6 }, (_, i) => {
-          const v = (i / 5) * yMax;
-          return (
-            <g key={i}>
-              <line x1={padL} y1={sy(v)} x2={width - padR} y2={sy(v)} stroke="var(--border)" strokeDasharray="3 3" />
-              <text x={padL - 10} y={sy(v) + 4} textAnchor="end" fontSize="11" fill="var(--text-3)" fontFamily="Manrope">{Math.round(v)}</text>
-            </g>
-          );
-        })}
-        <text x={16} y={padT + innerH / 2} transform={`rotate(-90 16 ${padT + innerH / 2})`} textAnchor="middle" fontSize="11.5" fill="var(--text-2)" fontFamily="Manrope" fontWeight="600">
-          Orta satış günləri
-        </text>
-        {data.map((d, i) => {
-          const gx = padL + i * groupW + groupW / 2;
-          const cols: { side: number; base: number; baseCol: string; bufCol: string; label: string }[] = [];
-          if (showOld && showNew) {
-            cols.push({ side: -1, base: d.old, baseCol: COL.oldBase, bufCol: COL.oldBuf, label: `${d.bucket} · Köhnə tikili` });
-            cols.push({ side: 1, base: d.new, baseCol: COL.newBase, bufCol: COL.newBuf, label: `${d.bucket} · Yeni tikili` });
-          } else if (showOld) {
-            cols.push({ side: 0, base: d.old, baseCol: COL.oldBase, bufCol: COL.oldBuf, label: `${d.bucket} · Köhnə tikili` });
-          } else {
-            cols.push({ side: 0, base: d.new, baseCol: COL.newBase, bufCol: COL.newBuf, label: `${d.bucket} · Yeni tikili` });
-          }
-          return (
-            <g key={i}>
-              {cols.map((c, j) => {
-                const cx = barsPerGroup > 1 ? gx + c.side * (barW / 2 + gap / 2) : gx;
-                return <g key={j}>{renderBar(cx, c.base, c.bufCol, c.baseCol, c.label)}</g>;
-              })}
-              <text x={gx} y={height - 30} textAnchor="middle" fontSize="12" fontWeight="600" fill="var(--text-1)" fontFamily="Manrope">{d.bucket}</text>
-            </g>
-          );
-        })}
-        <text x={padL + innerW / 2} y={height - 8} textAnchor="middle" fontSize="11.5" fill="var(--text-2)" fontFamily="Manrope" fontWeight="600">{T(`Qiymət aralığı (₼)`)}</text>
-      </svg>
-    </div>
-  );
-}
-
-function LegendSwatch({ color, label }: { color: string; label: string }) {
-  return (
-    <div className="fl-row" style={{ gap: 6 }}>
-      <span style={{ width: 14, height: 14, borderRadius: 3, background: color }} />
-      <span style={{ color: "var(--text-2)", fontSize: 12 }}>{label}</span>
     </div>
   );
 }

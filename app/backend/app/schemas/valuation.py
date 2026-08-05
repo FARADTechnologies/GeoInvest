@@ -1,81 +1,10 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
-class ValuationRequest(BaseModel):
-    """Parameters for a single property valuation.
-
-    Mirrors the B2C "Parametrlə qiymətləndir" form. Only `type` and `area`
-    are strictly required to produce a value; the rest refine the estimate
-    or are carried through for display.
-    """
-
-    address: str | None = None
-    rayon: str | None = None
-    type: str = Field(description="Property type, e.g. 'Yeni tikili' / 'Köhnə tikili'.")
-    area: float = Field(gt=0, description="Area in square meters.")
-    rooms: int | None = None
-    floor: int | None = None
-    total_floors: int | None = None
-    repair: str | None = None
-    extract: str | None = None
-    residence: str | None = None
-    # Coordinates from the Google address picker (filled later); carried
-    # through to the predict server when integrated.
-    latitude: float | None = None
-    longitude: float | None = None
-    valuation_date: str | None = None
-
-
-class BatchValuationRequest(BaseModel):
-    items: list[ValuationRequest]
-
-
-class ValuationResult(BaseModel):
-    """Computed valuation for one property.
-
-    `fair_value` and `price_per_m2` are anchored to real market medians
-    (per rayon + category + period) pulled from the same precomputed tables
-    that drive the map. Rent / yield / liquidity / score are modelled
-    estimates derived from those anchors (the source DB carries no rent data).
-    """
-
-    # Inputs echoed back (so the row is self-contained)
-    address: str | None = None
-    rayon: str
-    type: str
-    area: float
-    rooms: int | None = None
-    floor: int | None = None
-    total_floors: int | None = None
-    repair: str | None = None
-    extract: str | None = None
-    residence: str | None = None
-
-    # DB-anchored value
-    fair_value: float
-    price_per_m2: float
-    price_range: list[float]
-    market_median_kvm: float | None = None
-
-    # Modelled estimates
-    monthly_rent: float
-    rent_range: list[float]
-    yield_pct: float
-    payback_years: float
-    liquidity_days: int
-    score: int
-    risk: str
-
-    # Transparency about how the price was sourced
-    period: str | None = None
-    price_basis: str = Field(
-        description="Where price_per_m2 came from: 'rayon' | 'market' | 'fallback'."
-    )
-
-
-class BatchValuationResponse(BaseModel):
-    results: list[ValuationResult]
-    period: str | None = None
+# ValuationRequest / ValuationResult / the two Batch* wrappers used to live
+# here, describing the local valuation engine's contract. That engine invented
+# rent, yield, payback, liquidity and score, so it and its endpoints are gone;
+# the predict model's own contract (schemas/predict.py) is the only one left.
 
 
 class RayonPrice(BaseModel):
