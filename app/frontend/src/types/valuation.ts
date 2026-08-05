@@ -106,6 +106,9 @@ export type EstimateBounds = {
   lower_bound: number;
   point_estimate: number;
   upper_bound: number;
+  // Average asking price within a 500 m radius, when the model has enough
+  // neighbouring listings to compute one. Absent → the report shows a gap.
+  neighbourhood_price_500m?: number | null;
 };
 
 export type TrendPoint = {
@@ -133,6 +136,10 @@ export type AiData = {
   rent_estimate: AiEstimate;
   investment_metrics: InvestmentMetrics;
   as_of_date?: string | null;
+  // Year-over-year price growth for Baku as a whole and for this property's
+  // rayon. Both come from the predict server; both may be absent.
+  city_value?: number | null;
+  district_value?: number | null;
 };
 
 // Accessibility / nearby-object context (team #9 — empty until the POI API).

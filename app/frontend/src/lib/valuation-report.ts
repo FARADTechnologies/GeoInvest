@@ -92,6 +92,8 @@ type PredictResponse = {
   as_of_date?: string | null;
   accessibility_data?: RateReportData["accessibility_data"];
   rayon?: string | null;
+  city_value?: number | null;
+  district_value?: number | null;
 };
 
 export function reportFromPredict(resp: PredictResponse, input: ValuationInput): RateReportData {
@@ -100,7 +102,9 @@ export function reportFromPredict(resp: PredictResponse, input: ValuationInput):
       sale_estimate: resp.sale_estimate,
       rent_estimate: resp.rent_estimate,
       investment_metrics: resp.investment_metrics,
-      as_of_date: resp.as_of_date ?? null
+      as_of_date: resp.as_of_date ?? null,
+      city_value: resp.city_value ?? null,
+      district_value: resp.district_value ?? null
     },
     accessibility_data: resp.accessibility_data ?? {},
     latitude: input.latitude ?? null,

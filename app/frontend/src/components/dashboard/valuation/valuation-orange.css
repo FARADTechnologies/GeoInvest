@@ -387,6 +387,7 @@
   letter-spacing: -0.02em;
   margin-top: 10px;
   font-variant-numeric: tabular-nums; }
+.hm-val .big-tile .big .big-sub { font-size: 17px; font-weight: 600; color: var(--text-2); letter-spacing: 0; }
 .hm-val .big-tile .rng-label { font-weight: 600; font-size: 13px; color: var(--text-1); margin-top: 14px; }
 .hm-val .big-tile .rng { color: var(--text-2); font-size: 13px; margin-top: 4px; font-variant-numeric: tabular-nums; }
 .hm-val .bench-row { display: grid;

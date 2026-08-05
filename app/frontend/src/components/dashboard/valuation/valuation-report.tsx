@@ -26,6 +26,16 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
   const saleTrend = ai_data.sale_estimate.price_trend ?? [];
   const rentTrend = ai_data.rent_estimate.price_trend ?? [];
 
+  // Price appreciation across the model's own stored trend window. Null when
+  // the model returned no history — never substituted with a typical figure.
+  const apartmentGrowth = (() => {
+    if (saleTrend.length < 2) return null;
+    const first = saleTrend[0]?.point_estimate;
+    const last = saleTrend[saleTrend.length - 1]?.point_estimate;
+    if (!first || !last) return null;
+    return +(((last - first) / first) * 100).toFixed(1);
+  })();
+
   // §9/§12 nearby objects — loaded when coordinates are present (both flows).
   const [nearby, setNearby] = useState<NearbyCategory[]>([]);
   const lat = data.latitude;
@@ -115,7 +125,12 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
           <div className="big-tiles print-avoid-break" style={{ marginBottom: 18 }}>
             <div className="big-tile">
               <div className="label">{T("Satış qiyməti")} <Icons.Info className="info" /></div>
-              <div className="big">{fmtMoney(sale.point_estimate)}</div>
+              <div className="big">
+                {fmtMoney(sale.point_estimate)}
+                {inv.price_per_sqm != null && (
+                  <span className="big-sub"> ({fmtMoney(inv.price_per_sqm, " ₼/kv.m")})</span>
+                )}
+              </div>
               <div className="rng-label">{T("Qiymət aralığı")}:</div>
               <div className="rng">{fmtMoney(sale.lower_bound)} – {fmtMoney(sale.upper_bound)}</div>
               <div className="rng" style={{ marginTop: 6, fontSize: 12 }}>{T("Mənzilin süni intellekt modeli ilə dəyərləndirilmiş satış qiyməti")}</div>
@@ -133,10 +148,13 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
           <div className="print-avoid-break" style={{ marginBottom: 18 }}>
             <div className="chart-title" style={{ marginBottom: 8 }}>{T("Sərmayə dəyərləndirməsi")}</div>
             <div className="info-grid">
-              <InfoCell k={T("İllik kirayə gəliri")}>{fmtMoney(inv.annual_rent)}</InfoCell>
+              <InfoCell k={T("500m radiusda orta qiymət")}>{fmtMoney(sale.neighbourhood_price_500m)}</InfoCell>
               <InfoCell k={T("Kirayə gəlirliliyi")}>{pct(inv.rent_yield_percent)}</InfoCell>
-              <InfoCell k={T("Geri ödəmə müddəti")}>{inv.payback_period_years != null ? `${inv.payback_period_years} ${T("il")}` : "—"}</InfoCell>
-              <InfoCell k={T("1 m² qiyməti")}>{fmtMoney(inv.price_per_sqm, " ₼")}</InfoCell>
+              <InfoCell k={T("Kirayə ilə geri ödəmə")}>{inv.payback_period_years != null ? `${inv.payback_period_years} ${T("il")}` : "—"}</InfoCell>
+              <InfoCell k={T("Mənzilin qiymət artımı")}>{pct(apartmentGrowth)}</InfoCell>
+              <InfoCell k={T("Bakı üzrə qiymət artımı")}>{pct(ai_data.city_value)}</InfoCell>
+              <InfoCell k={T("Rayon üzrə qiymət artımı")}>{pct(ai_data.district_value)}</InfoCell>
+              <InfoCell k={T("İllik kirayə gəliri")}>{fmtMoney(inv.annual_rent)}</InfoCell>
             </div>
           </div>
 
