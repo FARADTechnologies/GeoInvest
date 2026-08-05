@@ -21,6 +21,8 @@ type Props = {
   t: Record<string, string>;
   activeView: DashboardView;
   onViewChange: (view: DashboardView) => void;
+  /** Real listing count for the Elanlar badge; hidden until it loads. */
+  listingCount?: number;
 };
 
 export type DashboardView =
@@ -49,7 +51,14 @@ type NavItem = {
   pill?: string;
 };
 
-export function NavSidebar({ t, activeView, onViewChange }: Props) {
+/** 168575 → "168.6k" — keeps the badge narrow without inventing a number. */
+function compactCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+export function NavSidebar({ t, activeView, onViewChange, listingCount }: Props) {
   // Single navigation group. Legacy "Homora V1" views (overview / map /
   // rayons / trends / b2c / reports / secondary system) stay hidden from the
   // menu per team request — their code stays in the shell.
@@ -63,7 +72,13 @@ export function NavSidebar({ t, activeView, onViewChange }: Props) {
     { id: "valuation-analysis", icon: PieChart, label: t.navValAnalysis ?? "Portfel analizi" },
     { id: "valuation-market", icon: BarChart3, label: t.navValMarket ?? "Bazar analizi" },
     { id: "valuation-hexmap", icon: Globe, label: t.navValHexMap ?? "Xəritə analizi" },
-    { id: "listings", icon: Mail, label: t.navListings, pill: "12.8k" },
+    {
+      id: "listings",
+      icon: Mail,
+      label: t.navListings,
+      // Was hardcoded "12.8k" while the view itself showed 168k.
+      pill: listingCount ? compactCount(listingCount) : undefined
+    },
     ...(isSuperAdmin
       ? [{ id: "admin" as const, icon: Shield, label: t.navAdmin ?? "Admin / Şirkətlər" }]
       : [])

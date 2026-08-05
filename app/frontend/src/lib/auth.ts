@@ -14,6 +14,17 @@ export class AuthError extends Error {
   }
 }
 
+/** A dead session must send the user to login, not surface a raw error.
+ *  Sessions used to vanish on every deploy; tokens are signed now, but an
+ *  expired or revoked one still has to land somewhere sensible. */
+function handleAuthFailure(status: number): void {
+  if (status !== 401 || typeof window === "undefined") return;
+  signOut();
+  if (!window.location.pathname.startsWith("/login")) {
+    window.location.replace("/login?next=" + encodeURIComponent(window.location.pathname));
+  }
+}
+
 async function detail(res: Response): Promise<string> {
   try {
     return ((await res.json()) as { detail?: string }).detail ?? "";
@@ -110,7 +121,7 @@ export async function fetchPendingAccounts(): Promise<PendingAccount[]> {
   const res = await fetch(apiUrl(`/auth/pending`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
-  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");
+  if (!res.ok) { handleAuthFailure(res.status); throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı"); }
   return ((await res.json()) as { items: PendingAccount[] }).items ?? [];
 }
 
@@ -124,7 +135,7 @@ export async function setAccountStatus(
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify({ email, status })
   });
-  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
+  if (!res.ok) { handleAuthFailure(res.status); throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı"); }
 }
 
 // ── Server-side batch valuation jobs ──────────────────────────────────
@@ -154,7 +165,7 @@ export async function fetchValuationJob(jobId: string): Promise<ValuationJob> {
   const res = await fetch(apiUrl(`/valuation/jobs/${jobId}`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
-  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Tapılmadı");
+  if (!res.ok) { handleAuthFailure(res.status); throw new AuthError(res.status, (await detail(res)) || "Tapılmadı"); }
   return (await res.json()) as ValuationJob;
 }
 
@@ -173,7 +184,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı");
+  if (!res.ok) { handleAuthFailure(res.status); throw new AuthError(res.status, (await detail(res)) || "Əməliyyat alınmadı"); }
   return (await res.json()) as T;
 }
 
@@ -182,7 +193,7 @@ export async function fetchUsers(): Promise<DirectoryUser[]> {
   const res = await fetch(apiUrl(`/auth/users`), {
     headers: { Accept: "application/json", ...authHeaders() }
   });
-  if (!res.ok) throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı");
+  if (!res.ok) { handleAuthFailure(res.status); throw new AuthError(res.status, (await detail(res)) || "Siyahı alınmadı"); }
   return ((await res.json()) as { items: DirectoryUser[] }).items ?? [];
 }
 

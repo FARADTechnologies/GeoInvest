@@ -165,7 +165,12 @@ export async function fetchListingsDB(): Promise<ListingsResult> {
       price: r.price,
       cat: (r.cat === "Köhnə tikili" ? "Köhnə tikili" : "Yeni tikili") as Listing["cat"],
       source: r.source,
-      status: "active" as const,
+      // The source DB has no field telling us whether a listing is still live,
+      // sold or paused — every row used to be stamped "active", so the Status
+      // column and its filter were decoration. Left unset until the team
+      // confirms which column carries it.
+      status: undefined,
+      address: r.address ?? undefined,
       date: r.date,
       floor: r.floor,
       sourceUrl: r.source_url ?? undefined

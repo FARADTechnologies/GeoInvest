@@ -108,9 +108,13 @@ export type Listing = {
   price: number;       // total AZN
   cat: "Yeni tikili" | "Köhnə tikili";
   source: string;
-  status: "active" | "paused" | "sold";
+  // Optional: the source DB carries no live/sold/paused flag, so DB-fed rows
+  // leave this unset. Mock rows still set it.
+  status?: "active" | "paused" | "sold";
   date: string;        // YYYY-MM-DD
   floor: number;
+  /** Street address when the API supplies one — also searched. */
+  address?: string;
   // Real source_url (DB-fed Elanlar); clicking the row opens the stored
   // prediction via the link flow. Absent for mock rows.
   sourceUrl?: string;

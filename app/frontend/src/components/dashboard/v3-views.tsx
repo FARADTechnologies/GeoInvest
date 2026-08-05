@@ -7,6 +7,7 @@
 // NOT touched — they keep their existing implementation in dashboard-shell.
 
 import { ArrowRight, Heart, MapPin, Search, Sparkles, TrendingUp, X } from "lucide-react";
+import { matchesQuery } from "@/lib/search";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import type { B2CSummary, Listing, RayonStat } from "@/types/api";
@@ -238,7 +239,7 @@ export function RayonsViewV3({
   }, [listings, rayons]);
 
   const rows = rayons
-    .filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))
+    .filter((r) => matchesQuery(q, [r.name]))
     .slice()
     .sort((a, b) =>
       sort === "median" ? b.median - a.median : sort === "listings" ? b.listings - a.listings : b.trend - a.trend
@@ -387,8 +388,8 @@ export function ListingsViewV3({
     (l) =>
       (rayon === "all" || l.rayonId === rayon) &&
       (cat === "all" || l.cat === cat) &&
-      (status === "all" || l.status === status) &&
-      (q === "" || (l.title + l.id + l.rayon).toLowerCase().includes(q.toLowerCase()))
+      (status === "all" || (l.status ?? "") === status) &&
+      matchesQuery(q, [l.title, l.id, l.rayon, l.address])
   );
   const rows = filtered.slice().sort((a, b) => {
     const av = a[sortK];
@@ -417,7 +418,7 @@ export function ListingsViewV3({
     }
   };
   const sIcon = (k: SortKey) => (sortK === k ? (sortDir === -1 ? " ↓" : " ↑") : "");
-  const statusBadge: Record<Listing["status"], [string, string]> = {
+  const statusBadge: Record<NonNullable<Listing["status"]>, [string, string]> = {
     active: ["ok", t.statusActive ?? "Aktiv"],
     paused: ["warn", t.statusPaused ?? "Duraklatıldı"],
     sold: ["muted", t.statusSold ?? "Satıldı"]
@@ -484,7 +485,13 @@ export function ListingsViewV3({
                   <td><span className={"hm-cat " + (l.cat === "Yeni tikili" ? "new" : "old")}>{l.cat}</span></td>
                   <td className="num muted">{l.date.slice(5)}</td>
                   <td className="muted">{l.source}</td>
-                  <td><Badge tone={statusBadge[l.status][0]}>{statusBadge[l.status][1]}</Badge></td>
+                  <td>
+                    {l.status ? (
+                      <Badge tone={statusBadge[l.status][0]}>{statusBadge[l.status][1]}</Badge>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

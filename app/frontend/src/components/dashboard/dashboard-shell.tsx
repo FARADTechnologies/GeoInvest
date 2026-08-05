@@ -203,7 +203,12 @@ export function DashboardShell({
       <div className="grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[260px_1fr]">
         {/* Left rail: nav (its own scroll, independent of the content) */}
         <aside className="border-b bg-card/40 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
-          <NavSidebar t={t} activeView={activeView} onViewChange={showView} />
+          <NavSidebar
+            t={t}
+            activeView={activeView}
+            onViewChange={showView}
+            listingCount={listingsQuery.data?.total}
+          />
         </aside>
 
         {/* Right: pinned top bar + independently scrolling content */}
