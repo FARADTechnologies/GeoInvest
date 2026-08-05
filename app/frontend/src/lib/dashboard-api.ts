@@ -1,12 +1,8 @@
-// Cosmetic extension to the existing api.ts.
-// Keeps the existing fetchFilters / fetchMetrics / fetchMapData unchanged
-// (they live in api.ts) and adds dashboard-only fetchers that proxy to
-// lib/mock-data.ts / lib/listings-data.ts.
+// Dashboard-only fetchers, alongside the core ones in api.ts.
 //
-// Rayons / Trends / B2C react to the global Period + Category controls
-// (NOT resolution / outlier — those are map-level). When the backend grows
-// endpoints for these shapes, change the body of each fetcher to a real
-// fetch — components don't need to change.
+// Everything here returns real backend data or nothing at all. The generated
+// sample data these used to fall back to has been removed: a screen with no
+// numbers is honest, a screen with invented numbers is not.
 
 import type {
   ActivityItem,
@@ -21,112 +17,55 @@ import type {
 } from "@/types/api";
 import { apiUrl } from "@/lib/api-url";
 import { apiGet } from "@/lib/api";
-import {
-  fetchActivity as mockActivity,
-  fetchHistogram as mockHistogram,
-  fetchRayons as mockRayons,
-  fetchSparklines as mockSparklines,
-  fetchTrendSeries as mockTrendSeries
-} from "@/lib/mock-data";
-import { buildB2C, buildRayonStats, filterListings } from "@/lib/listings-data";
-import { dashKey, loadSnapshot, trendKey } from "@/lib/snapshot";
-import { mockAllowed } from "@/lib/mock-gate";
 
-// The legacy V1 views below have no backend endpoint — they only ever had mock
-// data. With the fallback switched off they return nothing rather than invented
-// figures; the mock calls stay so re-enabling the gate restores them.
+
+// The legacy V1 views below have no backend endpoint. They used to be filled
+// with generated sample data; that is gone, so they return nothing until a real
+// endpoint exists.
 export function fetchRayons(): Promise<Rayon[]> {
-  return mockAllowed() ? mockRayons() : Promise.resolve([]);
+  return Promise.resolve([]);
 }
 
 export async function fetchSparklines(
   filters?: DashboardFilters,
   minAdsPerCell = 0
 ): Promise<Sparklines> {
-  if (!filters) return mockAllowed() ? mockSparklines() : Promise.resolve({} as Sparklines);
-
-  try {
-    return await apiGet<Sparklines>("/sparklines", filters, {
-      min_ads_per_cell: String(minAdsPerCell)
-    });
-  } catch (err) {
-    if (!mockAllowed()) throw err;
-    const snap = await loadSnapshot();
-    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
-    if (hit?.sparklines) return hit.sparklines;
-    return mockSparklines();
-  }
+  if (!filters) return {} as Sparklines;
+  return apiGet<Sparklines>("/sparklines", filters, {
+    min_ads_per_cell: String(minAdsPerCell)
+  });
 }
 
 export function fetchHistogram(): Promise<HistogramBucket[]> {
-  return mockAllowed() ? mockHistogram() : Promise.resolve([]);
-}
-
-// 12-month trend for the top-5 rayons, reacting to period + category.
-function seriesFor(base: number, seed: number): number[] {
-  const out: number[] = [];
-  let v = base * 0.9;
-  let rng = seed * 9973 + 7;
-  for (let i = 0; i < 12; i++) {
-    rng = (rng * 9301 + 49297) % 233280;
-    const noise = (rng / 233280 - 0.5) * 120;
-    v += (base - v) * 0.18 + noise;
-    out.push(Math.round(v));
-  }
-  out[11] = base;
-  return out;
+  return Promise.resolve([]);
 }
 
 export async function fetchTrendSeries(filters?: DashboardFilters): Promise<TrendSeries[]> {
-  if (filters) {
-    try {
-      const res = await apiGet<TrendSeries[]>("/trend-series", filters);
-      // Backend endpoint exists but currently returns [] for real data —
-      // only use it when it actually has series, else fall to mock so the
-      // Trends view never renders empty.
-      if (Array.isArray(res) && res.length > 0) return res;
-    } catch {
-      /* fall through to snapshot / mock */
-    }
-    const snap = await loadSnapshot();
-    const hit = snap?.trends[trendKey(filters.period, filters.categories)];
-    if (hit && hit.length > 0) return hit;
-  }
-  // Mock path — derive from the period/category-filtered rayon stats.
-  // Gated: in production a customer gets an empty chart rather than invented
-  // series (the backend's /trend-series currently returns [] — see below).
-  if (!mockAllowed()) return [];
-  const stats = buildRayonStats(filterListings(filters?.period, filters?.categories));
-  const ranked = stats.filter((s) => s.listings > 0).sort((a, b) => b.listings - a.listings);
-  const top = (ranked.length ? ranked : stats.slice().sort((a, b) => b.listings - a.listings)).slice(0, 5);
-  if (top.length === 0) return mockTrendSeries();
-  return top.map((r, i) => ({ label: r.short, data: seriesFor(r.median, i + 7) }));
+  if (!filters) return [];
+  const res = await apiGet<TrendSeries[]>("/trend-series", filters);
+  return Array.isArray(res) ? res : [];
 }
 
-export function fetchActivity(lang: "tr" | "en" | "az" = "tr"): Promise<ActivityItem[]> {
-  return mockAllowed() ? mockActivity(lang) : Promise.resolve([]);
+export function fetchActivity(_lang: "tr" | "en" | "az" = "tr"): Promise<ActivityItem[]> {
+  return Promise.resolve([]);
 }
 
 // ── v3 views (Rayons / Listings / B2C) — period + category aware ──────
 // `fetchListings` with no args returns the full set (İlanlar has its own
 // toolbar); with period/categories it returns the filtered set used by the
 // Rayons detail modal and the B2C listing count.
-export function fetchListings(period?: string, categories?: string[]): Promise<Listing[]> {
-  return Promise.resolve(mockAllowed() ? filterListings(period, categories) : []);
+export function fetchListings(_period?: string, _categories?: string[]): Promise<Listing[]> {
+  return Promise.resolve([]);
 }
 
 // Elanlar view — real apartment listings from the source DB (team #10).
-// Falls back to the mock set when the backend / source DB is unreachable,
-// matching the resilience pattern the rest of the dashboard uses.
 type ListingApiRow = {
   id: string; title: string; address: string | null; rayon: string; rooms: number; area: number;
   price: number; ppm: number; floor: number; cat: string; source: string;
   source_url: string | null; date: string;
 };
-// The listings payload is large (~170 KB, ~1.5-3 s). The shared apiGet timeout
-// is 1.5 s, so it aborted this call, silently fell back to mock AND tripped the
-// 15 s backend-down cooldown that pushed other views to mock too. Use a
-// dedicated fetch with a generous timeout instead.
+// The listings payload is large (~170 KB, ~1.5-3 s), so it gets its own
+// generous timeout rather than the shared one.
 const LISTINGS_TIMEOUT_MS = 20_000;
 
 // Number of real listings loaded into the Elanlar view for client-side
@@ -137,8 +76,7 @@ export const LISTINGS_PAGE = 1000;
 export type ListingsResult = { listings: Listing[]; total: number };
 
 export async function fetchListingsDB(): Promise<ListingsResult> {
-  try {
-    const controller = new AbortController();
+  const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), LISTINGS_TIMEOUT_MS);
     let response: Response;
     try {
@@ -176,19 +114,12 @@ export async function fetchListingsDB(): Promise<ListingsResult> {
       sourceUrl: r.source_url ?? undefined
     }));
     return { listings, total: res.total || listings.length };
-  } catch (err) {
-    // Production customers must not silently get invented listings.
-    if (!mockAllowed()) throw err;
-    const mock = filterListings();
-    return { listings: mock, total: mock.length };
-  }
 }
 
-export function fetchRayonStats(period?: string, categories?: string[]): Promise<RayonStat[]> {
-  if (!mockAllowed()) return Promise.resolve([]);
-  return Promise.resolve(buildRayonStats(filterListings(period, categories)));
+export function fetchRayonStats(_period?: string, _categories?: string[]): Promise<RayonStat[]> {
+  return Promise.resolve([]);
 }
 
-export function fetchB2C(period?: string, categories?: string[]): Promise<B2CSummary> {
-  return Promise.resolve(buildB2C(filterListings(period, categories)));
+export function fetchB2C(_period?: string, _categories?: string[]): Promise<B2CSummary> {
+  return Promise.resolve({} as B2CSummary);
 }

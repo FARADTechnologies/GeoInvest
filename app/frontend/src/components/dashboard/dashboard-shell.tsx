@@ -38,7 +38,6 @@ import {
   fetchSparklines,
   fetchTrendSeries
 } from "@/lib/dashboard-api";
-import { MONTH_LABELS_EN, MONTH_LABELS_TR } from "@/lib/mock-data";
 import { useStrings, type Lang } from "@/lib/i18n";
 import { queryKeys } from "@/lib/query-keys";
 import { DEFAULT_VIEW, pathForView } from "@/lib/view-routes";
@@ -54,12 +53,16 @@ import type {
   TrendSeries
 } from "@/types/api";
 
+// Month abbreviations for the 12-month chart axis; they used to live in the
+// sample-data module that has since been deleted.
+const MONTH_LABELS_AZ = ["May","Iyn","Iyl","Avq","Sen","Okt","Noy","Dek","Yan","Fev","Mar","Apr"];
+const MONTH_LABELS_EN = ["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
+
 // ──────────────────────────────────────────────────────────────────────
 // DashboardShell
 // Layout: [nav | filters] | [topbar / KPI / map+rayons / charts / activity]
-// All data is wired through TanStack Query. Backend-served queries drive
-// filters, metrics, map data, sparklines, and trend series; remaining
-// dashboard-only panels fall back to mock data until dedicated endpoints exist.
+// All data is wired through TanStack Query and comes from the backend. Panels
+// without an endpoint render empty rather than showing generated stand-ins.
 // ──────────────────────────────────────────────────────────────────────
 
 function createDefaultFilters(catalog: FiltersResponse): DashboardFilters | null {
@@ -152,15 +155,12 @@ export function DashboardShell({
     queryFn: () => fetchActivity(lang)
   });
 
-  // ── v3 views (Rayons / Listings / B2C) — mock-fed ──────────────────
-  // Rayons / Trends / B2C react to the global Period + Category (not
-  // resolution / outlier). İlanlar keeps the full set (it has its own
-  // toolbar), so listingsQuery stays unfiltered.
+  // ── v3 views (Rayons / Listings / B2C) ────────────────────────────
+  // Rayons and B2C have no backend endpoint yet and now resolve to empty.
   const periodKey = filters?.period ?? "";
   const catsKey = filters ? [...filters.categories].sort().join(",") : "";
 
-  // Elanlar view is fed from the real source DB (team #10); mock stays the
-  // fallback inside fetchListingsDB. Rayons / B2C keep the mock set below.
+  // Elanlar is fed from the real source DB (team #10).
   const listingsQuery = useQuery({ queryKey: ["v3", "listings", "db"], queryFn: fetchListingsDB });
   const filteredListingsQuery = useQuery({
     queryKey: ["v3", "listings", periodKey, catsKey],
@@ -196,7 +196,7 @@ export function DashboardShell({
 
   const mapData = useMemo(() => mapQuery.data ?? [], [mapQuery.data]);
 
-  const monthLabels = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_TR;
+  const monthLabels = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_AZ;
 
   return (
     <main className="min-h-screen bg-background lg:h-screen lg:overflow-hidden">

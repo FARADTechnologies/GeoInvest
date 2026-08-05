@@ -5,13 +5,6 @@ import type {
   MetricsResponse
 } from "@/types/api";
 import { apiUrl } from "@/lib/api-url";
-import {
-  fetchFallbackFilters,
-  fetchFallbackMapData,
-  fetchFallbackMetrics
-} from "@/lib/mock-data";
-import { dashKey, loadSnapshot } from "@/lib/snapshot";
-import { mockAllowed } from "@/lib/mock-gate";
 
 
 // ── Backend availability short-circuit ────────────────────────────────
@@ -89,51 +82,28 @@ export async function apiGet<T>(
   return response.json() as Promise<T>;
 }
 
-export async function fetchFilters() {
-  try {
-    return await apiGet<FiltersResponse>("/filters");
-  } catch (err) {
-    // In production only a super admin may see fallback data (mock-gate.ts).
-    if (!mockAllowed()) throw err;
-    const snap = await loadSnapshot();
-    if (snap?.filters) return snap.filters;
-    return fetchFallbackFilters();
-  }
+// No fallbacks below. When a call fails the error propagates and the view
+// renders an empty/error state — a figure nobody can trace is worse than a gap.
+export function fetchFilters() {
+  return apiGet<FiltersResponse>("/filters");
 }
 
 export async function fetchMetrics(filters: DashboardFilters, minAdsPerCell: number) {
-  try {
-    let metrics = await apiGet<MetricsResponse>("/metrics", filters, {
+  let metrics = await apiGet<MetricsResponse>("/metrics", filters, {
       min_ads_per_cell: String(minAdsPerCell)
     });
-    if (minAdsPerCell > 0 && metrics.active_h3_cells === 0 && metrics.total_ads === 0) {
-      metrics = await apiGet<MetricsResponse>("/metrics", filters, { min_ads_per_cell: "0" });
-    }
-    return { ...metrics, _source: "db" as const };
-  } catch (err) {
-    if (!mockAllowed()) throw err;
-    const snap = await loadSnapshot();
-    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
-    if (hit?.metrics) return { ...hit.metrics, _source: "mock" as const };
-    const mock = await fetchFallbackMetrics(filters, minAdsPerCell);
-    return { ...mock, _source: "mock" as const };
+  if (minAdsPerCell > 0 && metrics.active_h3_cells === 0 && metrics.total_ads === 0) {
+    metrics = await apiGet<MetricsResponse>("/metrics", filters, { min_ads_per_cell: "0" });
   }
+  return { ...metrics, _source: "db" as const };
 }
 
 export async function fetchMapData(filters: DashboardFilters, minAdsPerCell: number) {
-  try {
-    const rows = await apiGet<MapDataPoint[]>("/map-data", filters, {
-      min_ads_per_cell: String(minAdsPerCell)
-    });
-    if (rows.length === 0 && minAdsPerCell > 0) {
-      return apiGet<MapDataPoint[]>("/map-data", filters, { min_ads_per_cell: "0" });
-    }
-    return rows;
-  } catch (err) {
-    if (!mockAllowed()) throw err;
-    const snap = await loadSnapshot();
-    const hit = snap?.dashboard[dashKey(filters.analysis_type, filters.period, filters.resolution, filters.categories)];
-    if (hit?.mapData) return hit.mapData;
-    return fetchFallbackMapData(filters, minAdsPerCell);
+  const rows = await apiGet<MapDataPoint[]>("/map-data", filters, {
+    min_ads_per_cell: String(minAdsPerCell)
+  });
+  if (rows.length === 0 && minAdsPerCell > 0) {
+    return apiGet<MapDataPoint[]>("/map-data", filters, { min_ads_per_cell: "0" });
   }
+  return rows;
 }
