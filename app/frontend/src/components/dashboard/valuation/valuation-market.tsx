@@ -5,6 +5,7 @@
 // scoped under .hm-val. Dataset is the prototype's static baseline.
 
 import { useQuery } from "@tanstack/react-query";
+import { mockAllowed } from "@/lib/mock-gate";
 import { apiUrl } from "@/lib/api-url";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
@@ -346,13 +347,20 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
   const realIndexYoY = indexQuery.data?.latest_yoy?.all;
   const indexBase = indexQuery.data?.base;
 
+  // Values with no backend source yet (liquidity, monthly transactions and the
+  // YoY deltas the PM hasn't supplied). They used to fall back to invented
+  // constants that looked like measurements; with the mock gate closed they
+  // render as "—" instead of a number nobody can trace.
+  const modelled = mockAllowed();
+  const dash = "—";
+
   const kpis = [
-    { label: "Orta qiymət/m²", value: fmtMoney(realPpm ?? MKT_CITY.ppm, " ₼"), delta: trendPct(trendsQuery.data?.sale.all) ?? MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
-    { label: "Qiymət indeksi", value: (realIndex ?? MKT_CITY.ppmIndex).toFixed(1), delta: realIndexYoY ?? MKT_CITY.ppmIndexYoY, sub: `baza 100 = ${indexBase === "2023-08" ? "avqust 2023" : indexBase ?? "avqust 2023"}`, icon: <Icons.TrendUp size={16} />, accent: true },
-    { label: "Orta gəlirlilik", value: (realYield ?? MKT_CITY.yield).toFixed(1) + "%", delta: MKT_CITY.yieldYoY, icon: <Icons.Sparkle size={16} /> },
-    { label: "Orta likvidlik", value: MKT_CITY.liquidity + " gün", delta: -MKT_CITY.liquidityYoY, icon: <Icons.Refresh size={16} /> },
-    { label: "Orta kirayə", value: fmtMoney(realRent ?? MKT_CITY.rent), delta: trendPct(trendsQuery.data?.rent.all) ?? MKT_CITY.rentYoY, icon: <Icons.Building size={16} /> },
-    { label: "Aylıq əqd həcmi", value: fmtNumber(MKT_CITY.txnVolume), delta: MKT_CITY.txnYoY, icon: <Icons.Layers size={16} /> }
+    { label: "Orta qiymət/m²", value: realPpm != null ? fmtMoney(realPpm, " ₼") : modelled ? fmtMoney(MKT_CITY.ppm, " ₼") : dash, delta: trendPct(trendsQuery.data?.sale.all) ?? MKT_CITY.ppmIndexYoY, icon: <Icons.Coin size={16} /> },
+    { label: "Qiymət indeksi", value: realIndex != null ? realIndex.toFixed(1) : modelled ? MKT_CITY.ppmIndex.toFixed(1) : dash, delta: realIndexYoY ?? MKT_CITY.ppmIndexYoY, sub: `baza 100 = ${indexBase === "2023-08" ? "avqust 2023" : indexBase ?? "avqust 2023"}`, icon: <Icons.TrendUp size={16} />, accent: true },
+    { label: "Orta gəlirlilik", value: realYield != null ? realYield.toFixed(1) + "%" : modelled ? MKT_CITY.yield.toFixed(1) + "%" : dash, delta: modelled ? MKT_CITY.yieldYoY : undefined, icon: <Icons.Sparkle size={16} /> },
+    { label: "Orta likvidlik", value: modelled ? MKT_CITY.liquidity + " gün" : dash, delta: modelled ? -MKT_CITY.liquidityYoY : undefined, icon: <Icons.Refresh size={16} /> },
+    { label: "Orta kirayə", value: realRent != null ? fmtMoney(realRent) : modelled ? fmtMoney(MKT_CITY.rent) : dash, delta: trendPct(trendsQuery.data?.rent.all) ?? (modelled ? MKT_CITY.rentYoY : undefined), icon: <Icons.Building size={16} /> },
+    { label: "Aylıq əqd həcmi", value: modelled ? fmtNumber(MKT_CITY.txnVolume) : dash, delta: modelled ? MKT_CITY.txnYoY : undefined, icon: <Icons.Layers size={16} /> }
   ];
 
   const trendSeries = useMemo(() => {
@@ -522,7 +530,14 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                     <td className="num">{fmtNumber(d.txn)}</td>
                     <td className="num">{fmtNumber(d.supply)}</td>
                     <td className="num"><span style={{ color: "var(--green)", fontWeight: 700 }}>↑ {d.growth.toFixed(1)}%</span></td>
-                    <td><div style={{ width: 80 }}><MiniBar data={mktSeries(d.ppmNew, 12, "spark" + d.name, 0.1, 0.012).map(Math.round)} /></div></td>
+                    <td>
+                      {/* Synthesised from the current value, not measured. */}
+                      {modelled ? (
+                        <div style={{ width: 80 }}><MiniBar data={mktSeries(d.ppmNew, 12, "spark" + d.name, 0.1, 0.012).map(Math.round)} /></div>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -545,7 +560,16 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
               <MktSelect label={T(`Mərkəz`)} value={salesAgg} onChange={setSalesAgg} options={[{ value: "mean", label: "Orta" }, { value: "median", label: "Median" }]} minWidth={130} />
             </div>
           </div>
-          <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} districts={MKT_DISTRICTS} cityLiq={MKT_CITY.liquidity} />
+          {/* SALES_DAYS is a fixed table in this file — there is no
+              days-on-market data in the source DB, so nothing here was ever
+              measured. Shown only while modelled data is enabled. */}
+          {modelled ? (
+            <SalesDaysChart category={salesCat} region={salesRegion} buffer={salesBuffer} agg={salesAgg} districts={MKT_DISTRICTS} cityLiq={MKT_CITY.liquidity} />
+          ) : (
+            <div className="card-body" style={{ padding: "28px 20px", textAlign: "center", color: "var(--text-3)" }}>
+              {T(`Bu göstərici üçün hələ məlumat yoxdur.`)}
+            </div>
+          )}
         </div>
 
         {/* Yield + movers */}
