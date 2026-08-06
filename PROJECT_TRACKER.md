@@ -1,7 +1,11 @@
 # Homora B2B — İş Takip Belgesi
 
 > Tek kaynak. Her tur sonunda güncellenir. Bitenler silinmez, arşive taşınır.
-> Son güncelleme: **2026-08-06** (2. tur)
+> Son güncelleme: **2026-08-06** (3. tur)
+
+> ⚠️ **Bu belge repoda ve GitLab'da — ekip okuyor.**
+> Giriş bilgileri, erişim bilgileri, kişisel e-posta adresleri, iç ağ adresleri
+> buraya **yazılmaz**. Bir ayarın **adı** yazılır, **değeri asla**.
 
 ---
 
@@ -9,26 +13,24 @@
 
 | # | Konu | Detay | Durum |
 |---|---|---|---|
-| E1 | **Prod'da şifresiz super admin** | `analytics.homora.ai`'de `admin@homora.ai` / `12345` ile **OTP'siz** tam yetkili giriş yapılabiliyor. Sebep: compose'da `DEV_LOGIN_BYPASS` ve `SEED_ADMIN_PASSWORD` tanımlı değil, kod varsayılanları devrede | Kullanıcı "şimdilik kalsın" dedi |
-| E2 | **`RESEND_API_KEY` yok** | Compose'da tanımlı değil → OTP e-postası **hiç gönderilemiyor** | Bekliyor |
+| E2 | **Prod'da e-posta gitmiyor** | Yerelde OTP akışı uçtan uca çalışıyor (kayıt → onay → giriş → kod gönderildi, 200). Prod'da aynı istek 502 dönüyor ve gövde bizim JSON'umuz değil, Cloudflare'ın hata sayfası — yani origin cevap veremiyor | Araştırılıyor |
 | E3 | **`NEXT_PUBLIC_API_BASE_URL` hatalı** | Sonu `/api` ile bitiyor, kod `/api/v1` ekleyince `/api/api/v1` oluyordu. Kodu dayanıklı yaptım ama ayar yine de düzeltilmeli | Kod tolere ediyor |
-| E4 | **Scraper durmuş (dev)** | `item_app_scraperunlog`'da toplam 5 kayıt, sonuncusu 2026-07-02 ve 0 ilan çekmiş. 10 dk aralıkla çalışması gerekiyor | Bekliyor |
-| E5 | **Tahmin kuyruğu tıkalı (dev)** | 1 573 ilan `pending`, 5'i `processing`'de takılı, 863'ünde `prediction_error` | Bekliyor |
-| E6 | **Köhnə tikili akışı yok** | Tanımlı 3 scrape stream'in hepsi `yeni_tikili` | Bekliyor |
+
+**2. dereceye alındı** (ekibin kendi altyapısı, bizi bloklamıyor):
+`E4` scraper durmuş (dev, son çalışma 02.07.2026) · `E5` tahmin kuyruğunda ~2 400 değerlenmemiş ilan · `E6` scrape stream'lerin hepsi yeni tikili, köhnə tikili verisi bayatlıyor
+
+**Kapandı:** `E1` seed admin OTP muafiyeti — geliştirme süresince **kasıtlı**, kullanıcının kararı. Kod denetlendi: muafiyet tek bir hesaba kilitli, diğer herkes normal OTP akışından geçiyor. Kaldırma zamanını kullanıcı söyleyecek.
 
 ---
 
 ## ❓ Ekibe sorulacak sorular
 
-| # | Soru (Azerbaycanca) | Neden gerekli |
-|---|---|---|
-| S1 | *"Bir elanın neçə günə satıldığını hansı sahə göstərir? Elanın deaktiv olma tarixi saxlanılırmı?"* | **Likvidlik** göstergesi için hiç veri yok, şu an "—" |
-| S2 | *"Aylıq satış (əqd) sayı hansı cədvəldədir?"* | **Aylıq əqd həcmi** için veri yok (#3f) |
-| S3 | *"Elanın aktiv / satılmış / dayandırılmış olduğunu hansı sütun göstərir?"* | Status sütunu uydurmaydı, kaldırıldı |
-| S4 | *"Rayon üzrə kirayə qiyməti üçün real mənbə varmı?"* | Rayon tablosundaki kirayə formülle türetiliyor |
-| S5 | *"`item_app_items_excel` artıq istifadə olunmur — silinsinmi?"* | Arşiv tablosu, birleştirme kapatıldı |
-| S6 | *"Şirkət və işçi siyahısı üçün real cədvəl varmı?"* | Admin ekranında şirket listesi hâlâ örnek veri |
-| S7 | *"Production serverində CPU %99 idi — səbəbi nədir?"* | Ekran görüntüsünde görüldü |
+**Şimdi sorulacak:** yok — güncel sorunlar bitene kadar bekletiliyor.
+
+**2. derece (sonra):**
+`S1` ilan kaç günde satıldı / deaktiv tarihi · `S2` aylık əqd sayısı · `S3` aktiv/satılmış/dayandırılmış sütunu · `S4` rayon kirayə için ayrı kaynak · `S8` predict'teki `price_trend` gerçek geçmiş mi tahmin mi · `S9` sərmayə skoru metodolojisi · `S10` Xəzər ve Pirallahı aynı rakamları dönüyor (olası spatial join hatası)
+
+**Kapandı:** `S5` Excel — sistemden tamamen çıkarıldı, bir daha sorulmayacak · `S6` şirket tablosu — sistem içinden, kayıt oldukça üretilecek; dış dosya yok · `S7` prod CPU — bizi ilgilendirmiyor
 
 ---
 
@@ -36,8 +38,11 @@
 
 | # | İş | Not |
 |---|---|---|
-| B2 | **Rapor arayüzü** | Ekibin gönderdiği 30 dosyalık React paketi (`homora-valuation-report-ui-20260804`) bizim TypeScript yapımıza taşınacak. Başlı başına bir oturum |
-| B8 | Toplu değerleme canlı testi | **Deploy bekliyor.** Prod'da `/valuation/jobs` ve `/admin/data-status` uçları 401 dönüyor (yani var ve korumalı). Bu turun kodu henüz deploy edilmedi; "başlat → sekmeyi kapat → dön" senaryosu deploy sonrası denenecek |
+| B11 | **`send_email` hata yakalama** | httpx hataları `EmailError` olarak sarılmıyor → ağ/DNS sorununda istek çıplak 500/502 olarak ölüyor, mesaj kayboluyor. Düzeltme yazıldı, uygulanamadı |
+| B12 | **`/admin/data-status`'a e-posta teşhis bloğu** | Ayarın **varlığını** raporlar, değerini asla. "Prod'da e-posta kurulu mu?" bir daha tahmin işi olmasın |
+| B13 | **Excel arşiv ölü kodu** | `_MERGE_ARCHIVE_TABLE` yolu kapalı ama duruyor; tamamen sökülecek |
+| B8 | Toplu değerleme canlı testi | Docker açık, stack ayakta. "Başlat → sekmeyi kapat → dön" senaryosu |
+| B2 | Rapor arayüzü — kalan parça | Ana bölümler eşitlendi; ekibin paketiyle son karşılaştırma kaldı |
 
 ---
 
@@ -50,7 +55,8 @@
 - **Backend değerleme motoru silindi** (`/valuation/single`, `/valuation/batch`): kirayə, gəlirlilik, geri ödəmə, likvidlik ve skor sabit + hash jitter ile üretiliyordu. Artık tek yol ekibin predict modeli
 - **Sərmayə skoru / risk / likvidlik** ön yüzde de üretiliyordu (`modelInvestment`) → kaldırıldı, sütunlar çıkarıldı
 - **3 sahte demo portföy** (36 uydurma mənzil, uydurma sahipler) silindi — liste boş başlıyor
-- **Super admin konsolundaki 10 sahte şirket** silindi: gerçek banka adları (ABB, Kapital Bank, PAŞA Bank…), sahte VÖEN, ~114 uydurma çalışan
+- **Super admin konsolundaki 10 sahte şirket** silindi: gerçek banka adları, sahte VÖEN, ~114 uydurma çalışan
+- **Login sayfası:** "94.6% forecast accuracy" (ölçülmemiş model iddiası) ve eskimiş "12 847 elan" kaldırıldı
 - `reportFromLinkMock` (URL hash'inden tam değerleme üreten fonksiyon) silindi
 - `genTrend`, `miniSeries`, rayon kartlarındaki sahte sparkline'lar silindi
 - Mənzil hesabatındaki sabit "+9.1% / +10.2% / +10.1%" artım satırları ve "500m radius" uydurması kaldırıldı
@@ -70,7 +76,7 @@
 - Gecelik iş aylardır çöküyordu (`postgresql+asyncpg://` öneki) → düzeltildi
 - Otonom yenileme: her gece 00:00 + açılışta geride kalmışsa + `/admin/refresh`
 - `/admin/data-status` ile hata görünürlüğü
-- İmzalı oturum token'ları — deploy'dan sağ çıkıyor ("Sessiya bitib" hatası çözüldü)
+- İmzalı oturum belirteçleri — deploy'dan sağ çıkıyor ("Sessiya bitib" hatası çözüldü)
 - 401 alınca giriş sayfasına yönlendirme
 - API URL ikilenmesi koda dayanıklı hale getirildi
 
@@ -88,10 +94,13 @@
 - Mənzil hesabatında **rayon üzrə artım** gerçek (`/model/market/rayons`, min örneklem kuralıyla)
 - Kütləvi boş ekran: portföy yokken ne yapılacağı yazıyor; yanıltıcı "portfellər qiymətləndirilir" mesajı kaldırıldı
 - Rapor artık homora.ai ile birebir: 500m ortalama, Bakı artımı, rayon artımı (hepsi gerçek, predict'ten)
+- **Tarih formatı Azerbaycan standardına çevrildi:** `06.08.2026` / `08.2026` / eksende `08.26`. Tek modül (`lib/format-date.ts`) yönetiyor; API hâlâ ISO konuşuyor
+- Bazar analizi'nde "ən sürətli" ve "ən yavaş artan" listeleri aynı rayonları gösteriyordu (10'dan az rayon eşiği geçince dilimler çakışıyordu) → ayrıldı
 
 **Performans**
-- ⚠️ **Ölçüm notu:** prod'da `/model/market/trends` şu an **0.43 sn** dönüyor — yani yük bugün kritik değil. Sebep: JSONB açılımı sadece `prediction_info` dolu satırlara dokunuyor (~18k), 169k'nın hepsine değil. Tahmin kuyruğu ilerledikçe bu oran büyür; cache asıl o büyümeye karşı koruma
-- **Bazar analizi cache'i** (ekibin isteği): 4 ağır analitik artık gecelik döngü başına 1 kez hesaplanıyor. Gecelik iş bitince cache temizleniyor. Redis varsa Redis, yoksa süreç içi sözlük
+- ⚠️ **Ölçüm notu:** prod'da `/model/market/trends` **0.43 sn** dönüyor — yük bugün kritik değil. Sebep: JSONB açılımı sadece `prediction_info` dolu satırlara dokunuyor (~18k), 169k'nın hepsine değil. Tahmin kuyruğu ilerledikçe büyür; cache asıl o büyümeye karşı koruma
+- **Bazar analizi cache'i** (ekibin isteği): 4 ağır analitik gecelik döngü başına 1 kez hesaplanıyor. Gecelik iş bitince cache temizleniyor. Redis varsa Redis, yoksa süreç içi sözlük
+- **Ölçüldü:** soğuk çağrı **3.32 sn** → sonraki çağrılar **0.005 sn**
 
 **Arayüz — 1. tur**
 - Rotalama: her ekranın kendi URL'i (`/ads`, `/market`, …)
@@ -101,14 +110,15 @@
 - Ayarlar & Hesap ekranları sıfırdan yazıldı
 - Admin konsolu geri açıldı + gerçek onay listesi
 - Arama: çok kelimeli + aksan duyarsız (`Güneşli` = `Günəşli`)
-- Elanlar rozeti gerçek sayıya bağlandı (12.8k sabitti → 168.6k)
+- Elanlar rozeti gerçek sayıya bağlandı (sabit değerdi → gerçek toplam)
 - Ölü butonlar kaldırıldı, Yenilə tüm ekranları tazeliyor
 
 ---
 
 ## 📌 Kalıcı notlar
 
-- **Dev ve prod AYRI kaynak veritabanı.** Prod ~8x fazla veri (169k vs 12k). Ölçüm yaparken hangisine baktığını doğrula
+- **Bu belgeye hassas veri yazılmaz** (en üstteki uyarı). Aynı kural commit mesajları ve kod yorumları için de geçerli
+- **Dev ve prod AYRI kaynak veritabanı.** Prod ~8x fazla veri. Ölçüm yaparken hangisine baktığını doğrula
 - **Prod deploy disk sınırına takılabiliyor** — `MIN_DOCKER_FREE_GB` (varsayılan 100) CI değişkeni
 - `prediction_info` **tamamen ekibin sistemi** üretiyor; biz sadece okuyoruz
 - Kaynak DB **salt okunur** — SELECT dışında bir şey yapılmaz
