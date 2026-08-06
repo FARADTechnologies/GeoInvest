@@ -14,15 +14,33 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 _redis: Redis | None = None
 
+# When Redis is unreachable, stop dialling it on every call for a while. The
+# OTP path alone asks for the cache four times per sign-in, so a host that is
+# down — or worse, slow to refuse — turned one login into four connection
+# attempts, each paying the full timeout while the user waited. Every caller
+# degrades gracefully without Redis; they just need that answer quickly.
+_REDIS_RETRY_SECONDS = 30.0
+_redis_down_until = 0.0
+
 
 async def get_cache() -> Redis | None:
-    global _redis
-    if _redis is None:
-        try:
-            _redis = Redis.from_url(settings.redis_url, decode_responses=True)
-            await _redis.ping()
-        except Exception:
-            _redis = None
+    global _redis, _redis_down_until
+    if _redis is not None:
+        return _redis
+    if time.monotonic() < _redis_down_until:
+        return None
+    try:
+        client = Redis.from_url(settings.redis_url, decode_responses=True)
+        await client.ping()
+    except Exception:
+        _redis_down_until = time.monotonic() + _REDIS_RETRY_SECONDS
+        logging.getLogger(__name__).warning(
+            "Redis unreachable; continuing without it for %ss.",
+            int(_REDIS_RETRY_SECONDS),
+        )
+        return None
+    _redis = client
+    _redis_down_until = 0.0
     return _redis
 
 

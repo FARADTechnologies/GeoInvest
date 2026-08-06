@@ -14,6 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from app.api.deps import require_super_admin
 from app.models.user import User
+from app.services.email import email_status
 from app.services.nightly_job import last_run_info, run_nightly_job
 
 logger = logging.getLogger(__name__)
@@ -39,8 +40,17 @@ async def _run_guarded() -> None:
 
 @router.get("/admin/data-status")
 async def data_status(_: Annotated[User, Depends(require_super_admin)]) -> dict:
-    """Freshness of the analytics tables + the last refresh outcome."""
-    return {"refresh": last_run_info(), "running": _lock.locked()}
+    """Freshness of the analytics tables, the last refresh, and mail readiness.
+
+    The mail block answers "can this deployment send the OTP at all?" — a
+    question that previously could only be settled by triggering a real login
+    and reading the failure. It reports presence, never a value.
+    """
+    return {
+        "refresh": last_run_info(),
+        "running": _lock.locked(),
+        "email": email_status(),
+    }
 
 
 @router.post("/admin/refresh")
