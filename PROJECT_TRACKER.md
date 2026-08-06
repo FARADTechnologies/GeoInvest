@@ -13,7 +13,8 @@
 
 | # | Konu | Detay | Durum |
 |---|---|---|---|
-| E2 | **Prod'da e-posta gitmiyor** | Yerelde OTP akışı uçtan uca çalışıyor (kayıt → onay → giriş → kod gönderildi, 200). Prod'da aynı istek 502 dönüyor ve gövde bizim JSON'umuz değil, Cloudflare'ın hata sayfası — yani origin cevap veremiyor | Araştırılıyor |
+| E2 | **Prod'da e-posta anahtarı eksik** | ✅ **KESİN TEŞHİS.** `/admin/data-status` → `email.configured = false`, `email.sender_set = true`. Yani gönderen adresi tanımlı (`hello@updates.homora.ai`) ama **API anahtarı prod ortamında yok**. Ekibin "anahtarlar sistemde var" bilgisi doğru değil. Yerelde aynı kod ile tüm zincir çalışıyor | **Ekipte: anahtarı prod backend ortamına ekle** |
+| E7 | Cloudflare 5xx'leri maskeliyor | Uygulamamız 502 + Azerbaycanca mesaj döndürüyor ama Cloudflare kendi "error code: 502" sayfasını gösteriyor. 401 gibi 4xx'ler aynen geçiyor. Kullanıcı hata sebebini göremiyor | Düşük öncelik |
 | E3 | **`NEXT_PUBLIC_API_BASE_URL` hatalı** | Sonu `/api` ile bitiyor, kod `/api/v1` ekleyince `/api/api/v1` oluyordu. Kodu dayanıklı yaptım ama ayar yine de düzeltilmeli | Kod tolere ediyor |
 
 **2. dereceye alındı** (ekibin kendi altyapısı, bizi bloklamıyor):
@@ -100,7 +101,13 @@
 - **B8 toplu değerleme testi GEÇTİ:** 2 mənzillik iş başlatıldı, istemci tamamen koparıldı, iş sunucuda döndü ve 2/2 tamamlandı. Sonuçlar gerçek (362 011 ₼ / 173 540 ₼, rayonlar koordinattan çözülmüş)
 - **B2 alanı doğrulandı:** `neighbourhood_price_500m` predict cevabında **gerçekten var** (3 286 / 2 614) → rapordaki "500m radiusda orta qiymət" artık gerçek sayı gösteriyor
 - `price_trend` modelden 13 aylık gerçek seri dönüyor → rapordaki trend grafiği gerçek
-- OTP akışı yerelde uçtan uca çalıştı: kayıt → onay → giriş → kod gönderildi (200)
+- **OTP zinciri yerelde TAM doğrulandı** (tek tek, hepsi geçti):
+  1. Kayıt → `pending` hesap
+  2. Super admin onayı → `active`
+  3. Giriş → 6 haneli kod üretildi, Redis'e yazıldı, e-posta gönderildi (200)
+  4. **Kod doğrulama → oturum açıldı** (`company_admin` rolüyle) ← bu adım daha önce hiç test edilmemişti
+  5. Kod tek kullanımlık: doğrulamadan sonra Redis'ten silindi, tekrar denemede 401
+  6. Hız sınırı: 60 sn içinde ikinci istek 429
 - Tarih formatı ekranda doğrulandı: grafik ekseni `05.25 · 07.25 · 09.25 …`
 
 **Performans**
