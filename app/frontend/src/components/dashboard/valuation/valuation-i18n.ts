@@ -296,6 +296,11 @@ const D: Dict = {
     en: "AI-model-estimated rent price of the property"
   },
   "Sərmayə dəyərləndirməsi": { tr: "Yatırım değerlendirmesi", en: "Investment assessment" },
+  "Yeniləri qiymətləndir": { tr: "Yenileri değerle", en: "Valuate the new ones" },
+  "Hamısını yenidən hesabla": { tr: "Tümünü yeniden hesapla", en: "Recalculate all" },
+  "Bütün mənzilləri modeldən yenidən keçirir": { tr: "Tüm daireleri modelden yeniden geçirir", en: "Runs every property through the model again" },
+  "Bütün mənzillər yenidən qiymətləndiriləcək": { tr: "Tüm daireler yeniden değerlendirilecek", en: "Every property will be valuated again" },
+  "Mövcud nəticələr yenisi ilə əvəz olunacaq. Davam edilsin?": { tr: "Mevcut sonuçlar yenisiyle değiştirilecek. Devam edilsin mi?", en: "Existing results will be replaced. Continue?" },
   "İllik kirayə gəliri": { tr: "Yıllık kira geliri", en: "Annual rent income" },
   "Kirayə gəlirliliyi": { tr: "Kira getirisi", en: "Rental yield" },
   "Geri ödəmə müddəti": { tr: "Geri ödeme süresi", en: "Payback period" },

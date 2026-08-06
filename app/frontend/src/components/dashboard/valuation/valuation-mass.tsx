@@ -133,6 +133,24 @@ function draftFromInput(input: ValuationInput, id: string): OProp {
 
 type Sub = { name: "list" } | { name: "portfolio"; id: string } | { name: "analysis"; id: string };
 
+// Which portfolio is open lives in the URL, so a link can be shared and a
+// reload lands back where you were. The id comes from localStorage rather than
+// a server, so it can't be a path segment Next could pre-render — it rides in
+// the query string instead: /bulk?p=<id> and /bulk?p=<id>&v=analysis.
+function subToSearch(route: Sub): string {
+  if (route.name === "list") return "";
+  const q = new URLSearchParams({ p: route.id });
+  if (route.name === "analysis") q.set("v", "analysis");
+  return `?${q}`;
+}
+
+function subFromSearch(search: string, exists: (id: string) => boolean): Sub | null {
+  const q = new URLSearchParams(search);
+  const id = q.get("p");
+  if (!id || !exists(id)) return null;
+  return q.get("v") === "analysis" ? { name: "analysis", id } : { name: "portfolio", id };
+}
+
 export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
   setValLang(lang);
   const metaQuery = useQuery({ queryKey: ["valuation", "meta"], queryFn: fetchValuationMeta });
@@ -158,6 +176,36 @@ export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
   useEffect(() => {
     if (seeded) savePortfolios(portfolios, source);
   }, [seeded, portfolios, source]);
+
+  // ── URL <-> open portfolio ────────────────────────────────────────
+  // Restore from the address bar once the stored portfolios are in hand; an
+  // id that no longer exists simply falls back to the list.
+  useEffect(() => {
+    if (!seeded) return;
+    const fromUrl = subFromSearch(window.location.search, (id) => portfolios.some((p) => p.id === id));
+    if (fromUrl) setRoute(fromUrl);
+    // Only on the first pass after seeding — later changes are driven by the
+    // effect below, and re-running here would fight it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seeded]);
+
+  useEffect(() => {
+    if (!seeded) return;
+    const next = window.location.pathname + subToSearch(route);
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.pushState(null, "", next);
+    }
+  }, [route, seeded]);
+
+  // Back / forward should move between portfolios, not out of the app.
+  useEffect(() => {
+    const onPop = () => {
+      const fromUrl = subFromSearch(window.location.search, (id) => portfolios.some((p) => p.id === id));
+      setRoute(fromUrl ?? { name: "list" });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [portfolios]);
 
   const update = (pf: Portfolio) => setPortfolios((prev) => prev.map((p) => (p.id === pf.id ? pf : p)));
   const active = route.name !== "list" ? portfolios.find((p) => p.id === route.id) : undefined;
@@ -450,8 +498,19 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
     }
   };
 
+  // Only the rows that have never been valuated — the cheap, common action.
   const valuateDrafts = () => runBatch(items.filter((x) => x.valued === false));
-  const revaluate = () => runBatch(items);
+  // Every row again, including ones that already have a value. Each row is a
+  // fresh model call (~20-40 s), so on a large portfolio this is expensive and
+  // is worth confirming first.
+  const revaluate = () => {
+    if (valued.length > 0 && !window.confirm(
+      T("Bütün mənzillər yenidən qiymətləndiriləcək") +
+      ` (${items.length}). ` +
+      T("Mövcud nəticələr yenisi ilə əvəz olunacaq. Davam edilsin?")
+    )) return;
+    runBatch(items);
+  };
 
   return (
     <>
@@ -573,12 +632,20 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
         </div>
         <span className="sp" />
         {draftCount > 0 && (
-          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy || !!progress}>{progress ? <><Icons.Refresh size={16} /> {T(`Qiymətləndirilir…`)}</> : <><Icons.Sparkle size={16} /> Portfolionu qiymətləndir ({draftCount})</>}</button>
+          <button className="btn btn-primary btn-lg" onClick={valuateDrafts} disabled={busy || !!progress}>{progress ? <><Icons.Refresh size={16} /> {T(`Qiymətləndirilir…`)}</> : <><Icons.Sparkle size={16} /> {T(`Yeniləri qiymətləndir`)} ({draftCount})</>}</button>
         )}
         {draftCount === 0 && stats && (
           <button className="btn btn-secondary" onClick={onAnalysis}><Icons.TrendUp size={14} /> {T(`Portfel analizi`)}</button>
         )}
-        <button className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`} onClick={revaluate} disabled={items.length === 0 || busy || !!progress} style={{ opacity: items.length === 0 ? 0.5 : 1 }}><Icons.Sparkle size={16} /> {T(`Portfeli qiymətləndir`)}</button>
+        <button
+          className={`btn ${draftCount > 0 ? "btn-secondary" : "btn-primary btn-lg"}`}
+          onClick={revaluate}
+          disabled={items.length === 0 || busy || !!progress}
+          title={T(`Bütün mənzilləri modeldən yenidən keçirir`)}
+          style={{ opacity: items.length === 0 ? 0.5 : 1 }}
+        >
+          <Icons.Refresh size={16} /> {T(`Hamısını yenidən hesabla`)} ({items.length})
+        </button>
       </div>
 
       {progress && (
