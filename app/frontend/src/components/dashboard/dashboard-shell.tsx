@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -55,6 +55,9 @@ import type {
 
 // Month abbreviations for the 12-month chart axis; they used to live in the
 // sample-data module that has since been deleted.
+// Remembers whether the nav rail is collapsed, across reloads.
+const RAIL_KEY = "homora-rail-collapsed";
+
 const MONTH_LABELS_AZ = ["May","Iyn","Iyl","Avq","Sen","Okt","Noy","Dek","Yan","Fev","Mar","Apr"];
 const MONTH_LABELS_EN = ["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
 
@@ -196,11 +199,53 @@ export function DashboardShell({
 
   const mapData = useMemo(() => mapQuery.data ?? [], [mapQuery.data]);
 
+  // ── Sidebar rail ────────────────────────────────────────────────────
+  // Collapsed state survives reloads, and Ctrl/Cmd+B toggles it from
+  // anywhere — the same shortcut editors use, so it needs no discovering.
+  const [railCollapsed, setRailCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      setRailCollapsed(window.localStorage.getItem(RAIL_KEY) === "1");
+    } catch {
+      /* private mode / storage disabled — start expanded */
+    }
+  }, []);
+  const toggleRail = useCallback(() => {
+    setRailCollapsed((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(RAIL_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore quota errors */
+      }
+      return next;
+    });
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "b" || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+      // Don't steal the key while the user is typing into a field.
+      const el = document.activeElement;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (el instanceof HTMLElement && el.isContentEditable) return;
+      e.preventDefault();
+      toggleRail();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleRail]);
+
   const monthLabels = lang === "en" ? MONTH_LABELS_EN : MONTH_LABELS_AZ;
 
   return (
     <main className="min-h-screen bg-background lg:h-screen lg:overflow-hidden">
-      <div className="grid min-h-screen grid-cols-1 lg:h-screen lg:grid-cols-[260px_1fr]">
+      <div
+        className={
+          "grid min-h-screen grid-cols-1 lg:h-screen " +
+          (railCollapsed ? "lg:grid-cols-[68px_1fr]" : "lg:grid-cols-[260px_1fr]")
+        }
+      >
         {/* Left rail: nav (its own scroll, independent of the content) */}
         <aside className="border-b bg-card/40 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
           <NavSidebar
@@ -208,6 +253,8 @@ export function DashboardShell({
             activeView={activeView}
             onViewChange={showView}
             listingCount={listingsQuery.data?.total}
+            collapsed={railCollapsed}
+            onToggleCollapsed={toggleRail}
           />
         </aside>
 

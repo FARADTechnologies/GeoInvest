@@ -6,6 +6,8 @@ import {
   Calculator,
   Globe,
   Mail,
+  PanelLeftClose,
+  PanelLeftOpen,
   PieChart,
   Settings,
   Shield,
@@ -23,6 +25,9 @@ type Props = {
   onViewChange: (view: DashboardView) => void;
   /** Real listing count for the Elanlar badge; hidden until it loads. */
   listingCount?: number;
+  /** Rail collapsed to icons only. */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 };
 
 export type DashboardView =
@@ -58,7 +63,7 @@ function compactCount(n: number): string {
   return String(n);
 }
 
-export function NavSidebar({ t, activeView, onViewChange, listingCount }: Props) {
+export function NavSidebar({ t, activeView, onViewChange, listingCount, collapsed, onToggleCollapsed }: Props) {
   // Single navigation group. Legacy "Homora V1" views (overview / map /
   // rayons / trends / b2c / reports / secondary system) stay hidden from the
   // menu per team request — their code stays in the shell.
@@ -88,13 +93,18 @@ export function NavSidebar({ t, activeView, onViewChange, listingCount }: Props)
     { id: "account", icon: User, label: t.navAccount }
   ];
 
+  const toggleLabel = collapsed
+    ? (t.sidebarExpand ?? "Yan paneli aç")
+    : (t.sidebarCollapse ?? "Yan paneli bağla");
+
   return (
-    <nav className="flex flex-col gap-2 px-3 py-4">
-      {/* Brand — pinned to the top of the rail while the nav list scrolls */}
-      <Link
-        href="/"
-        className="sticky top-0 z-10 -mx-3 -mt-4 mb-1 flex items-center gap-2 border-b bg-card px-5 py-3 transition-colors hover:bg-muted/40"
-        aria-label="Homora.ai dashboard"
+    <nav className={cn("flex flex-col gap-2 py-4", collapsed ? "px-2" : "px-3")}>
+      {/* Brand + collapse control — pinned while the nav list scrolls */}
+      <div
+        className={cn(
+          "sticky top-0 z-10 -mt-4 mb-1 flex items-center border-b bg-card py-3",
+          collapsed ? "-mx-2 justify-center px-2" : "-mx-3 gap-2 px-5"
+        )}
       >
         {/* Official Homora.ai wordmark (team #4), inlined so it can't 404 on
             deploy; `.app-logo` inverts it to white in dark mode. */}
@@ -102,21 +112,39 @@ export function NavSidebar({ t, activeView, onViewChange, listingCount }: Props)
             hardcoded tenant name every user saw regardless of who they were.
             Dropped rather than faked; re-add it here once real companies
             exist and the signed-in user can be mapped to one. */}
-        <HomoraLogo height={22} className="app-logo" />
-      </Link>
+        {!collapsed && (
+          <Link href="/" className="min-w-0 flex-1" aria-label="Homora.ai dashboard">
+            <HomoraLogo height={22} className="app-logo" />
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          title={`${toggleLabel} (Ctrl+B)`}
+          aria-label={toggleLabel}
+          aria-expanded={!collapsed}
+          className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+        >
+          {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+      </div>
 
       <div className="flex flex-col gap-0.5">
         {items.map((n) => (
-          <NavRow key={n.id} item={n} active={activeView === n.id} onClick={() => onViewChange(n.id)} />
+          <NavRow key={n.id} item={n} active={activeView === n.id} collapsed={collapsed} onClick={() => onViewChange(n.id)} />
         ))}
       </div>
 
       <div className="flex flex-col gap-0.5">
-        <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          {t.navAccount}
-        </div>
+        {collapsed ? (
+          <div className="my-2 border-t" />
+        ) : (
+          <div className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            {t.navAccount}
+          </div>
+        )}
         {settings.map((n) => (
-          <NavRow key={n.id} item={n} active={activeView === n.id} onClick={() => onViewChange(n.id)} />
+          <NavRow key={n.id} item={n} active={activeView === n.id} collapsed={collapsed} onClick={() => onViewChange(n.id)} />
         ))}
       </div>
     </nav>
@@ -126,10 +154,12 @@ export function NavSidebar({ t, activeView, onViewChange, listingCount }: Props)
 function NavRow({
   item,
   active,
+  collapsed,
   onClick
 }: {
   item: NavItem;
   active: boolean;
+  collapsed: boolean;
   onClick: () => void;
 }) {
   const Icon = item.icon;
@@ -137,16 +167,21 @@ function NavRow({
     <button
       type="button"
       onClick={onClick}
+      // Collapsed rows carry the label as a tooltip, so the icon alone is
+      // still identifiable.
+      title={collapsed ? (item.pill ? `${item.label} · ${item.pill}` : item.label) : undefined}
+      aria-label={collapsed ? item.label : undefined}
       className={cn(
-        "flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-[12.5px] font-medium transition-colors",
+        "flex h-9 items-center rounded-lg text-[12.5px] font-medium transition-colors",
+        collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
         active
           ? "bg-[var(--brand-600)] text-white shadow-sm"
           : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
       )}
     >
       <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-      <span className="flex-1 truncate text-left">{item.label}</span>
-      {item.pill ? (
+      {!collapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
+      {!collapsed && item.pill ? (
         <span
           className={cn(
             "rounded-full px-1.5 py-0.5 text-[9.5px] font-bold tracking-wider",

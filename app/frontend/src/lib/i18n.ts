@@ -152,6 +152,8 @@ const EN: Strings = {
   navAlerts: "Alerts",
   navSettings: "Settings",
   navAccount: "Account",
+  sidebarCollapse: "Collapse sidebar",
+  sidebarExpand: "Expand sidebar",
 
   // v3 views (Rayons / Listings / B2C)
   rayonsPageTitle: "Rayons",
@@ -439,6 +441,8 @@ const AZ: Strings = {
   navAdmin: "Admin / Şirkətlər",
   navSettings: "Ayarlar",
   navAccount: "Hesab",
+  sidebarCollapse: "Yan paneli bağla",
+  sidebarExpand: "Yan paneli aç",
 
   // v3 views (Rayons / Listings / B2C)
   rayonsPageTitle: "Rayonlar",
