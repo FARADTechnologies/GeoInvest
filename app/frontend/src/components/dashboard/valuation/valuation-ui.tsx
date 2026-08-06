@@ -90,45 +90,98 @@ export function DonutChart({
   max = 100,
   size = 84,
   label = "",
-  color
+  suffix = "%",
+  color = "#2A8B7E"
 }: {
   value: number;
   max?: number;
   size?: number;
   label?: string;
+  /** Unit shown after the number. Pass "" for a bare count. */
+  suffix?: string;
   color?: string;
 }) {
-  const c = color || (value >= 78 ? "#1F8A5B" : value >= 60 ? "#C58A1A" : "#C0392B");
-  const tint =
-    value >= 78 ? "rgba(31,138,91,0.12)" : value >= 60 ? "rgba(197,138,26,0.12)" : "rgba(192,57,43,0.12)";
-  const sw = size / 9;
-  const r = (size - sw) / 2;
-  const cr = 2 * Math.PI * r;
-  const pct = value / max;
+  // This used to pick its colour from the investment score's risk bands
+  // (>=78 green, >=60 amber, else red) and, worse, derive the halo from those
+  // same thresholds even when a caller passed an explicit colour. Both of the
+  // remaining callers show a share of the market, where "38" is neither good
+  // nor bad — yet it was being drawn with a red halo. The ring is now one
+  // colour, given by the caller, and the track is neutral.
+  const pct = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  const stroke = Math.max(6, Math.round(size / 11));
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const mid = size / 2;
+
   return (
-    <div style={{ width: size, height: size, position: "relative", display: "grid", placeItems: "center" }}>
-      <svg width={size} height={size} style={{ transform: "rotate(-90deg)", position: "absolute" }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill={tint} stroke="none" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={sw} />
+    <div
+      style={{ width: size, height: size, position: "relative", flexShrink: 0 }}
+      role="img"
+      aria-label={`${label ? label + ": " : ""}${value}${suffix}`}
+    >
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        width={size}
+        height={size}
+        style={{ display: "block", transform: "rotate(-90deg)" }}
+      >
+        <circle cx={mid} cy={mid} r={r} fill={color} fillOpacity={0.07} stroke="none" />
+        <circle cx={mid} cy={mid} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
         <circle
-          cx={size / 2}
-          cy={size / 2}
+          cx={mid}
+          cy={mid}
           r={r}
           fill="none"
-          stroke={c}
-          strokeWidth={sw}
-          strokeDasharray={cr}
-          strokeDashoffset={cr * (1 - pct)}
+          stroke={color}
+          strokeWidth={stroke}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - pct)}
           strokeLinecap="round"
         />
       </svg>
-      <div style={{ position: "relative", textAlign: "center", lineHeight: 1.1 }}>
-        <div style={{ fontWeight: 800, fontSize: size / 3.5, color: c, letterSpacing: "-0.02em" }}>{value}</div>
-        {label && (
-          <div style={{ fontSize: 9, color: "var(--text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 2 }}>
-            {label}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          display: "grid",
+          placeItems: "center",
+          textAlign: "center",
+          lineHeight: 1.05
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: Math.round(size / 3.6),
+              color: "var(--text-1)",
+              letterSpacing: "-0.02em",
+              fontVariantNumeric: "tabular-nums"
+            }}
+          >
+            {Math.round(value)}
+            {suffix && (
+              <span style={{ fontSize: Math.round(size / 7), fontWeight: 600, color: "var(--text-3)" }}>
+                {suffix}
+              </span>
+            )}
           </div>
-        )}
+          {label && (
+            <div
+              style={{
+                fontSize: Math.max(8.5, Math.round(size / 10)),
+                color: "var(--text-3)",
+                fontWeight: 600,
+                marginTop: 3,
+                maxWidth: size - stroke * 2.6,
+                marginInline: "auto",
+                lineHeight: 1.2
+              }}
+            >
+              {label}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

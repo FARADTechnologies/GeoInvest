@@ -297,6 +297,11 @@ const D: Dict = {
   },
   "Sərmayə dəyərləndirməsi": { tr: "Yatırım değerlendirmesi", en: "Investment assessment" },
   "Yeniləri qiymətləndir": { tr: "Yenileri değerle", en: "Valuate the new ones" },
+  "Hələ portfeliniz yoxdur": { tr: "Henüz portföyünüz yok", en: "You have no portfolios yet" },
+  "Portfel yaradın, sonra mənzilləri əl ilə və ya Excel ilə əlavə edin. Hər mənzil Homora modelindən keçirilir və nəticələr portfel üzrə yığılır.": {
+    tr: "Bir portföy oluşturun, sonra daireleri elle veya Excel ile ekleyin. Her daire Homora modelinden geçirilir ve sonuçlar portföy bazında toplanır.",
+    en: "Create a portfolio, then add properties by hand or from Excel. Each one goes through the Homora model and the results roll up across the portfolio."
+  },
   "Hamısını yenidən hesabla": { tr: "Tümünü yeniden hesapla", en: "Recalculate all" },
   "Bütün mənzilləri modeldən yenidən keçirir": { tr: "Tüm daireleri modelden yeniden geçirir", en: "Runs every property through the model again" },
   "Bütün mənzillər yenidən qiymətləndiriləcək": { tr: "Tüm daireler yeniden değerlendirilecek", en: "Every property will be valuated again" },

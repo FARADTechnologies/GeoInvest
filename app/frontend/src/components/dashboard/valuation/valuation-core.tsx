@@ -5,7 +5,9 @@
 // modal, and the detail report modal. Data is fed from our /valuation/* API
 // (mapped from snake_case to the prototype's camelCase shape).
 
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { fetchMarketRayons } from "@/lib/market-api";
 import { T } from "@/components/dashboard/valuation/valuation-i18n";
 import { usePlacesAutocomplete } from "@/components/dashboard/valuation/valuation-maps";
 import { MapPicker } from "@/components/dashboard/valuation/valuation-map-picker";
@@ -697,17 +699,34 @@ export function PropertyReport({
   };
   const deltaPct = (v: number, avg: number) => (avg ? +(((v - avg) / avg) * 100).toFixed(1) : 0);
 
-  // Only comparisons we can actually compute stay here. The three price-growth
-  // rows ("+9.1% / +10.2% / +10.1%") were literal constants in the source — the
-  // same three numbers for every apartment in every rayon — and the "500 m
-  // radius" figure was just this property's own ₼/m² multiplied by 0.98. The
-  // per-rayon growth that would replace them lives in Bazar analizi
-  // (/model/market/rayons); wiring it per property needs the rayon key on the
-  // portfolio row, which the batch result does not carry yet (tracker B9).
+  // Price growth for this property's rayon, measured. The three rows that used
+  // to sit here ("+9.1% / +10.2% / +10.1%") were literal constants, identical
+  // for every apartment in every rayon; this reads the same endpoint Bazar
+  // analizi does, and the rayon comes from the predict server's own spatial
+  // resolution of the coordinates. Rayons with too small a sample are excluded
+  // upstream, so a missing entry stays "—" rather than borrowing a neighbour's.
+  const rayonsQuery = useQuery({ queryKey: ["valuation", "market", "rayons"], queryFn: fetchMarketRayons });
+  const rayonGrowth = useMemo(() => {
+    const key = (n: string) => n.replace(/\s*rayonu\s*$/i, "").trim().toLocaleLowerCase("az");
+    if (!p.district || p.district === "—") return null;
+    const min = rayonsQuery.data?.min_sample ?? 20;
+    const hit = rayonsQuery.data?.rayons.find((r) => key(r.rayon) === key(p.district));
+    if (!hit || hit.growth_pct == null || (hit.growth_count ?? 0) < min) return null;
+    return +hit.growth_pct.toFixed(1);
+  }, [rayonsQuery.data, p.district]);
+
+  const growthRow = (k: string, v: number | null | undefined) => ({
+    k,
+    v: v == null ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(1)}%`,
+    d: v ?? undefined
+  });
+
   const benches: { k: string; v: string; d?: number; invert?: boolean; vsLabel?: string }[] = [
     { k: "Kirayə gəlirliyi", v: fmtPercent(p.yield), d: deltaPct(p.yield, stats.avgYield), vsLabel: "portfel orta" },
     { k: "Kirayə ilə geri ödəmə", v: `${p.payback} il`, d: deltaPct(p.payback, stats.avgPayback), invert: true, vsLabel: "portfel orta" },
-    { k: "Qiymət / m²", v: fmtMoney(p.pricePerM2, " ₼/m²"), d: deltaPct(p.pricePerM2, stats.avgPricePerM2), vsLabel: "portfel orta" }
+    { k: "Qiymət / m²", v: fmtMoney(p.pricePerM2, " ₼/m²"), d: deltaPct(p.pricePerM2, stats.avgPricePerM2), vsLabel: "portfel orta" },
+    growthRow("Mənzilin qiymət artımı", p.growth),
+    growthRow(`${p.district !== "—" ? p.district : "Rayon"} üzrə qiymət artımı`, rayonGrowth)
   ];
 
   return (

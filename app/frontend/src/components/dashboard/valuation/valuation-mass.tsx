@@ -253,6 +253,15 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
         </div>
       </div>
 
+      {!loading && portfolios.length === 0 && (
+        <div className="card card-pad" style={{ marginBottom: 14 }}>
+          <div className="card-title">{T(`Hələ portfeliniz yoxdur`)}</div>
+          <div className="card-sub" style={{ marginTop: 4, maxWidth: "62ch" }}>
+            {T(`Portfel yaradın, sonra mənzilləri əl ilə və ya Excel ilə əlavə edin. Hər mənzil Homora modelindən keçirilir və nəticələr portfel üzrə yığılır.`)}
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
         {portfolios.map((pf) => {
           const st = pf.items.length ? statsOf(pf.items) : null;
@@ -284,7 +293,7 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
           </div>
         </div>
       </div>
-      {loading ? <div className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>{T(`Portfellər qiymətləndirilir…`)}</div> : null}
+      {loading ? <div className="muted" style={{ marginTop: 12, fontSize: 12.5 }}>{T(`Yüklənir…`)}</div> : null}
 
       {creating && (
         <div className="modal-backdrop" onClick={() => setCreating(false)}>
@@ -770,7 +779,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           <div className="card-title">{T(`Növ üzrə`)}</div>
           <div className="card-sub" style={{ margin: "4px 0 14px" }}>{T(`Yeni vs köhnə tikili.`)}</div>
           <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 12 }}>
-            <DonutChart value={Math.round((stats.newCount / Math.max(stats.n, 1)) * 100)} label="Yeni tikili %" size={84} color="#2A8B7E" />
+            <DonutChart value={Math.round((stats.newCount / Math.max(stats.n, 1)) * 100)} label={T(`Yeni tikili`)} size={84} color="#2A8B7E" />
             <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
               <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#2A8B7E" }} /><span style={{ fontSize: 13 }}>{T(`Yeni tikili`)}</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.newCount}</strong></div>
               <div className="fl-row" style={{ gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#0F1E3D" }} /><span style={{ fontSize: 13 }}>{T(`Köhnə tikili`)}</span><span className="sp" /><strong style={{ fontVariantNumeric: "tabular-nums" }}>{stats.n - stats.newCount}</strong></div>
