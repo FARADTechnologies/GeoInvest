@@ -65,3 +65,6 @@ screenshots/
 .firebase/
 app/frontend/out/
 /Homora B2B*.html
+
+# Local-only Docker Compose overrides (test inboxes, per-machine tweaks).
+app/docker-compose.override.yml
