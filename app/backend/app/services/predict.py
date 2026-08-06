@@ -14,6 +14,7 @@ import httpx
 import psycopg
 
 from app.core.config import settings
+from app.services.cache import cached_market
 
 
 class PredictError(Exception):
@@ -411,7 +412,7 @@ def _query_room_segments(conn_str: str) -> list[tuple]:
             return cur.fetchall()
 
 
-async def market_room_segments() -> dict:
+async def _market_room_segments_uncached() -> dict:
     """Room-count segments (₼/m², rent, yield, share) split by build type.
 
     Returns { "all": [...], "new": [...], "old": [...] } so the frontend's
@@ -503,7 +504,7 @@ def _query_trend(conn_str: str, kind: str) -> list[tuple]:
             return cur.fetchall()
 
 
-async def market_trends() -> dict:
+async def _market_trends_uncached() -> dict:
     """Monthly sale ₼/m² and rent ₼ curves per build type (all / new / old).
 
     Returns { "sale": {all:[{date,value}], new:[...], old:[...]},
@@ -634,7 +635,7 @@ def _query_rayon_growth(conn_str: str) -> list[tuple]:
             return cur.fetchall()
 
 
-async def market_rayons() -> dict:
+async def _market_rayons_uncached() -> dict:
     """Per-rayon rental yield (last month) and price growth for Bazar analizi.
 
     Returns { "rayons": [{rayon, yield_pct, rent, recent_count, growth_pct,
@@ -700,7 +701,7 @@ def _query_index_yoy(conn_str: str) -> list[tuple]:
             return cur.fetchall()
 
 
-async def market_index() -> dict:
+async def _market_index_uncached() -> dict:
     """City price index (base 100 = Aug 2023) per build type — team #3c.
 
     Returns { base, all:[{date,value}], new:[...], old:[...],
@@ -745,3 +746,26 @@ async def market_index() -> dict:
             "old": round(latest[1], 1),
         },
     }
+
+
+# ── Cached entry points ───────────────────────────────────────────────────────
+#
+# Each of the four aggregates above scans the source database hard, and their
+# inputs only change when the nightly job runs. The wrappers below are what the
+# routes call, so a page load costs one Redis read instead of a full scan.
+
+
+async def market_trends() -> dict:
+    return await cached_market("trends", _market_trends_uncached)
+
+
+async def market_rayons() -> dict:
+    return await cached_market("rayons", _market_rayons_uncached)
+
+
+async def market_index() -> dict:
+    return await cached_market("index", _market_index_uncached)
+
+
+async def market_room_segments() -> dict:
+    return await cached_market("segments", _market_room_segments_uncached)

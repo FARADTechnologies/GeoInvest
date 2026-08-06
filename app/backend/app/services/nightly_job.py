@@ -15,6 +15,7 @@ from datetime import date, datetime, timezone
 import psycopg
 from sqlalchemy import delete, text
 
+from app.services.cache import invalidate_market
 from app.core.config import settings
 from app.db.session import async_session_factory
 from app.models.h3_analytics import H3AnalyticsRecord
@@ -328,6 +329,10 @@ async def run_nightly_job() -> None:
         )
         raise
     else:
+        # Fresh rows landed, so every cached market aggregate is now stale.
+        # Dropping them here means the new figures show up on the next page
+        # load rather than whenever the TTL happens to lapse.
+        await invalidate_market()
         logger.info("Nightly job completed successfully.")
         _last_run.update(
             finished_at=datetime.now(timezone.utc).isoformat(),
