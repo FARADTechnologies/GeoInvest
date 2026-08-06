@@ -41,8 +41,7 @@
 | B11 | **`send_email` hata yakalama** | httpx hataları `EmailError` olarak sarılmıyor → ağ/DNS sorununda istek çıplak 500/502 olarak ölüyor, mesaj kayboluyor. Düzeltme yazıldı, uygulanamadı |
 | B12 | **`/admin/data-status`'a e-posta teşhis bloğu** | Ayarın **varlığını** raporlar, değerini asla. "Prod'da e-posta kurulu mu?" bir daha tahmin işi olmasın |
 | B13 | **Excel arşiv ölü kodu** | `_MERGE_ARCHIVE_TABLE` yolu kapalı ama duruyor; tamamen sökülecek |
-| B8 | Toplu değerleme canlı testi | Docker açık, stack ayakta. "Başlat → sekmeyi kapat → dön" senaryosu |
-| B2 | Rapor arayüzü — kalan parça | Ana bölümler eşitlendi; ekibin paketiyle son karşılaştırma kaldı |
+| B14 | **`city_value` / `district_value` boş geliyor** | Canlı testte doğrulandı: predict cevabında bu iki alan `null`. Rapordaki "Bakı üzrə artım" ve "Rayon üzrə artım" bu yüzden "—" gösteriyor. Ekibe sorulacak: bu alanları hangi uç dolduruyor? |
 
 ---
 
@@ -96,6 +95,13 @@
 - Rapor artık homora.ai ile birebir: 500m ortalama, Bakı artımı, rayon artımı (hepsi gerçek, predict'ten)
 - **Tarih formatı Azerbaycan standardına çevrildi:** `06.08.2026` / `08.2026` / eksende `08.26`. Tek modül (`lib/format-date.ts`) yönetiyor; API hâlâ ISO konuşuyor
 - Bazar analizi'nde "ən sürətli" ve "ən yavaş artan" listeleri aynı rayonları gösteriyordu (10'dan az rayon eşiği geçince dilimler çakışıyordu) → ayrıldı
+
+**Canlı doğrulama (2026-08-06, yerel Docker)**
+- **B8 toplu değerleme testi GEÇTİ:** 2 mənzillik iş başlatıldı, istemci tamamen koparıldı, iş sunucuda döndü ve 2/2 tamamlandı. Sonuçlar gerçek (362 011 ₼ / 173 540 ₼, rayonlar koordinattan çözülmüş)
+- **B2 alanı doğrulandı:** `neighbourhood_price_500m` predict cevabında **gerçekten var** (3 286 / 2 614) → rapordaki "500m radiusda orta qiymət" artık gerçek sayı gösteriyor
+- `price_trend` modelden 13 aylık gerçek seri dönüyor → rapordaki trend grafiği gerçek
+- OTP akışı yerelde uçtan uca çalıştı: kayıt → onay → giriş → kod gönderildi (200)
+- Tarih formatı ekranda doğrulandı: grafik ekseni `05.25 · 07.25 · 09.25 …`
 
 **Performans**
 - ⚠️ **Ölçüm notu:** prod'da `/model/market/trends` **0.43 sn** dönüyor — yük bugün kritik değil. Sebep: JSONB açılımı sadece `prediction_info` dolu satırlara dokunuyor (~18k), 169k'nın hepsine değil. Tahmin kuyruğu ilerledikçe büyür; cache asıl o büyümeye karşı koruma
