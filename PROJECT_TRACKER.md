@@ -37,10 +37,7 @@
 | # | İş | Not |
 |---|---|---|
 | B2 | **Rapor arayüzü** | Ekibin gönderdiği 30 dosyalık React paketi (`homora-valuation-report-ui-20260804`) bizim TypeScript yapımıza taşınacak. Başlı başına bir oturum |
-| B7 | Yuvarlak yüzde göstergesi | Tasarımı kötü, değiştirilecek |
-| B8 | Toplu değerleme canlı testi | Kod hazır, deploy sonrası "başlat → sekmeyi kapat → dön" senaryosu denenmeli |
-| B9 | Rayon bazlı artım mənzil hesabatında | `/model/market/rayons` gerçek artımı veriyor; portföy satırında rayon anahtarı yok, eklenmeli |
-| B10 | Boş ekran metinleri | Uydurma veriler kalkınca bazı kartlar boş kaldı; "veri yok" mesajları gözden geçirilmeli |
+| B8 | Toplu değerleme canlı testi | **Deploy bekliyor.** Prod'da `/valuation/jobs` ve `/admin/data-status` uçları 401 dönüyor (yani var ve korumalı). Bu turun kodu henüz deploy edilmedi; "başlat → sekmeyi kapat → dön" senaryosu deploy sonrası denenecek |
 
 ---
 
@@ -87,9 +84,13 @@
 - Sol bar aç/kapa: `Ctrl+B` + panel başlığındaki buton, seçim kalıcı, kapalıyken ikonlarda tooltip
 - Portföy URL'e yansıyor: `/bulk?p=<id>` (+ `&v=analysis`); geri/ileri portföyler arasında geziyor
 - İki "qiymətləndir" butonu ayrıştı: **Yeniləri qiymətləndir (N)** vs **Hamısını yenidən hesabla (N)**; pahalı olan onay soruyor
+- Yuvarlak gösterge yeniden yazıldı: skor eşikleri (78/60 → yeşil/kırmızı) hâlâ içindeydi, nötr bir oranı kırmızı hale ile çiziyordu; artık tek renk + nötr iz, birim sayının yanında, erişilebilir
+- Mənzil hesabatında **rayon üzrə artım** gerçek (`/model/market/rayons`, min örneklem kuralıyla)
+- Kütləvi boş ekran: portföy yokken ne yapılacağı yazıyor; yanıltıcı "portfellər qiymətləndirilir" mesajı kaldırıldı
 - Rapor artık homora.ai ile birebir: 500m ortalama, Bakı artımı, rayon artımı (hepsi gerçek, predict'ten)
 
 **Performans**
+- ⚠️ **Ölçüm notu:** prod'da `/model/market/trends` şu an **0.43 sn** dönüyor — yani yük bugün kritik değil. Sebep: JSONB açılımı sadece `prediction_info` dolu satırlara dokunuyor (~18k), 169k'nın hepsine değil. Tahmin kuyruğu ilerledikçe bu oran büyür; cache asıl o büyümeye karşı koruma
 - **Bazar analizi cache'i** (ekibin isteği): 4 ağır analitik artık gecelik döngü başına 1 kez hesaplanıyor. Gecelik iş bitince cache temizleniyor. Redis varsa Redis, yoksa süreç içi sözlük
 
 **Arayüz — 1. tur**
