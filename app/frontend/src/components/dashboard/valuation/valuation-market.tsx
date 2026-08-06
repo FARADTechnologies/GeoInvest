@@ -32,6 +32,7 @@ import {
   type TrendCat,
   type TrendPoint
 } from "@/lib/market-api";
+import { formatMonthShort } from "@/lib/format-date";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import type { Lang } from "@/lib/i18n";
@@ -277,7 +278,7 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
 
   const chartPoints = trendSource.slice(-months);
   const chartSeries = chartPoints.map((p) => p.value);
-  const chartLabels = chartPoints.map((p) => ({ short: p.date.slice(0, 7) }));
+  const chartLabels = chartPoints.map((p) => ({ short: formatMonthShort(p.date) }));
   const trendMeta = MKT_METRICS[trendMetric];
   const startV = chartSeries[0];
   const endV = chartSeries[chartSeries.length - 1];

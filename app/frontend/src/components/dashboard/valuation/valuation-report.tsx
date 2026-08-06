@@ -13,6 +13,7 @@ import { T } from "@/components/dashboard/valuation/valuation-i18n";
 import { Icons, LineChart, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
 import { fetchNearby, type NearbyCategory } from "@/lib/valuation-report";
 import type { RateReportData, TrendPoint } from "@/types/valuation";
+import { formatMonthShort } from "@/lib/format-date";
 
 const rent = (n: number | null | undefined) => (n == null ? "—" : `${fmtMoney(n)} / ${T("ay")}`);
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(n % 1 === 0 ? 0 : 2).replace(/\.?0+$/, "")}%`);
@@ -207,7 +208,7 @@ function trendSeries(t: TrendPoint[]): number[] {
 }
 function trendLabels(t: TrendPoint[]): string[] {
   // ISO month-end → "YYYY-MM" label.
-  return t.map((p) => (p.date || "").slice(0, 7));
+  return t.map((p) => formatMonthShort(p.date));
 }
 
 function InfoCell({ k, children }: { k: string; children: React.ReactNode }) {

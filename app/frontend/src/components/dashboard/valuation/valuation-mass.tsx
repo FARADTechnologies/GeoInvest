@@ -26,6 +26,7 @@ import { COLUMNS, ColumnPicker, colClass, useVisibleCols } from "@/components/da
 import { RateReport } from "@/components/dashboard/valuation/valuation-report";
 import { geocodeAddress } from "@/components/dashboard/valuation/valuation-maps";
 import { fetchValuationMeta, newId } from "@/lib/valuation-data";
+import { formatDate } from "@/lib/format-date";
 import {
   buildPredictPayload,
   predictByParams,
@@ -224,7 +225,7 @@ export function ValuationMassView({ lang = "az" }: { lang?: Lang }) {
         onOpen={(id) => setRoute({ name: "portfolio", id })}
         onCreate={(name) => {
           // The author is whoever is signed in — never a placeholder name.
-          const pf: Portfolio = { id: newId("pf"), name: name || `Yeni portfel · ${new Date().toLocaleDateString("az-AZ")}`, description: "Boş portfel — mənzilləri əl ilə əlavə edin.", createdAt: new Date().toISOString().slice(0, 10), createdBy: getUser()?.name || "—", items: [] };
+          const pf: Portfolio = { id: newId("pf"), name: name || `Yeni portfel · ${formatDate(new Date())}`, description: "Boş portfel — mənzilləri əl ilə əlavə edin.", createdAt: new Date().toISOString().slice(0, 10), createdBy: getUser()?.name || "—", items: [] };
           setPortfolios((prev) => [pf, ...prev]);
           setRoute({ name: "portfolio", id: pf.id });
         }}
@@ -272,7 +273,7 @@ function MassLanding({ portfolios, source, loading, onOpen, onCreate }: { portfo
                 <div className="fl-row" style={{ alignItems: "flex-start" }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="card-title" style={{ fontSize: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pf.name}</div>
-                    <div className="cell-muted" style={{ marginTop: 4 }}>{pf.createdAt} · {pf.createdBy}</div>
+                    <div className="cell-muted" style={{ marginTop: 4 }}>{formatDate(pf.createdAt)} · {pf.createdBy}</div>
                   </div>
                   {st ? null : <Pill tone="amber" dot>{T(`Qaralama`)}</Pill>}
                 </div>
@@ -530,7 +531,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
             <h1 className="page-title">{portfolio.name}</h1>
             {draftCount > 0 ? <Pill tone="amber" dot>{draftCount} qaralama</Pill> : items.length > 0 ? <Pill tone="green" dot>{T(`Qiymətləndirildi`)}</Pill> : <Pill tone="gray" dot>{T(`Boş`)}</Pill>}
           </div>
-          <p className="page-sub">{portfolio.description} · Yaradılıb {portfolio.createdAt} · {portfolio.createdBy}</p>
+          <p className="page-sub">{portfolio.description} · Yaradılıb {formatDate(portfolio.createdAt)} · {portfolio.createdBy}</p>
         </div>
         <div className="page-actions">
           <SourceBadge source={source} />

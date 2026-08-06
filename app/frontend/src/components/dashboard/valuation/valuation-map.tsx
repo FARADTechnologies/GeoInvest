@@ -13,6 +13,7 @@ import { Icons, LineChart, Pill, fmtMoney, fmtNumber } from "@/components/dashbo
 import { MapPanel } from "@/components/map/map-panel";
 import { fetchFilters, fetchMapData } from "@/lib/api";
 import { fetchMarketTrends } from "@/lib/market-api";
+import { formatMonth, formatMonthShort } from "@/lib/format-date";
 import { useStrings, type Lang } from "@/lib/i18n";
 import type { DashboardFilters } from "@/types/api";
 
@@ -142,7 +143,7 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
     return (trendsQuery.data?.sale[cat] ?? []).slice(-12);
   }, [trendsQuery.data, metric, category]);
   const trendData = trendPoints.map((p) => p.value);
-  const months = trendPoints.map((p) => p.date.slice(0, 7));
+  const months = trendPoints.map((p) => formatMonthShort(p.date));
 
   return (
     <div className="hm-val">
@@ -171,7 +172,7 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
         <div className="card" style={{ padding: "14px 18px", marginBottom: 14 }}>
           <div className="fl-row" style={{ gap: 22, flexWrap: "wrap", alignItems: "flex-end" }}>
             <ToolField label={T(`Dövr`)}>
-              <MapSelect value={activePeriod} onChange={setPeriod} options={periods.map((p) => ({ value: p, label: p }))} minWidth={130} />
+              <MapSelect value={activePeriod} onChange={setPeriod} options={periods.map((p) => ({ value: p, label: formatMonth(p) }))} minWidth={130} />
             </ToolField>
             <ToolField label={T(`Kateqoriya`)}>
               <MapSelect value={category} onChange={setCategory} options={[{ value: "all", label: T(`Hamısı`) }, { value: "new", label: T(`Yeni tikili`) }, { value: "old", label: T(`Köhnə tikili`) }]} minWidth={150} />
@@ -197,7 +198,7 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
           <div className="card-head">
             <div>
               <div className="card-title">{T(`Bakı İstilik Xəritəsi`)}</div>
-              <div className="card-sub">{aggLabel} {T(meta.label).toLowerCase()} · {activePeriod}</div>
+              <div className="card-sub">{aggLabel} {T(meta.label).toLowerCase()} · {formatMonth(activePeriod)}</div>
             </div>
             <span className="sp" />
             <Pill tone="navy">{category === "all" ? T(`Bütün kateqoriyalar`) : category === "new" ? T(`Yeni tikili`) : T(`Köhnə tikili`)}</Pill>

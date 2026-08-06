@@ -42,6 +42,7 @@ import {
   type SuperCompany,
   type SuperRequest
 } from "@/lib/super-admin-data";
+import { formatDate } from "@/lib/format-date";
 import "@/components/dashboard/v3-views.css";
 import "@/components/dashboard/admin.css";
 
@@ -426,7 +427,7 @@ export function AdminView({ t }: { t: Record<string, string> }) {
                         <Logo name={c.short || c.name} />
                         <div style={{ minWidth: 0 }}>
                           <b>{c.short || c.name}</b>
-                          <div className="hm-cell-sub">{c.title} · {c.created}</div>
+                          <div className="hm-cell-sub">{c.title} · {formatDate(c.created)}</div>
                         </div>
                       </div>
                     </td>
@@ -514,7 +515,7 @@ export function AdminView({ t }: { t: Record<string, string> }) {
                     <div className="hm-req-contact">{a.email}</div>
                   </div>
                   <div className="hm-req-meta">
-                    <span className="muted">{a.created_at.slice(0, 10)}</span>
+                    <span className="muted">{formatDate(a.created_at)}</span>
                   </div>
                   <div className="hm-req-actions">
                     <button
