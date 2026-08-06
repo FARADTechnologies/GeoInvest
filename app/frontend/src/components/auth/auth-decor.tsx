@@ -176,8 +176,14 @@ export function HMProductMock({ t, style }: ProductMockProps) {
           marginTop: 10
         }}
       >
-        <Stat label={t.statListings} value="12,847" />
-        <Stat label={t.statAccuracy} value="94.6%" accent="#86efac" />
+        {/* "12,847 listings" and "94.6% forecast accuracy" used to sit here.
+            The count was a hardcoded number that had drifted an order of
+            magnitude from reality, and the accuracy figure was a claim about
+            the model's performance that nobody had measured — the kind of
+            number a customer could reasonably rely on. Both are gone; the
+            live listing total is shown once signed in, where it is real. */}
+        <Stat label={t.statCity} value="Bakı" />
+        <Stat label={t.statCoverage} value={t.statCoverageValue} accent="#86efac" />
       </div>
     </div>
   );

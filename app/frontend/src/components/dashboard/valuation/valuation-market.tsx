@@ -322,7 +322,14 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
       .filter((r) => r.growth_pct != null && (r.growth_count ?? 0) >= min)
       .sort((a, b) => (b.growth_pct ?? 0) - (a.growth_pct ?? 0))
       .map((r) => ({ name: shortRayon(r.rayon), growth: r.growth_pct ?? 0 }));
-    return { rising: ranked.slice(0, 5), falling: ranked.slice(-5).reverse() };
+    // slice(0,5) and slice(-5) overlap once fewer than ten rayons qualify, and
+    // with four qualifying rayons both lists showed the same four names —
+    // "fastest growing" and "slowest growing" reading identically. The slowest
+    // list now draws only from what the fastest one did not take, and stays
+    // empty (and hidden) when there is nothing left to show.
+    const rising = ranked.slice(0, 5);
+    const falling = ranked.slice(rising.length).slice(-5).reverse();
+    return { rising, falling };
   }, [rayonsQuery.data]);
 
   // ── Room segments — real only ──────────────────────────────────────
@@ -473,11 +480,15 @@ export function ValuationMarketView({ lang = "az" }: { lang?: Lang }) {
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {rising.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="up" />)}
                 </div>
-                <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-                <div className="card-sub" style={{ marginBottom: 10 }}>{T(`Ən yavaş artan rayonlar`)}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {falling.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="slow" />)}
-                </div>
+                {falling.length > 0 && (
+                  <>
+                    <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
+                    <div className="card-sub" style={{ marginBottom: 10 }}>{T(`Ən yavaş artan rayonlar`)}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {falling.map((d, i) => <MoverRow key={d.name} rank={i + 1} name={d.name} value={d.growth} dir="slow" />)}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <NoData note={loading ? T(`Yüklənir…`) : T(`Məlumat yoxdur.`)} />
