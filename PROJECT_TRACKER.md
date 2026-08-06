@@ -1,7 +1,7 @@
 # Homora B2B — İş Takip Belgesi
 
 > Tek kaynak. Her tur sonunda güncellenir. Bitenler silinmez, arşive taşınır.
-> Son güncelleme: **2026-08-06**
+> Son güncelleme: **2026-08-06** (2. tur)
 
 ---
 
@@ -37,9 +37,6 @@
 | # | İş | Not |
 |---|---|---|
 | B2 | **Rapor arayüzü** | Ekibin gönderdiği 30 dosyalık React paketi (`homora-valuation-report-ui-20260804`) bizim TypeScript yapımıza taşınacak. Başlı başına bir oturum |
-| B4 | Portföy URL'i değişmiyor | `/bulk` sabit kalıyor, portföy id'si girmeli |
-| B5 | İki "qiymətləndir" butonu | Turuncu/beyaz — farkı ne, neden iki tane |
-| B6 | Sol bar aç/kapa | Klavye kısayolu + fare ile |
 | B7 | Yuvarlak yüzde göstergesi | Tasarımı kötü, değiştirilecek |
 | B8 | Toplu değerleme canlı testi | Kod hazır, deploy sonrası "başlat → sekmeyi kapat → dön" senaryosu denenmeli |
 | B9 | Rayon bazlı artım mənzil hesabatında | `/model/market/rayons` gerçek artımı veriyor; portföy satırında rayon anahtarı yok, eklenmeli |
@@ -86,7 +83,16 @@
 - Rol/durum yönetimi + kendini kilitleme koruması
 - Kişisel gmail adresi koddan çıkarıldı (GitLab'a sızmıştı)
 
-**Arayüz**
+**Arayüz — 2. tur (2026-08-06)**
+- Sol bar aç/kapa: `Ctrl+B` + panel başlığındaki buton, seçim kalıcı, kapalıyken ikonlarda tooltip
+- Portföy URL'e yansıyor: `/bulk?p=<id>` (+ `&v=analysis`); geri/ileri portföyler arasında geziyor
+- İki "qiymətləndir" butonu ayrıştı: **Yeniləri qiymətləndir (N)** vs **Hamısını yenidən hesabla (N)**; pahalı olan onay soruyor
+- Rapor artık homora.ai ile birebir: 500m ortalama, Bakı artımı, rayon artımı (hepsi gerçek, predict'ten)
+
+**Performans**
+- **Bazar analizi cache'i** (ekibin isteği): 4 ağır analitik artık gecelik döngü başına 1 kez hesaplanıyor. Gecelik iş bitince cache temizleniyor. Redis varsa Redis, yoksa süreç içi sözlük
+
+**Arayüz — 1. tur**
 - Rotalama: her ekranın kendi URL'i (`/ads`, `/market`, …)
 - Dark mode tek palete indirildi (3 ayrı palet vardı)
 - Logo 404'ü çözüldü (SVG koda gömüldü)
