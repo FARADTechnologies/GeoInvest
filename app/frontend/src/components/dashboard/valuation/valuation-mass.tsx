@@ -736,7 +736,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
   const districtBars = Object.entries(stats.byDistrict).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([label, value]) => ({ label, value }));
   const sorted = [...items].sort((a, b) => b.yield - a.yield);
   const top = sorted.slice(0, 5);
-  const bottom = sorted.slice(-5).reverse();
+  const bottom = sorted.slice(top.length).slice(-5).reverse();
 
   return (
     <>
@@ -744,7 +744,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
         <div style={{ flex: 1 }}>
           <div className="crumbs"><a onClick={onBack}>{portfolio.name}</a><span className="sep">/</span><span>{T(`Portfel analizi`)}</span></div>
           <h1 className="page-title">{T(`Portfel analizi`)}</h1>
-          <p className="page-sub">{T(`Portfel üzrə zəngin analitika — risk profili, paylanma, top performans və müqayisə.`)}</p>
+          <p className="page-sub">{T(`Portfel üzrə analitika — gəlirlilik, paylanma, top performans və müqayisə.`)}</p>
         </div>
         <div className="page-actions"><SourceBadge source={source} /><button className="btn btn-secondary"><Icons.PDF size={14} /> {T(`Analitik hesabat (PDF)`)}</button></div>
       </div>
@@ -805,15 +805,17 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-        <div className="card"><div className="card-head"><div className="card-title">{T(`Top 5 — ən yüksək skor`)}</div><span className="sp" /><Icons.Star size={14} style={{ color: "var(--green)" }} /></div><RankList items={top} variant="top" /></div>
-        <div className="card"><div className="card-head"><div className="card-title">{T(`Aşağı 5 — diqqət lazımdır`)}</div><span className="sp" /><Icons.TrendDown size={14} style={{ color: "var(--red)" }} /></div><RankList items={bottom} variant="bottom" /></div>
+        <div className="card"><div className="card-head"><div className="card-title">{T(`Ən yüksək gəlirlilik`)}</div><span className="sp" /><Icons.Star size={14} style={{ color: "var(--green)" }} /></div><RankList items={top} variant="top" /></div>
+        {bottom.length > 0 && (
+          <div className="card"><div className="card-head"><div className="card-title">{T(`Ən aşağı gəlirlilik`)}</div><span className="sp" /><Icons.TrendDown size={14} style={{ color: "var(--red)" }} /></div><RankList items={bottom} variant="bottom" /></div>
+        )}
       </div>
 
       <div className="card card-pad" style={{ marginBottom: 14 }}>
         <div className="fl-row" style={{ gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <div className="card-title">{T(METRICS[scatterX].label)} vs. {T(METRICS[scatterY].label)}</div>
-            <div className="card-sub" style={{ marginTop: 4 }}>Hər nöqtə bir mənzil. Ölçü = sahə, rəng = risk səviyyəsi.</div>
+            <div className="card-sub" style={{ marginTop: 4 }}>Hər nöqtə bir mənzil. Ölçü = sahə, rəng = portfel ortasına görə gəlirlilik.</div>
           </div>
           <div className="fl-row" style={{ gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
             <ChartSelect label="X oxu" value={scatterX} onChange={setScatterX} options={MK.map((k) => ({ value: k, label: T(METRICS[k].label) }))} />
