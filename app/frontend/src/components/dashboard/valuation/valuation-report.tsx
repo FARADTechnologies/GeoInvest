@@ -14,6 +14,7 @@ import { Icons, LineChart, fmtMoney, fmtNumber } from "@/components/dashboard/va
 import { fetchNearby, type NearbyCategory } from "@/lib/valuation-report";
 import type { RateReportData, TrendPoint } from "@/types/valuation";
 import { formatMonthShort } from "@/lib/format-date";
+import "@/components/dashboard/valuation/valuation-report.css";
 
 const rent = (n: number | null | undefined) => (n == null ? "—" : `${fmtMoney(n)} / ${T("ay")}`);
 const pct = (n: number | null | undefined) => (n == null ? "—" : `${n.toFixed(n % 1 === 0 ? 0 : 2).replace(/\.?0+$/, "")}%`);
@@ -134,21 +135,21 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
               </div>
               <div className="rng-label">{T("Qiymət aralığı")}:</div>
               <div className="rng">{fmtMoney(sale.lower_bound)} – {fmtMoney(sale.upper_bound)}</div>
-              <div className="rng" style={{ marginTop: 6, fontSize: 12 }}>{T("Mənzilin süni intellekt modeli ilə dəyərləndirilmiş satış qiyməti")}</div>
+              <div className="rng tile-note">{T("Mənzilin süni intellekt modeli ilə dəyərləndirilmiş satış qiyməti")}</div>
             </div>
             <div className="big-tile">
               <div className="label">{T("Kirayə qiyməti")} <Icons.Info className="info" /></div>
               <div className="big">{rent(rentEst.point_estimate)}</div>
               <div className="rng-label">{T("Kirayə aralığı")}:</div>
               <div className="rng">{rent(rentEst.lower_bound)} – {rent(rentEst.upper_bound)}</div>
-              <div className="rng" style={{ marginTop: 6, fontSize: 12 }}>{T("Mənzilin süni intellekt modeli ilə dəyərləndirilmiş kirayə qiyməti")}</div>
+              <div className="rng tile-note">{T("Mənzilin süni intellekt modeli ilə dəyərləndirilmiş kirayə qiyməti")}</div>
             </div>
           </div>
 
           {/* ── §9 Sərmayə dəyərləndirməsi ──────────────────────────────── */}
           <div className="print-avoid-break" style={{ marginBottom: 18 }}>
             <div className="chart-title" style={{ marginBottom: 8 }}>{T("Sərmayə dəyərləndirməsi")}</div>
-            <div className="info-grid">
+            <div className="info-grid invest-grid">
               <InfoCell k={T("500m radiusda orta qiymət")}>{fmtMoney(sale.neighbourhood_price_500m)}</InfoCell>
               <InfoCell k={T("Kirayə gəlirliliyi")}>{pct(inv.rent_yield_percent)}</InfoCell>
               <InfoCell k={T("Kirayə ilə geri ödəmə")}>{inv.payback_period_years != null ? `${inv.payback_period_years} ${T("il")}` : "—"}</InfoCell>
@@ -164,7 +165,7 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
             <div className="card chart-card print-avoid-break" style={{ marginBottom: 14 }}>
               <div className="chart-title">{T("Satış qiymətinin trendi")}</div>
               <div className="chart-sub">{T("Qrafik son 1 ildə qiymətləndirilmiş potensial satış dəyərinin dinamikasını əks etdirir.")}</div>
-              <LineChart data={trendSeries(saleTrend)} labels={trendLabels(saleTrend)} height={220} color="#2A8B7E" />
+              <LineChart data={trendSeries(saleTrend)} labels={trendLabels(saleTrend)} height={220} color="#008080" />
             </div>
           )}
 
@@ -173,7 +174,7 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
             <div className="card chart-card print-avoid-break" style={{ marginBottom: 14 }}>
               <div className="chart-title">{T("Kirayə qiymətinin trendi")}</div>
               <div className="chart-sub">{T("Qrafik son 1 ildə qiymətləndirilmiş potensial kirayə qiymətinin dinamikasını əks etdirir.")}</div>
-              <LineChart data={trendSeries(rentTrend)} labels={trendLabels(rentTrend)} height={200} color="#D9531E" />
+              <LineChart data={trendSeries(rentTrend)} labels={trendLabels(rentTrend)} height={200} color="#FF5C00" />
             </div>
           )}
 
@@ -186,11 +187,8 @@ export function RateReport({ data, onClose }: { data: RateReportData; onClose: (
           <MortgageCalculator price={mortgagePrice} predicted={mortgagePredicted} />
 
           {/* ── §13 Disclaimer ──────────────────────────────────────────── */}
-          <div className="card card-pad print-avoid-break" style={{ marginTop: 16, background: "var(--card-2)" }}>
-            <div style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.6, display: "flex", gap: 8 }}>
-              <Icons.Info size={14} style={{ flexShrink: 0, marginTop: 2 }} />
-              <span>{T("Bu əmlak üzrə qiymətləndirmə hesabatı Homora süni intellekt modeli əsasında hazırlanmışdır.")}</span>
-            </div>
+          <div className="report-disclaimer print-avoid-break">
+            <span>{T("Bu əmlak üzrə qiymətləndirmə hesabatı Homora süni intellekt modeli əsasında hazırlanmışdır.")}</span>
           </div>
         </div>
       </div>
@@ -225,13 +223,14 @@ function InfoCell({ k, children }: { k: string; children: React.ReactNode }) {
 function SourceLink({ url }: { url: string }) {
   const href = /^https?:\/\//i.test(url) ? url : `https://${url}`;
   return (
-    <div className="card" style={{ padding: "12px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
-      <Icons.Layers size={15} style={{ color: "var(--orange)", flexShrink: 0 }} />
-      <span style={{ fontSize: 12.5, color: "var(--text-3)", fontWeight: 600, flexShrink: 0 }}>{T("Mənbə")} :</span>
-      <a href={href} target="_blank" rel="noreferrer noopener"
-        style={{ fontSize: 13, color: "var(--orange)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
-        {url}
-      </a>
+    <div className="source-link print-avoid-break" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span className="source-label">{T("Mənbə")} :</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+        <Icons.Layers size={16} style={{ color: "#055eff", flexShrink: 0 }} />
+        <a href={href} target="_blank" rel="noreferrer noopener">
+          {url}
+        </a>
+      </span>
     </div>
   );
 }
@@ -302,21 +301,21 @@ function LocationSection({ lat, lon, nearby }: { lat: number; lon: number; nearb
       <StaticOsmMap lat={lat} lon={lon} />
       {nearby.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div className="chart-sub" style={{ marginBottom: 8, fontWeight: 600 }}>{T("Yaxın obyektlər")}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+          <div className="nearby-title">{T("Yaxın obyektlər")}</div>
+          <div className="nearby-grid">
             {nearby.map((cat) => (
-              <div key={cat.category} className="print-avoid-break" style={{ border: "1px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+              <div key={cat.category} className="nearby-card print-avoid-break">
+                <div className="nearby-card-title">
                   {catLabel(cat.category)} <span style={{ opacity: 0.45, fontWeight: 500 }}>· {cat.items.length}</span>
                 </div>
                 {cat.items.slice(0, 5).map((o, i) => (
-                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12.5, padding: "3px 0", borderTop: i ? "1px solid var(--border)" : "none" }}>
+                  <div key={i} className="nearby-row" style={{ borderTop: i ? "1px solid #eceff2" : "none" }}>
                     <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{o.name}</span>
                     <span style={{ opacity: 0.6, flexShrink: 0 }}>{fmtDist(o.distance)}</span>
                   </div>
                 ))}
                 {cat.items.length > 5 && (
-                  <div style={{ fontSize: 11.5, opacity: 0.5, marginTop: 4 }}>+{cat.items.length - 5} {T("daha")}</div>
+                  <div className="nearby-more">+{cat.items.length - 5} {T("daha")}</div>
                 )}
               </div>
             ))}

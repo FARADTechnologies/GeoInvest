@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans, Poppins } from "next/font/google";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 
@@ -9,6 +9,16 @@ const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-jakarta",
+  display: "swap"
+});
+
+// The valuation report is a faithful copy of homora.ai's own, down to the
+// typeface. It is the only surface that uses this; everything else stays on
+// Jakarta.
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
   display: "swap"
 });
 
@@ -27,7 +37,7 @@ export default function RootLayout({
     // We default to "light" to avoid a flash; <ThemeProvider> overrides
     // immediately based on localStorage / prefers-color-scheme.
     <html lang="az" data-theme="light" suppressHydrationWarning>
-      <body className={jakarta.variable}>
+      <body className={`${jakarta.variable} ${poppins.variable}`}>
         <Providers>{children}</Providers>
       </body>
     </html>

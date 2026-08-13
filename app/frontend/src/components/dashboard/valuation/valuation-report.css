@@ -1,0 +1,354 @@
+/* Qiymətləndirmə hesabatı — homora.ai's own report, matched 1:1.
+ *
+ * Values here are taken from the team's exported source
+ * (homora-valuation-report-ui-20260804): the inline styles on RateApartmentModal
+ * and its RateModal components, plus the .rate-report rules in their style.css.
+ * Their build reaches this look through Chakra + Bootstrap; ours is hand-written,
+ * so the design lives in this one file instead of scattered across props.
+ *
+ * Everything is scoped to `.rate-report`, so no other screen is affected. Only
+ * presentation is set here — the markup and behaviour are untouched.
+ *
+ * The report is deliberately light in both themes. Theirs hardcodes a white
+ * body with black text, it is the same surface that gets printed to PDF, and a
+ * valuation handed to a client should look identical wherever it was produced.
+ */
+
+.hm-val .modal.rate-report {
+  /* .custom-modal-width */
+  max-width: 1200px;
+  background: #ffffff;
+  color: #000000;
+  font-family: var(--font-poppins), Poppins, sans-serif;
+}
+
+.hm-val .rate-report,
+.hm-val .rate-report .card,
+.hm-val .rate-report .modal-head,
+.hm-val .rate-report .modal-body {
+  background: #ffffff;
+  color: #000000;
+}
+
+.hm-val .rate-report .modal-head {
+  border-bottom: 1px solid #eceff2;
+}
+
+.hm-val .rate-report .modal-title {
+  color: #1a2c32;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.hm-val .rate-report .crumbs,
+.hm-val .rate-report .crumbs .sep {
+  color: #657b92;
+}
+
+/* "Hesabatı yüklə" — white button, black label (their Buttons.jsx). */
+.hm-val .rate-report .modal-head .btn {
+  background: #ffffff;
+  border: 1px solid #eceff2;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.hm-val .rate-report .modal-close {
+  background: #ffffff;
+  border: 2px solid #1a2c32;
+  border-radius: 999px;
+  color: #1a2c32;
+}
+
+/* ── §6 Mənzil xüsusiyyətləri ─────────────────────────────────────────
+   Four across, hairline dividers, no outer gaps — one continuous table. */
+.hm-val .rate-report .info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.hm-val .rate-report .info-cell {
+  padding: 16px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
+}
+
+.hm-val .rate-report .info-cell:nth-child(4n) {
+  border-right: none;
+}
+
+.hm-val .rate-report .info-cell:nth-last-child(-n + 4) {
+  border-bottom: none;
+}
+
+.hm-val .rate-report .info-cell .k {
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.hm-val .rate-report .info-cell .v {
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* ── §7 Mənbə linki ──────────────────────────────────────────────────── */
+.hm-val .rate-report .source-link {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 24px;
+  background: transparent;
+}
+
+.hm-val .rate-report .source-link .source-label {
+  color: #325158;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.hm-val .rate-report .source-link a {
+  color: #055eff;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* ── §8 Qiymətləndirmə nəticəsi ──────────────────────────────────────
+   Two centred cards carrying the sale and rent estimates. */
+.hm-val .rate-report .big-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.hm-val .rate-report .big-tile {
+  text-align: center;
+  padding: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.hm-val .rate-report .big-tile .label {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  color: #1a2c32;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.hm-val .rate-report .big-tile .label .info {
+  width: 16px;
+  height: 16px;
+  color: #657b92;
+}
+
+.hm-val .rate-report .big-tile .big {
+  color: #bc3701;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin-top: 0;
+}
+
+.hm-val .rate-report .big-tile .big .big-sub {
+  color: #bc3701;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.hm-val .rate-report .big-tile .rng-label {
+  color: #1a2c32;
+  font-size: 24px;
+  font-weight: 500;
+  margin-top: 0;
+}
+
+.hm-val .rate-report .big-tile .rng {
+  color: #506379;
+  font-size: 20px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* The explanatory line under each range is theirs as a tooltip; kept visible
+   here but stepped down so it reads as a note rather than a value. */
+.hm-val .rate-report .big-tile .rng.tile-note {
+  font-size: 13px;
+  font-weight: 400;
+  color: #657b92;
+}
+
+/* ── §9 Sərmayə dəyərləndirməsi ──────────────────────────────────────
+   A bordered panel of items, each with a floating circular coin icon. */
+.hm-val .rate-report .invest-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 16px;
+  border: 1px solid #eceff2;
+  border-radius: 8px;
+  padding: 20px;
+  box-sizing: border-box;
+  background: #ffffff;
+}
+
+.hm-val .rate-report .invest-grid .info-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.hm-val .rate-report .invest-grid .info-cell::before {
+  content: "";
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 100px;
+  background: #ffffff url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' \
+stroke='%23BC3701' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+<circle cx='12' cy='12' r='9'/><path d='M14.8 9.2a3 3 0 0 0-2.8-1.7c-1.6 0-2.6.9-2.6 2 0 2.7 5.6 1.4 5.6 4.2 0 1.2-1.1 2.1-2.8 2.1a3 3 0 0 1-2.9-1.8'/>\
+<path d='M12 6v12'/></svg>") center / 20px 20px no-repeat;
+  box-shadow: 0 4px 8px rgba(50, 81, 88, 0.2);
+}
+
+.hm-val .rate-report .invest-grid .info-cell .k {
+  color: #22272f;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  white-space: normal;
+}
+
+.hm-val .rate-report .invest-grid .info-cell .v {
+  color: #657b92;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 20px;
+  margin-top: 0;
+}
+
+/* ── §10/§11 Trend qrafikləri ─────────────────────────────────────── */
+.hm-val .rate-report .chart-card {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-top: 56px;
+  margin-bottom: 24px;
+}
+
+.hm-val .rate-report .chart-title {
+  color: #1a2c32;
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.hm-val .rate-report .chart-sub {
+  color: #3b757f;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+/* ── §12 Lokasiya / yaxın obyektlər ─────────────────────────────────── */
+.hm-val .rate-report .nearby-title {
+  color: #1a2c32;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+}
+
+.hm-val .rate-report .nearby-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hm-val .rate-report .nearby-card {
+  border: 1px solid #eceff2;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #ffffff;
+}
+
+.hm-val .rate-report .nearby-card-title {
+  color: #1a2c32;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.hm-val .rate-report .nearby-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  color: #22272f;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.hm-val .rate-report .nearby-row > span:last-child {
+  color: #657b92;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.hm-val .rate-report .nearby-more {
+  color: #8899a8;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* ── §13 Disclaimer ─────────────────────────────────────────────────── */
+.hm-val .rate-report .report-disclaimer {
+  margin-top: 24px;
+  padding: 14px 16px 0;
+  border-top: 1px solid #eceff2;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #657b92;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+  display: block;
+}
+
+/* ── Narrow screens ─────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hm-val .rate-report .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hm-val .rate-report .info-cell:nth-child(4n) {
+    border-right: 1px solid #e5e7eb;
+  }
+  .hm-val .rate-report .info-cell:nth-child(2n) {
+    border-right: none;
+  }
+  .hm-val .rate-report .big-tiles,
+  .hm-val .rate-report .invest-grid {
+    grid-template-columns: 1fr;
+  }
+}
