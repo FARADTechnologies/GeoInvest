@@ -39,8 +39,6 @@
 
 | # | İş | Not |
 |---|---|---|
-| B11 | **`send_email` hata yakalama** | httpx hataları `EmailError` olarak sarılmıyor → ağ/DNS sorununda istek çıplak 500/502 olarak ölüyor, mesaj kayboluyor. Düzeltme yazıldı, uygulanamadı |
-| B12 | **`/admin/data-status`'a e-posta teşhis bloğu** | Ayarın **varlığını** raporlar, değerini asla. "Prod'da e-posta kurulu mu?" bir daha tahmin işi olmasın |
 | B13 | **Excel arşiv ölü kodu** | `_MERGE_ARCHIVE_TABLE` yolu kapalı ama duruyor; tamamen sökülecek |
 | B14 | **`city_value` / `district_value` boş geliyor** | Canlı testte doğrulandı: predict cevabında bu iki alan `null`. Rapordaki "Bakı üzrə artım" ve "Rayon üzrə artım" bu yüzden "—" gösteriyor. Ekibe sorulacak: bu alanları hangi uç dolduruyor? |
 
@@ -81,6 +79,9 @@
 - API URL ikilenmesi koda dayanıklı hale getirildi
 
 **Kimlik / güvenlik**
+- `send_email` artık ağ/DNS/timeout hatalarını da yakalıyor — eskiden bunlar sarılmadan kaçıyor, istek çıplak 500/502 olarak ölüyordu
+- `/admin/data-status` e-posta hazırlık bloğu taşıyor (varlık bilgisi, değer değil) — prod teşhisi bununla kesinleşti
+- Redis erişilemezse artık her çağrıda yeniden aranmıyor (giriş başına 4 kez tam timeout ödeniyordu); başarısız bağlantı 30 sn hatırlanıyor
 - Kayıt → "pending" hesap → super admin onayı → giriş (uçtan uca test edildi)
 - OTP e-posta bombardımanı açığı kapatıldı (60 sn'de 1, günde 10)
 - Rol/durum yönetimi + kendini kilitleme koruması
