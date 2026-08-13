@@ -567,7 +567,7 @@ function PortfolioDetail({ portfolio, meta, source, setSource, onBack, onAnalysi
           <MiniStat k={T(`Ümumi dəyər`)} v={fmtMoney(stats.totalValue)} accent />
           <MiniStat k={T(`Aylıq kirayə`)} v={fmtMoney(stats.totalRent)} />
           <MiniStat k={T(`Orta gəlirlilik`)} v={`${stats.avgYield}%`} />
-          <MiniStat k={T(`Orta skor`)} v={`${stats.avgScore}/100`} last />
+          <MiniStat k={T(`Orta geri ödəmə`)} v={`${stats.avgPayback} il`} last />
         </div>
       )}
 
@@ -766,7 +766,7 @@ export function PortfolioAnalysis({ portfolio, source, onBack }: { portfolio: Po
           <AggStat label={T(`Orta qiymət/m²`)} value={fmtMoney(stats.avgPricePerM2, "")} sub="min–max" items={items} metricKey="pricePerM2" />
           <AggStat label={T(`Orta aylıq kirayə`)} value={fmtMoney(stats.totalRent / Math.max(stats.n, 1))} items={items} metricKey="monthlyRent" />
           <AggStat label={T(`Orta gəlirlilik`)} value={`${stats.avgYield}%`} items={items} metricKey="yield" />
-          <AggStat label={T(`Orta likvidlik`)} value={`${stats.avgLiquidity} gün`} items={items} metricKey="liquidity" />
+          <AggStat label={T(`Orta geri ödəmə`)} value={`${stats.avgPayback} il`} items={items} metricKey="payback" />
         </div>
       </div>
 
@@ -919,14 +919,14 @@ function BinPanel({ items, metricKey, bin, onClose, onOpen }: { items: OProp[]; 
       </div>
       <div style={{ maxHeight: 320, overflowY: "auto" }}>
         <table className="data" style={{ width: "100%" }}>
-          <thead><tr><th style={{ width: 70 }}>ID</th><th>{T(`Ünvan`)}</th><th className="num">{T(meta.label)}</th><th className="num">{T(`Fair value`)}</th><th className="num">{T(`Gəlirlilik`)}</th><th className="num">{T(`Skor`)}</th></tr></thead>
+          <thead><tr><th style={{ width: 70 }}>ID</th><th>{T(`Ünvan`)}</th><th className="num">{T(meta.label)}</th><th className="num">{T(`Fair value`)}</th><th className="num">{T(`Gəlirlilik`)}</th><th className="num">{T(`Geri ödəmə`)}</th></tr></thead>
           <tbody>
             {matched.map((p) => (
               <tr key={p.id} className="row-click" style={{ cursor: "pointer" }} onClick={() => onOpen(p.id)} title={T(`Hesabatı aç`)}>
                 <td className="cell-muted mono">{p.id}</td>
                 <td><div className="cell-primary" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 280 }}>{p.address}</div><div className="cell-muted">{p.district}</div></td>
                 <td className="num cell-strong" style={{ color: "var(--orange)" }}>{meta.fmt(meta.get(p))}</td>
-                <td className="num">{fmtMoney(p.fairValue)}</td><td className="num">{p.yield}%</td><td className="num">{p.score}</td>
+                <td className="num">{fmtMoney(p.fairValue)}</td><td className="num">{p.yield}%</td><td className="num">{p.payback} il</td>
               </tr>
             ))}
           </tbody>

@@ -213,7 +213,7 @@ export function ValuationSingleView({ lang = "az", onNavigate }: { lang?: Lang; 
             <SingleStat k={T(`Qiymətləndirilmiş`)} v={String(stats.n)} />
             <SingleStat k={T(`Orta fair value`)} v={fmtMoney(Math.round(stats.totalValue / stats.n))} accent />
             <SingleStat k={T(`Orta gəlirlilik`)} v={`${stats.avgYield}%`} />
-            <SingleStat k={T(`Orta skor`)} v={`${stats.avgScore}/100`} last />
+            <SingleStat k={T(`Orta geri ödəmə`)} v={`${stats.avgPayback} il`} last />
           </div>
         )}
 
