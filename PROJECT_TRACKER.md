@@ -97,6 +97,13 @@
 - **Tarih formatı Azerbaycan standardına çevrildi:** `06.08.2026` / `08.2026` / eksende `08.26`. Tek modül (`lib/format-date.ts`) yönetiyor; API hâlâ ISO konuşuyor
 - Bazar analizi'nde "ən sürətli" ve "ən yavaş artan" listeleri aynı rayonları gösteriyordu (10'dan az rayon eşiği geçince dilimler çakışıyordu) → ayrıldı
 
+**Rapor tasarımı — ekibin paketiyle birebir (B2 bitti)**
+- Ekibin export'undaki inline stiller tek bir stil dosyasına çevrildi (`valuation-report.css`), yalnız `.rate-report` kapsamında — başka hiçbir ekran etkilenmiyor, işlev değişmedi
+- Poppins fontu eklendi (sadece rapor kullanıyor)
+- Ölçülerek doğrulandı (tarayıcıda hesaplanmış CSS ile ekibin kaynağı karşılaştırıldı): başlık 24/700 `#1A2C32` · değer 24/600 `#BC3701` · aralık 20/500 `#506379` · özellik 14 `#9CA3AF` / 16-500 `#1F2937` · sərmayə paneli 8px radius, 20px padding, `#ECEFF2` kenar, 40×40 daire ikon · mənbə 20-400 `#325158`, link 18-500 `#055EFF` · qrafik başlık 15-500, alt 14 `#3B757F` · disclaimer 13/20 ortalı `#657B92` · modal 1200px — **hepsi tam eşleşti**
+- Qrafik renkleri ekibinkiyle aynı: satış `#008080`, kirayə `#FF5C00`
+- Rapor her iki temada açık renkte kalıyor (onlarınki de öyle; aynı yüzey PDF'e basılıyor)
+
 **Canlı doğrulama (2026-08-06, yerel Docker)**
 - **B8 toplu değerleme testi GEÇTİ:** 2 mənzillik iş başlatıldı, istemci tamamen koparıldı, iş sunucuda döndü ve 2/2 tamamlandı. Sonuçlar gerçek (362 011 ₼ / 173 540 ₼, rayonlar koordinattan çözülmüş)
 - **B2 alanı doğrulandı:** `neighbourhood_price_500m` predict cevabında **gerçekten var** (3 286 / 2 614) → rapordaki "500m radiusda orta qiymət" artık gerçek sayı gösteriyor
