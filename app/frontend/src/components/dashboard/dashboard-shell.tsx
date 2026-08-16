@@ -58,6 +58,19 @@ import type {
 // Remembers whether the nav rail is collapsed, across reloads.
 const RAIL_KEY = "homora-rail-collapsed";
 
+// Chosen interface language, kept across navigations.
+const LANG_KEY = "homora-lang";
+const LANGS: Lang[] = ["az", "en"];
+
+function readLang(): Lang | null {
+  try {
+    const v = window.localStorage.getItem(LANG_KEY) as Lang | null;
+    return v && LANGS.includes(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 const MONTH_LABELS_AZ = ["May","Iyn","Iyl","Avq","Sen","Okt","Noy","Dek","Yan","Fev","Mar","Apr"];
 const MONTH_LABELS_EN = ["May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr"];
 
@@ -92,7 +105,23 @@ export function DashboardShell({
 }: {
   initialView?: DashboardView;
 } = {}) {
-  const [lang, setLang] = useState<Lang>("az");
+  // Each screen has its own URL, so switching tabs is a real navigation and
+  // this component remounts — which reset the language to the default on every
+  // tab change, undoing whatever the user had picked. The choice now outlives
+  // the remount.
+  const [lang, setLangState] = useState<Lang>("az");
+  useEffect(() => {
+    const saved = readLang();
+    if (saved) setLangState(saved);
+  }, []);
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
+    try {
+      window.localStorage.setItem(LANG_KEY, next);
+    } catch {
+      /* private mode — the choice just won't survive the next navigation */
+    }
+  }, []);
   const t = useStrings(lang);
   const router = useRouter();
 

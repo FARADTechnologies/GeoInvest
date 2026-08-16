@@ -96,7 +96,16 @@ export function MapPanel({ data, loading, error, t, metric }: Props) {
           Map data unavailable
         </div>
       ) : (
-        <DeckH3Map data={data} colorMetric={colorMetric} />
+        <DeckH3Map
+            data={data}
+            colorMetric={colorMetric}
+            labels={{
+              ads: t.tipAds ?? "Elan sayı",
+              price: t.tipPrice ?? "Qiymət",
+              unit: t.tipUnit ?? "₼/m²",
+              locale: t.locale ?? "az-AZ"
+            }}
+          />
       )}
     </div>
   );

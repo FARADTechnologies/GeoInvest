@@ -107,3 +107,13 @@ export async function fetchMapData(filters: DashboardFilters, minAdsPerCell: num
   }
   return rows;
 }
+
+
+// Rayon boundaries — used to name the rayon an H3 cell sits in
+// (lib/rayon-lookup). These come from the source DB's type_id 22 rows, the same
+// ones the nightly job joins against. Note /boundaries is a different set: that
+// file holds settlements (qəsəbələr), which would name "Mərdəkan qəsəbəsi"
+// where the map wants "Xəzər rayonu". Boundaries never move, so cache freely.
+export function fetchRayonPolygons() {
+  return apiGet<{ features: import("@/lib/rayon-lookup").BoundaryFeature[] }>("/model/rayon-polygons");
+}

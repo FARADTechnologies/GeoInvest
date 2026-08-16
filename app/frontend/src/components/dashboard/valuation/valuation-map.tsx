@@ -5,13 +5,14 @@
 // replaced by our real deck.gl map (MapPanel) fed from /map-data.
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import "@/components/dashboard/valuation/valuation-orange.css";
 import { setValLang, T } from "@/components/dashboard/valuation/valuation-i18n";
 import { Icons, LineChart, Pill, fmtMoney, fmtNumber } from "@/components/dashboard/valuation/valuation-ui";
 import { MapPanel } from "@/components/map/map-panel";
-import { fetchFilters, fetchMapData } from "@/lib/api";
+import { fetchFilters, fetchMapData, fetchRayonPolygons } from "@/lib/api";
+import { rayonForCell, setRayonBoundaries } from "@/lib/rayon-lookup";
 import { fetchMarketTrends } from "@/lib/market-api";
 import { formatMonth, formatMonthShort } from "@/lib/format-date";
 import { useStrings, type Lang } from "@/lib/i18n";
@@ -89,6 +90,19 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
   const [agg, setAgg] = useState("mean");
   const [category, setCategory] = useState("all");
 
+  // Rayon polygons for the hover card. The pure-hex aggregation has no rayon
+  // to report, so the cell's own centre is matched against these instead.
+  const boundariesQuery = useQuery({
+    queryKey: ["rayon-polygons"],
+    queryFn: fetchRayonPolygons,
+    staleTime: Infinity
+  });
+  useEffect(() => {
+    if (boundariesQuery.data?.features?.length) {
+      setRayonBoundaries(boundariesQuery.data.features);
+    }
+  }, [boundariesQuery.data]);
+
   const filtersQuery = useQuery({ queryKey: ["filters"], queryFn: fetchFilters });
   const catalog = filtersQuery.data;
   const periods = catalog?.periods ?? [];
@@ -119,15 +133,21 @@ export function ValuationMapView({ lang = "az" }: { lang?: Lang }) {
     const prices = data.map((d) => d.median_price_kvm).filter((v) => v > 0);
     const counts = data.map((d) => d.ad_count);
     const a = agg === "median" ? median : mean;
+    // Every pure-hex row is stamped "GLOBAL", which counted as one rayon for
+    // the whole city. Fall back to the cell's own centre so the tile reports
+    // how many rayons the visible cells actually cover.
     const rayons = new Set<string>();
-    data.forEach((d) => (d.rayon_name || "").split(", ").forEach((r) => r && rayons.add(r)));
+    data.forEach((d) => {
+      const name = d.rayon_name && d.rayon_name !== "GLOBAL" ? d.rayon_name : rayonForCell(d.h3_index);
+      (name || "").split(", ").forEach((r) => r && rayons.add(r));
+    });
     return {
       totalListings: counts.reduce((s, x) => s + x, 0),
       ppm: Math.round(a(prices)),
       cells: data.length,
       rayons: rayons.size
     };
-  }, [data, agg]);
+  }, [data, agg, boundariesQuery.data]);
 
   const aggLabel = agg === "median" ? T(`Median`) : T(`Orta`);
   const meta = METRICS[metric];

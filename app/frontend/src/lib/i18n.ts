@@ -155,6 +155,10 @@ const EN: Strings = {
   navAlerts: "Alerts",
   navSettings: "Settings",
   navAccount: "Account",
+  tipAds: "Listings",
+  tipPrice: "Price",
+  tipUnit: "AZN/m²",
+  locale: "en-US",
   sidebarCollapse: "Collapse sidebar",
   sidebarExpand: "Expand sidebar",
 
@@ -447,6 +451,10 @@ const AZ: Strings = {
   navAdmin: "Admin / Şirkətlər",
   navSettings: "Ayarlar",
   navAccount: "Hesab",
+  tipAds: "Elan sayı",
+  tipPrice: "Qiymət",
+  tipUnit: "₼/m²",
+  locale: "az-AZ",
   sidebarCollapse: "Yan paneli bağla",
   sidebarExpand: "Yan paneli aç",
 
