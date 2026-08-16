@@ -18,6 +18,7 @@ from app.services.predict import (
     nearby_objects,
     predict_by_link,
     resolve_rayon,
+    rayon_polygons,
 )
 
 router = APIRouter()
@@ -110,6 +111,16 @@ async def model_market_rayons() -> dict:
     analizi yield bars and fastest/slowest growing lists (team #3g / #3j)."""
     try:
         return await market_rayons()
+    except PredictError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+
+@router.get("/model/rayon-polygons")
+async def model_rayon_polygons() -> dict:
+    """Baku rayon boundaries as GeoJSON, so the map can name the rayon a cell
+    falls in. Same rows the nightly job joins against, so the two agree."""
+    try:
+        return await rayon_polygons()
     except PredictError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.message) from exc
 

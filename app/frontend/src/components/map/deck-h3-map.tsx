@@ -2,6 +2,7 @@
 
 import DeckGL from "@deck.gl/react";
 import { H3HexagonLayer } from "@deck.gl/geo-layers";
+import { rayonForCell } from "@/lib/rayon-lookup";
 import Map from "react-map-gl/maplibre";
 
 import { useTheme } from "@/components/theme-provider";
@@ -51,21 +52,31 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#039;");
 }
 
-function buildTooltip(object: MapDataPoint, colorMetric: ColorMetric) {
+type TooltipLabels = { ads: string; price: string; unit: string; locale: string };
+
+function buildTooltip(object: MapDataPoint, colorMetric: ColorMetric, labels: TooltipLabels) {
   const highlightPrice = colorMetric === "median_price_kvm";
   const highlightAds = colorMetric === "ad_count";
 
+  // "GLOBAL" is what the pure-hex aggregation stamps on every row because it
+  // has no rayon to attach. Resolve it here from the cell's own centre so the
+  // tooltip names the place you are pointing at.
+  const heading =
+    object.rayon_name && object.rayon_name !== "GLOBAL"
+      ? object.rayon_name
+      : rayonForCell(object.h3_index) ?? object.rayon_name;
+
   return `
     <div style="min-width: 190px">
-      <div style="font-weight: 700; color: #1cc999; margin-bottom: 4px">${escapeHtml(object.rayon_name)}</div>
+      <div style="font-weight: 700; color: #1cc999; margin-bottom: 4px">${escapeHtml(heading)}</div>
       <div style="color: #a8b3c7; margin-bottom: 8px">${escapeHtml(object.category)}</div>
       <div style="display: flex; justify-content: space-between; gap: 12px; ${highlightAds ? "color: #fff; font-weight: 600;" : ""}">
-        <span>Ads</span>
-        <strong>${object.ad_count.toLocaleString("en-US")}</strong>
+        <span>${escapeHtml(labels.ads)}</span>
+        <strong>${object.ad_count.toLocaleString(labels.locale)}</strong>
       </div>
       <div style="display: flex; justify-content: space-between; gap: 12px; ${highlightPrice ? "color: #fff; font-weight: 600;" : ""}">
-        <span>Price</span>
-        <strong>${Math.round(object.median_price_kvm).toLocaleString("en-US")} AZN/m²</strong>
+        <span>${escapeHtml(labels.price)}</span>
+        <strong>${Math.round(object.median_price_kvm).toLocaleString(labels.locale)} ${escapeHtml(labels.unit)}</strong>
       </div>
     </div>
   `;
@@ -74,9 +85,18 @@ function buildTooltip(object: MapDataPoint, colorMetric: ColorMetric) {
 type Props = {
   data: MapDataPoint[];
   colorMetric: ColorMetric;
+  /** Tooltip copy, so the hover card speaks the interface language. */
+  labels?: TooltipLabels;
 };
 
-export function DeckH3Map({ data, colorMetric }: Props) {
+const DEFAULT_LABELS: TooltipLabels = {
+  ads: "Elan sayı",
+  price: "Qiymət",
+  unit: "₼/m²",
+  locale: "az-AZ"
+};
+
+export function DeckH3Map({ data, colorMetric, labels = DEFAULT_LABELS }: Props) {
   const { theme } = useTheme();
   const mapStyle = theme === "dark" ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
   const values = data.map((item) => item[colorMetric]);
@@ -110,7 +130,7 @@ export function DeckH3Map({ data, colorMetric }: Props) {
       getTooltip={({ object }) =>
         object
           ? {
-              html: buildTooltip(object as MapDataPoint, colorMetric),
+              html: buildTooltip(object as MapDataPoint, colorMetric, labels),
               style: {
                 backgroundColor: "rgba(16, 22, 31, 0.96)",
                 border: "1px solid rgba(255,255,255,0.12)",

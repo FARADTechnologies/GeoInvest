@@ -286,6 +286,56 @@ def _query_rayon(conn_str: str, lat: float, lon: float) -> str | None:
             return row[0] if row else None
 
 
+def _query_rayon_polygons(conn_str: str) -> list[tuple]:
+    """(name, GeoJSON geometry) for each Baku rayon boundary."""
+    with psycopg.connect(
+        conn_str, connect_timeout=15, options="-c statement_timeout=30000"
+    ) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT o.name, ST_AsGeoJSON(o.geom) "
+                "FROM index_app_object o "
+                "WHERE o.type_id = 22 AND o.geom IS NOT NULL "
+                "ORDER BY o.name"
+            )
+            return cur.fetchall()
+
+
+async def _rayon_polygons_uncached() -> dict:
+    """Rayon boundaries as GeoJSON, for the map's hover card.
+
+    The map aggregates purely by hexagon, so its rows carry no rayon and the
+    tooltip could only say "GLOBAL". Handing the polygons to the client lets it
+    name the rayon a cell's centre falls in — from the same `index_app_object`
+    rows (type_id 22) the nightly job joins against, so the two agree.
+    """
+    if not settings.source_database_url:
+        raise PredictError(503, "Rayon sərhədləri konfiqurasiya olunmayıb.")
+    conn_str = settings.source_database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    )
+    try:
+        rows = await asyncio.to_thread(_query_rayon_polygons, conn_str)
+    except psycopg.Error as exc:
+        raise PredictError(502, "Rayon sərhədləri alınmadı.") from exc
+
+    features = []
+    for name, geojson in rows:
+        if not name or not geojson:
+            continue
+        try:
+            geometry = json.loads(geojson)
+        except (TypeError, ValueError):
+            continue
+        features.append({"properties": {"name": name}, "geometry": geometry})
+    return {"features": features}
+
+
+async def rayon_polygons() -> dict:
+    # Boundaries do not move; one fetch per rebuild cycle is plenty.
+    return await cached_market("rayon-polygons", _rayon_polygons_uncached)
+
+
 async def resolve_rayon(lat: float | None, lon: float | None) -> str | None:
     """Baku rayon name for a coordinate, or None. Never raises (best-effort)."""
     if not settings.source_database_url or lat is None or lon is None:
