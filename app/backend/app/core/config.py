@@ -36,6 +36,34 @@ class Settings(BaseSettings):
         default=PROJECT_ROOT / "data" / "baku_districts.json"
     )
     cache_ttl_seconds: int = 120
+    source_database_url: str = ""  # Ana DB — postgresql://user:pass@host:port/dbname
+
+    # Predict server (team) — used by the backend proxy so the secret never
+    # reaches the browser. Left empty until the .env supplies them; routes
+    # return a clear "not configured" error in that case.
+    predict_url: str = ""
+    predict_client_id: str = ""
+    predict_client_secret: str = ""
+    predict_timeout_seconds: float = 120.0
+
+    # Email (Resend) + OTP auth. Secrets live in the gitignored .env only.
+    resend_api_key: str = ""
+    default_from_email: str = "hello@updates.homora.ai"
+    # Where account requests are sent. Kept as a role address, never a personal
+    # one — this file is committed, and a private inbox does not belong in it.
+    # Override with ACCOUNT_REQUEST_EMAIL to route them somewhere else.
+    account_request_email: str = "office@homora.ai"
+    # Seed a first admin so the OTP login has a user to check against.
+    seed_admin_email: str = "admin@homora.ai"
+    seed_admin_password: str = "12345"
+    # Signs session tokens. Leave unset outside production and a value derived
+    # from the DB URL is used, which stays stable across restarts.
+    secret_key: str = ""
+
+    # Dev-only: let the seed admin sign in without the OTP step so the team can
+    # reach the app while email/OTP delivery is still being provisioned. MUST be
+    # turned off in production by setting DEV_LOGIN_BYPASS=false.
+    dev_login_bypass: bool = True
 
     @property
     def allowed_origins_list(self) -> list[str]:

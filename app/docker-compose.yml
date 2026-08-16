@@ -50,6 +50,11 @@ services:
       - "8000:8000"
     volumes:
       - ../data:/data:ro
+      # Secrets (predict client id/secret, source DB url) are read by pydantic
+      # from this gitignored file at /app/.env. Mounted (not env_file) so Docker
+      # Compose never interpolates the "$" in the pbkdf2 secret. Override via
+      # the `environment:` block above still wins (e.g. DATABASE_URL).
+      - ./backend/.env:/app/.env:ro
     depends_on:
       db:
         condition: service_healthy
@@ -63,6 +68,9 @@ services:
     environment:
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
       NEXT_PUBLIC_API_PREFIX: /api/v1
+      # Google Maps key (team #1/#2). Value comes from the gitignored app/.env
+      # (GOOGLE_MAPS_API_KEY); blank if unset → form degrades to plain input.
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     ports:
       - "3000:3000"
     depends_on:

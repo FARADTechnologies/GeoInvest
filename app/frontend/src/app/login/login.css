@@ -1,0 +1,338 @@
+/* Homora.ai — auth/login styles. Scoped under .hm-root so they don't
+   leak into the dashboard. Imported only from app/login/page.tsx and
+   app/forgot-password/page.tsx. */
+
+.hm-root,
+.hm-root *,
+.hm-root *::before,
+.hm-root *::after {
+  box-sizing: border-box;
+}
+
+.hm-root {
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+.hm-root button {
+  font-family: inherit;
+}
+
+.hm-root input {
+  font-family: inherit;
+}
+
+/* ── Login-only token overrides ────────────────────────────────────
+   The dashboard's globals.css already defines --brand-* and most --ink-*.
+   Here we layer the login-specific surface/shadow tokens that the auth
+   styles below rely on. */
+.hm-root {
+  --surface-sunken: #faf9fd;
+  --sh-glass:
+    0 32px 80px -16px rgba(76, 29, 149, 0.35),
+    0 8px 24px -4px rgba(76, 29, 149, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --r-md: 12px;
+  --r-lg: 16px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hm-root[data-theme="dark"] {
+  --surface-sunken: #0e0b1f;
+}
+
+/* ── Field ───────────────────────────────────────────────────────── */
+.hm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hm-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-700);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.hm-label-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brand-600);
+  text-decoration: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.hm-label-hint:hover {
+  text-decoration: underline;
+}
+
+.hm-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--surface-line, hsl(var(--border)));
+  border-radius: var(--r-md);
+  transition:
+    border-color 0.18s var(--ease-out),
+    box-shadow 0.18s var(--ease-out),
+    background 0.18s;
+}
+.hm-input-wrap:hover {
+  border-color: var(--ink-300);
+}
+.hm-input-wrap:focus-within {
+  border-color: var(--brand-600);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand-500) 16%, transparent);
+}
+.hm-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 14.5px;
+  font-weight: 450;
+  color: var(--ink-900);
+  letter-spacing: -0.005em;
+}
+.hm-input::placeholder {
+  color: var(--ink-400);
+  font-weight: 400;
+}
+.hm-input-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 12px;
+  color: var(--ink-400);
+}
+.hm-input-icon + .hm-input {
+  padding-left: 10px;
+}
+.hm-input-suffix {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--ink-500);
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border: 0;
+}
+.hm-input-suffix:hover {
+  color: var(--ink-700);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.hm-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14.5px;
+  letter-spacing: -0.005em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 18px;
+  border-radius: var(--r-md);
+  transition:
+    transform 0.12s var(--ease-out),
+    background 0.15s,
+    box-shadow 0.15s,
+    color 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+.hm-btn:active {
+  transform: translateY(1px) scale(0.998);
+}
+.hm-btn-primary {
+  background: var(--brand-600);
+  color: #fff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.15) inset,
+    0 8px 24px -6px color-mix(in oklab, var(--brand-600) 70%, transparent),
+    0 1px 2px rgba(14, 11, 31, 0.12);
+}
+.hm-btn-primary:hover:not(:disabled) {
+  background: var(--brand-700);
+}
+.hm-btn-primary:disabled {
+  background: var(--ink-300);
+  color: var(--ink-500);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.hm-btn-ghost {
+  background: var(--surface);
+  color: var(--ink-800);
+  border: 1px solid var(--surface-line, hsl(var(--border)));
+}
+.hm-btn-ghost:hover {
+  background: var(--ink-50);
+  border-color: var(--ink-300);
+}
+
+/* ── Divider, SSO, Check, Tabs, OTP ──────────────────────────────── */
+.hm-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-400);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.hm-divider::before,
+.hm-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--surface-line, hsl(var(--border)));
+}
+
+.hm-sso-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--surface-line, hsl(var(--border)));
+  border-radius: var(--r-md);
+  padding: 11px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-800);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-family: inherit;
+}
+.hm-sso-btn:hover {
+  border-color: var(--ink-300);
+  background: var(--ink-50);
+}
+
+.hm-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--ink-700);
+  user-select: none;
+  position: relative;
+}
+.hm-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.hm-check-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--ink-300);
+  background: var(--surface);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hm-check input:checked + .hm-check-box {
+  background: var(--brand-600);
+  border-color: var(--brand-600);
+}
+.hm-check input:checked + .hm-check-box svg {
+  opacity: 1;
+}
+.hm-check-box svg {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.hm-tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--ink-100);
+  border-radius: 10px;
+  gap: 2px;
+}
+.hm-tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--ink-500);
+  padding: 8px 16px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.hm-tab[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink-900);
+  box-shadow: var(--sh-1);
+}
+
+.hm-otp {
+  display: flex;
+  gap: 10px;
+}
+.hm-otp-cell {
+  width: 48px;
+  height: 56px;
+  flex: 1;
+  text-align: center;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--surface-line, hsl(var(--border)));
+  border-radius: var(--r-md);
+  color: var(--ink-900);
+  letter-spacing: 0;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  outline: 0;
+}
+.hm-otp-cell:focus {
+  border-color: var(--brand-600);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand-500) 16%, transparent);
+}
+.hm-otp-cell[data-filled="true"] {
+  background: var(--brand-50);
+  border-color: var(--brand-300);
+  color: var(--brand-800);
+}
+
+@keyframes hm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hm-fade {
+  animation: hm-fade-up 0.32s var(--ease-out) both;
+}

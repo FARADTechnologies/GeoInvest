@@ -4,6 +4,7 @@ import DeckGL from "@deck.gl/react";
 import { H3HexagonLayer } from "@deck.gl/geo-layers";
 import Map from "react-map-gl/maplibre";
 
+import { useTheme } from "@/components/theme-provider";
 import type { MapDataPoint } from "@/types/api";
 
 export type ColorMetric = "median_price_kvm" | "ad_count";
@@ -16,7 +17,9 @@ const INITIAL_VIEW_STATE = {
   bearing: 0
 };
 
-const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+// Base map follows the app theme: dark tiles in dark mode, light in light mode.
+const MAP_STYLE_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const MAP_STYLE_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 
 function interpolate(a: number, b: number, t: number) {
   return Math.round(a + (b - a) * t);
@@ -74,6 +77,8 @@ type Props = {
 };
 
 export function DeckH3Map({ data, colorMetric }: Props) {
+  const { theme } = useTheme();
+  const mapStyle = theme === "dark" ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
   const values = data.map((item) => item[colorMetric]);
   const minVal = values.length > 0 ? Math.min(...values) : 0;
   const maxVal = values.length > 0 ? Math.max(...values) : 1;
@@ -118,7 +123,7 @@ export function DeckH3Map({ data, colorMetric }: Props) {
           : null
       }
     >
-      <Map reuseMaps mapStyle={MAP_STYLE} />
+      <Map reuseMaps mapStyle={mapStyle} />
     </DeckGL>
   );
 }
